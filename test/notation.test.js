@@ -66,6 +66,28 @@ test("the course's way of writing a session", () => {
   assert.deepEqual(parsePlan("20' R1-R2"), { R1: { sec: 1200, m: 0 } });
 });
 
+test("the course's model sessions read as sessions of their zone", () => {
+  const models = {
+    'R2': ["R2 3×(4'-6'-6'-4'/1')/3'", "R2 2×(6'-8'-8'-6'/1')/3'", "R2 3×(8'-6'-4'/1')/3'", "R2 2×(4×5'/1')/3'"],
+    'R3': ["R3 4×(3×2'/30'')/6'", "R3 6×(2'-1'30''-1'/30'')/4'30''", "R3 5×(1'-2'-2'-1'/30'')/6'"],
+    'R3+': ["R3+ 4×(6×30''/30'')/8'", "R3+ 5×(4×45''/45'')/8'", "R3+ 4×(500-300/200)/12'"],
+    'R4': ["R4 5×(3×150/100)/6'", "R4 5×(250-200/100)/8'", "R4 3×(3×200/100)/10' + R4 3×(3×150/100)/10'"],
+    'R5': ["R5 4×(3×10''/30'')/4'", "4×50m R5/4' + 4×100m R5/5'"],
+    'R6': ["R6 3×(3×50/3')/6'"]
+  };
+  for (const zone of Object.keys(models)) {
+    for (const text of models[zone]) {
+      const r = infer('5km R1 + ' + text, tables, 'any');
+      assert.equal(r.main, zone, text);
+      assert.equal(r.unzoned, null, text);
+    }
+  }
+  // the course counts the first R2 session as 60' of work and the first R3+ one as 12'
+  const part = (text, zone) => Math.round(infer(text, tables, 'any').parts.find(p => p.zone === zone).min);
+  assert.equal(part(models.R2[0], 'R2'), 60);
+  assert.equal(part(models['R3+'][0], 'R3+'), 12);
+});
+
 test('each effort is kept: its repetitions, its rest, and what comes before it', () => {
   const p = readPlan("2km R1 + 6x 3' R3/3' R1 + R6 2x(3x 50/3')/6'", []).pieces;
   assert.deepEqual(p.map(x => x.text), ['2km R1', "3' R3", "3' R1", '50', "3'", "6'"]);

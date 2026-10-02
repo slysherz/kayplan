@@ -17,7 +17,7 @@ function texts() {
     const src = fs.readFileSync(new URL(f, dir), 'utf8');
     for (const m of src.matchAll(/\btr\(\s*('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")/g)) found.add(new Function('return ' + m[1])());
   }
-  for (const z of Object.values(ZINFO)) for (const [k, v] of Object.entries(z)) { if (k !== 'recovery' && k !== 'models') for (const x of [].concat(v)) found.add(x); }
+  for (const z of Object.values(ZINFO)) for (const [k, v] of Object.entries(z)) { if (k !== 'recovery') for (const x of [].concat(v)) found.add(x); }
   for (const x of [...MONTHS, ...DAYS]) found.add(x);
   return found;
 }
@@ -55,13 +55,12 @@ test('the language in use decides the words and the decimal mark', () => {
     assert.equal(cycles.splitMacro(plan, 0, 6, 0).macros[1].name, 'Novo macrociclo');
     const card = zoneCard('R4', parseTables(TABLES).value, 'younger');
     assert.equal(card.name, 'Capacidade láctica (tolerância)');
-    assert.deepEqual(card.rows.map(r => r[0]), ['Intensidade', 'Como treinar', 'Sessões-modelo', 'Por semana', 'Na sessão', 'Na época', 'Desenvolve-se', 'Perde-se', 'Com travão', 'Escalões', 'Km por ano']);
+    assert.deepEqual(card.rows.map(r => r[0]), ['Intensidade', 'Como treinar', 'Por semana', 'Na sessão', 'Na época', 'Desenvolve-se', 'Perde-se', 'Com travão', 'Escalões']);
     const row = label => card.rows.find(r => r[0] === label)[1];
     assert.equal(row('Por semana'), 'Desenvolver: 2–4 sessões. Manter: 1. Contado em conjunto com R5. Recuperação depois de uma sessão: 48–72 h.');
     assert.match(row('Escalões'), /Não sugerido para younger\.$/);
-    assert.equal(row('Km por ano'), 'Senior 8–35,2');
-    // the model sessions are notation: the same in every language
-    assert.deepEqual(row('Sessões-modelo'), ZINFO.R4.models);
+    assert.equal(row('Perde-se'), 'Cerca de 18 ± 4 dias sem treino.');
+    assert.equal(zoneCard('R4', parseTables(TABLES + 'zone-km older  R4 35.2\n').value, 'older').rows.pop()[1], 'older 35,2');
     setLang('xx');
     assert.equal(getLang(), 'en');
   } finally { setLang('en'); }

@@ -141,7 +141,7 @@ export function gridReport(data, planId, band, today) {
 export function zoneReport(zone, tables) {
   const c = zoneCard(zone, tables);
   if (!c) return null;
-  return [c.zone + ' · ' + c.name, c.what, ...c.rows.map(([label, v]) => label + ':' + (Array.isArray(v) ? v.map(x => '\n  - ' + x).join('') : ' ' + v)), c.source].join('\n');
+  return [c.zone + ' · ' + c.name, c.what, ...c.rows.map(([label, v]) => label + ':' + (Array.isArray(v) ? v.map(x => '\n  - ' + x).join('') : ' ' + v))].join('\n');
 }
 
 // the races and events table, for every plan

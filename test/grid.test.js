@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import * as e from '../src/engine.js';
 import { gridView, contents, stateOf } from '../src/grid.js';
 import { zoneCard, ZINFO } from '../src/zones.js';
-import { infer } from '../src/notation.js';
 import { gridReport, zoneReport } from '../src/report.js';
 import { parseTables, serializeTables } from '../src/format.js';
 import { memoryStore, fixture, TABLES } from './helpers.js';
@@ -131,19 +130,19 @@ D developing, M maintaining, b below maintenance, by the course's sessions a wee
        season               0 7  1 6   0 0  0 0  0 0  0 0  1 <1   0 0`);
 });
 
-test("zone cards: every model session reads as a session of its zone", () => {
+test('zone cards: km a year, and nothing about where the text comes from', () => {
+  // km a year are the grid's own figures, from the zone-km lines; with none there is no such row
+  assert.equal(zoneCard('R6', tables).rows.find(r => r[0] === 'Km a year'), undefined);
+  const withKm = parseTables(TABLES + 'zone-km younger  R1 267  R6 7.2\nzone-km older  R1 840  R2 515  R6 21\n').value;
+  assert.equal(zoneCard('R6', withKm).rows.find(r => r[0] === 'Km a year')[1], 'younger 7.2, older 21');
+  assert.equal(zoneCard('R2', withKm).rows.find(r => r[0] === 'Km a year')[1], 'older 515');
+  // a card says each thing once, and not where it comes from
   for (const zone of Object.keys(ZINFO)) {
-    for (const text of ZINFO[zone].models || []) {
-      const r = infer('5km R1 + ' + text, tables, 'any');
-      assert.equal(r.main, zone, text);
-      assert.equal(r.unzoned, null, text);
-    }
+    const card = zoneCard(zone, withKm, 'older'), all = JSON.stringify(card);
+    assert.doesNotMatch(all, /slide|course|Kayplan|Grau/i, zone);
+    assert.equal(card.source, undefined);
+    assert.equal(card.rows.find(r => r[0] === 'Intensity')[1].length <= 3, true);
   }
-  // the course counts this R2 session as 60' of work and this R3+ one as 12'
-  const part = (text, zone) => Math.round(infer(text, tables, 'any').parts.find(p => p.zone === zone).min);
-  assert.equal(part(ZINFO.R2.models[0], 'R2'), 60);
-  assert.equal(part(ZINFO['R3+'].models[0], 'R3+'), 12);
-  assert.equal(zoneCard('R6', tables).rows.find(r => r[0] === 'Km a year')[1], 'Iniciado 7.2, Infantil 11.5, Cadete 21, Junior 9.6, Senior 9–10.2');
 });
 
 test("the course's km a year in each zone stand at the end of the rows", async () => {

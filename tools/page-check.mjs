@@ -103,7 +103,8 @@ try {
   assert.equal(await ff.js('return document.getElementById("tip").hidden'), true);
   await ff.click('.zlab[data-tip="R2"]');
   await ff.hover('.tab');
-  assert.match(await text('#tip'), /R2 · Aerobic glycolytic[^]*Model sessions[^]*R2 3×\(4'-6'-6'-4'\/1'\)\/3'[^]*In a session[^]*In the season[^]*Resisted[^]*Km a year[^]*Infantil 267, Cadete 415–455/);
+  assert.match(await text('#tip'), /R2 · Aerobic glycolytic[^]*How to train[^]*Per week[^]*In a session[^]*In the season[^]*Resisted[^]*Km a year[^]*junior 961/);
+  assert.doesNotMatch(await text('#tip'), /slide|course|Model sessions/i);
   assert.equal(await ff.js('const t = document.getElementById("tip"); return !t.hidden && t.classList.contains("pinned") && t.getBoundingClientRect().bottom <= window.innerHeight'), true);
   await shot('01-zone-card-open');
   await ff.keys(ff.ESCAPE);

@@ -564,8 +564,8 @@ function showTip(el) {
   const card = data ? zoneCard(el.dataset.tip, data.tables, state.band) : null;
   if (!card) return;
   tipEl.innerHTML = '<h4><i style="background:' + Z[card.zone].bg + '"></i>' + card.zone + ' · ' + esc(card.name) + '</h4><p>' + esc(card.what) + '</p><dl>' +
-    card.rows.map(([label, v, kind]) => '<dt>' + esc(label) + '</dt><dd' + (kind ? ' class="mono"' : '') + '>' + (Array.isArray(v) ? '<ul>' + v.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul>' : esc(v)) + '</dd>').join('') +
-    '</dl><div class="src">' + esc(card.source) + '</div>';
+    card.rows.map(([label, v]) => '<dt>' + esc(label) + '</dt><dd>' + (Array.isArray(v) ? '<ul>' + v.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul>' : esc(v)) + '</dd>').join('') +
+    '</dl>';
   tipEl.hidden = false;
   const r = el.getBoundingClientRect();
   tipEl.style.left = (r.right + 8) + 'px';
