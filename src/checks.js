@@ -2,7 +2,7 @@
 // Each check compares what is written with a line of tables.txt, and is off when that line is missing.
 // The texts are what the coach reads, in the language in use. Nothing here stops an edit.
 
-import { ZONES, minutesOf, minutesText, durationText } from './notation.js';
+import { ZONES, minutesOf, minutesText } from './notation.js';
 import { sheet, sessionView, eventsFor, weekOf } from './engine.js';
 import { sessionKey, sortSessions } from './format.js';
 import { addDays, daysBetween, weekday, DAYS } from './dates.js';
@@ -16,6 +16,12 @@ const ORDER = { R5: 0, R6: 0, R3: 1, 'R3+': 1, R4: 1, R2: 2, R1: 2 };
 function hoursOf(tables, zone) {
   const key = Object.keys(tables.recovery).find(k => k.split('-').includes(zone));
   return key ? tables.recovery[key] : 0;
+}
+
+// a time as the coach writes it: 60', 1'30'', 45''
+function short(sec) {
+  const s = Math.round(sec), m = Math.floor(s / 60), r = s % 60;
+  return (m ? m + "'" : '') + (r || !m ? r + "''" : '');
 }
 
 // a session that needs two days before the next one like it (48 h or more)
@@ -40,7 +46,7 @@ export function sessionChecks(s, tables) {
   const allowed = tables.zones[band];
   if (allowed) {
     const odd = ZONES.filter(z => z !== 'R0' && !allowed.includes(z) && reps.some(r => r.zone === z));
-    if (odd.length) out.push(tr('{0}: not a zone the course gives {1}', odd.join(', '), band));
+    if (odd.length) out.push(tr('{0}: not recommended for {1}', odd.join(', '), band));
   }
 
   // the order of contents; R1 at the start is the warm-up
@@ -48,7 +54,7 @@ export function sessionChecks(s, tables) {
   let k = 0, late = null;
   while (k < seq.length && seq[k] === 'R1') k++;
   for (const z of seq.slice(k)) {
-    if (late && ORDER[z] < ORDER[late]) { out.push(tr("{0} is written after {1}; the course's order is R5 and R6 first, then R3, R3+ and R4, then R2 and R1", z, late)); break; }
+    if (late && ORDER[z] < ORDER[late]) { out.push(tr('{0} after {1}: the recommended order is R5 and R6, then R3, R3+ and R4, then R2 and R1', z, late)); break; }
     if (!late || ORDER[z] > ORDER[late]) late = z;
   }
 
@@ -56,7 +62,9 @@ export function sessionChecks(s, tables) {
   for (const z of Object.keys(tables.rep)) {
     const [lo, hi] = tables.rep[z];
     const bad = reps.map(r => mins(r, z) * 60).find((sec, i) => reps[i].zone === z && sec > 0 && (sec < lo - 0.5 || sec > hi + 0.5));
-    if (bad !== undefined) out.push(tr('{0}: a repetition of {1}; the course gives {2} to {3}', z, durationText(bad), durationText(lo), durationText(hi)));
+    if (bad !== undefined) out.push(bad > hi
+      ? tr('{0}: {1} exceeds the recommended maximum of {2} to {3}', z, short(bad), short(lo), short(hi))
+      : tr('{0}: {1} is below the recommended minimum of {2} to {3}', z, short(bad), short(lo), short(hi)));
   }
 
   // the rest after a repetition (the rest table). Inside brackets the short rests belong to the
@@ -71,15 +79,15 @@ export function sessionChecks(s, tables) {
     if (r < need - 1 / 120) {
       told.add(p.zone);
       out.push(rule.sec
-        ? tr('{0}: {1} of rest after a repetition; the course gives {2} or more', p.zone, durationText(r * 60), durationText(rule.sec))
-        : tr('{0}: {1} of rest after {2} of work; the course gives 1:{3} or more', p.zone, durationText(r * 60), durationText(w * 60), rule.ratio));
+        ? tr('{0}: {1} of rest, below the recommended minimum of {2}', p.zone, short(r * 60), short(rule.sec))
+        : tr('{0}: {1} of rest after {2}, below the recommended minimum of 1:{3}', p.zone, short(r * 60), short(w * 60), rule.ratio));
     }
   }
 
   // more work in a zone than a full session of it (the reference table, times "most")
   if (tables.most !== null) {
     for (const p of s.parts) {
-      if (p.zone !== 'R0' && p.share > tables.most + 1e-9) out.push(tr('{0}: {1} in one session; a full session of it is {2}', p.zone, minutesText(p.min), minutesText(tables.reference[p.zone] / 60)));
+      if (p.zone !== 'R0' && p.share > tables.most + 1e-9) out.push(tr('{0}: {1} in one session exceeds the recommended maximum of {2}', p.zone, minutesText(p.min), short(tables.reference[p.zone] * tables.most)));
     }
   }
 
@@ -89,7 +97,7 @@ export function sessionChecks(s, tables) {
     if (first) {
       const z = first.reps.find(r => r.zone in tables.warm).zone;
       const done = Object.keys(first.before).reduce((n, key) => n + mins(first.before[key], key), 0);
-      if (done * 60 < tables.warm[z] - 0.5) out.push(tr('{0} starts {1} into the session; the course says VO2max is only fully available after {2}', z, minutesText(done), minutesText(tables.warm[z] / 60)));
+      if (done * 60 < tables.warm[z] - 0.5) out.push(tr('{0} starts {1} into the session: at least {2} before it is recommended', z, short(done * 60), short(tables.warm[z])));
     }
   }
   return out;
@@ -125,7 +133,7 @@ export function checksView(data, planId, band, today) {
     // quality in the morning, volume in the afternoon (slide 196)
     for (const pm of list.filter(s => s.slot === 'pm')) {
       const am = list.find(s => s.date === pm.date && s.slot === 'am');
-      if (am && ORDER[am.main] === 2 && ORDER[pm.main] < 2) week.push(tr('{0} before {1}; the course puts the quality session in the morning', named(am), named(pm)));
+      if (am && ORDER[am.main] === 2 && ORDER[pm.main] < 2) week.push(tr('{0} before {1}: the quality session is recommended in the morning', named(am), named(pm)));
     }
 
     // race-pace sessions in the week (the race-pace table)
@@ -133,8 +141,8 @@ export function checksView(data, planId, band, today) {
     if (tables.racePace) {
       const comp = !!meso && meso.pat === 'comp', limit = tables.racePace[comp ? 1 : 0];
       if (r7 > limit) week.push(comp
-        ? tr('{0} R7 sessions; the course gives at most {1} a week in the competitive period', r7, limit)
-        : tr('{0} R7 sessions; the course gives at most {1} a week in the preparatory period', r7, limit));
+        ? tr('{0} R7 sessions exceed the recommended maximum of {1} a week in the competitive period', r7, limit)
+        : tr('{0} R7 sessions exceed the recommended maximum of {1} a week in the preparatory period', r7, limit));
     }
 
     // a content of the block that has no session in a week with sessions
@@ -148,21 +156,21 @@ export function checksView(data, planId, band, today) {
     // a recovery week keeps volume and intensity low
     if (wk.type === 'R') {
       const heavy = list.filter(s => hard(tables, s));
-      if (heavy.length) week.push(tr('A recovery week with {0}; the course keeps its volume and intensity low', heavy.map(named).join(', ')));
+      if (heavy.length) week.push(tr('A recovery week with {0}: low volume and intensity are recommended', heavy.map(named).join(', ')));
     }
 
     // around a race: a light day before, the day after off (slide 128)
     for (const s of list) {
       for (const e of races) {
-        if (s.date === addDays(e.date, -1) && hard(tables, s)) week.push(tr('{0} is the day before {1}; the course keeps that day light', named(s), e.name));
-        if (s.date === addDays(e.to, 1)) week.push(tr('{0} is the day after {1}; the course leaves that day off', tr(DAYS[weekday(s.date)]), e.name));
+        if (s.date === addDays(e.date, -1) && hard(tables, s)) week.push(tr('{0} is the day before {1}: a light day is recommended', named(s), e.name));
+        if (s.date === addDays(e.to, 1)) week.push(tr('{0} is the day after {1}: a day off is recommended', tr(DAYS[weekday(s.date)]), e.name));
       }
     }
 
     // the taper lowers the volume, not the number of sessions (slide 189)
     if ((wk.type === 'AT' || wk.type === 'CT') && list.length) {
       const before = all.filter(s => weekOf(data.season, s.date) === wk.n - 1).length;
-      if (before > list.length) week.push(tr('{0} sessions, {1} the week before; in the taper the course lowers the volume and keeps the number of sessions', list.length, before));
+      if (before > list.length) week.push(tr('{0} sessions, {1} the week before: in the taper, lower the volume and keep the number of sessions', list.length, before));
     }
 
     let count = week.length;

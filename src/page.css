@@ -19,7 +19,9 @@ button:focus-visible, textarea:focus-visible, select:focus-visible, input:focus-
 header { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; padding: 8px 16px; background: #FFFFFF; border-bottom: 1px solid #D8DEE4; flex-shrink: 0; }
 .brand { font-weight: 600; font-size: 17px; letter-spacing: .02em; }
 .tabs, .pills { display: flex; gap: 6px; flex-wrap: wrap; }
-.pills { margin-left: auto; align-items: center; }
+.pills { align-items: center; }
+/* the plans and bands keep their place; the status and the language switch are pushed to the right */
+#status { margin-left: auto; }
 .tab { height: 40px; padding: 0 14px; border: 1px solid #C5CDD5; border-radius: 6px; background: #FFFFFF; font-weight: 500; }
 .tab.on { background: #0F5C7A; border-color: #0F5C7A; color: #FFFFFF; }
 .pill { height: 40px; padding: 0 16px; border: 1px solid #C5CDD5; border-radius: 20px; background: #FFFFFF; font-weight: 500; }

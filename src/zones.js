@@ -26,7 +26,7 @@ export const ZINFO = {
     build: 'At least 8 weeks.',
     decay: 'About 30 ± 5 days without training.',
     resisted: 'R1F: R1 against a brake. Develops with 3–4 sessions a week, maintained with 2. Counted here as R1.',
-    ages: 'All categories.'
+    ages: 'From Iniciado.'
   },
   'R2': {
     name: 'Aerobic glycolytic',
@@ -105,7 +105,7 @@ export const ZINFO = {
     build: 'Trained all season.',
     decay: 'About 5 ± 3 days without training.',
     resisted: 'R6F: R6 against a brake. Develops with 2–4 sessions a week, maintained with 1–2. R6F and R6+ are counted here as R6.',
-    ages: 'All categories.'
+    ages: 'From Iniciado.'
   },
   'R7': {
     name: 'Competition pace',
@@ -126,9 +126,8 @@ const range = r => r[0] === r[1] ? String(r[0]) : r[0] + '–' + r[1];
 // The card of one zone: { zone, name, what, rows: [[label, text or list]] }, or null.
 // The sessions per week and the km a year come from tables.txt, so the card shows the same figures as the grid.
 // A card states one value for each thing and does not say where it comes from: that is in this file's head.
-// band: the age band the card is shown for, to say when the zone is not suggested at that age.
 // The text is looked up in the language in use.
-export function zoneCard(zone, tables, band) {
+export function zoneCard(zone, tables) {
   const z = ZINFO[zone];
   if (!z) return null;
   const c = contents(tables).find(x => x.zones.includes(zone));
@@ -146,7 +145,7 @@ export function zoneCard(zone, tables, band) {
     [tr('Builds'), tr(z.build)],
     z.decay && [tr('Decays'), tr(z.decay)],
     z.resisted && [tr('Resisted'), tr(z.resisted)],
-    [tr('Ages'), tr(z.ages) + (tables.zones[band] && !tables.zones[band].includes(zone) ? ' ' + tr('Not suggested for {0}.', band) : '')],
+    [tr('Ages'), tr(z.ages)],
     km && [tr('Km a year'), km]
   ];
   return { zone, name: tr(z.name), what: tr(z.what), rows: rows.filter(Boolean) };

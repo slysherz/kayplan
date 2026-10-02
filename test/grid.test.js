@@ -90,10 +90,10 @@ test('the grid marks the zones the course does not suggest for the band', async 
   // a band with no zones line has nothing marked
   assert.deepEqual([...new Set(gridView(data, 'group-a', 'older', TODAY).rows.map(r => r.suggested))], [null]);
   assert.match(gridReport(data, 'group-a', 'younger', TODAY), /\(zone\) not in the course's long-term table for this age\n\n   wk  monday      content  R1 +\(R2\) +\(R3\) +\(R3\+\) +\(R4\) +\(R5\) +R6 +\(R7\)\n/);
-  const ages = (zone, band) => zoneCard(zone, data.tables, band).rows.find(r => r[0] === 'Ages')[1];
-  assert.match(ages('R3', 'younger'), /Not suggested for younger\.$/);
-  assert.doesNotMatch(ages('R1', 'younger'), /Not suggested/);
-  assert.doesNotMatch(ages('R3', 'older'), /Not suggested/);
+  // the card gives the youngest category with km in the zone (slide 172), whatever band is shown
+  const ages = zone => zoneCard(zone, data.tables).rows.find(r => r[0] === 'Ages')[1];
+  assert.deepEqual(['R1', 'R2', 'R3', 'R3+', 'R4', 'R5', 'R6', 'R7'].map(ages),
+    ['From Iniciado.', 'From Infantil.', 'From Infantil.', 'From Cadete.', 'Seniors only.', 'From Junior.', 'From Iniciado.', 'From Infantil.']);
   const odd = await load({ 'tables.txt': fixture()['tables.txt'] + 'zones guest  R1\n' });
   assert.deepEqual(e.check(odd, TODAY).map(p => p.message), ['zones are given for "guest", which is not a band of any plan']);
 });
@@ -138,7 +138,7 @@ test('zone cards: km a year, and nothing about where the text comes from', () =>
   assert.equal(zoneCard('R2', withKm).rows.find(r => r[0] === 'Km a year')[1], 'older 515');
   // a card says each thing once, and not where it comes from
   for (const zone of Object.keys(ZINFO)) {
-    const card = zoneCard(zone, withKm, 'older'), all = JSON.stringify(card);
+    const card = zoneCard(zone, withKm), all = JSON.stringify(card);
     assert.doesNotMatch(all, /slide|course|Kayplan|Grau/i, zone);
     assert.equal(card.source, undefined);
     assert.equal(card.rows.find(r => r[0] === 'Intensity')[1].length <= 3, true);

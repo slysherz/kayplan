@@ -234,7 +234,7 @@ Sat 2026-01-24
   am older · planned · main zone R6 · 20' R1 + 4x 10'' R6/2' + 10' R1
       R6 40'' · R1 30' · 4.9 km
       20' R1 ≈ 3.2 km · 10'' R6 ≈ 40 m · 10' R1 ≈ 1.6 km
-      check: R6: 2'00'' of rest after a repetition; the course gives 3'00'' or more
+      check: R6: 2' of rest, below the recommended minimum of 3'
 Sun 2026-01-25`);
   const younger = weekReport(await load(), 'group-a', 3, '2026-01-21', 'younger');
   assert.match(younger, /pm younger/);

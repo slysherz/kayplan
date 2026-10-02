@@ -293,14 +293,15 @@ function header() {
     const s = data.season, end = new Date(Date.parse(s.start) + (s.weeks * 7 - 1) * 86400000).getUTCFullYear(), start = +s.start.slice(0, 4);
     label = start === end ? String(start) : start + '–' + String(end).slice(2);
     const plan = planOf(data, state.plan);
+    // every plan shows its bands, one or several, so the plan buttons never move
     pills = data.plans.map(p => '<button class="pill' + (p.id === state.plan ? ' on' : '') + '" data-act="plan" data-v="' + p.id + '">' + esc(p.name) + '</button>').join('') +
-      (plan && plan.bands.length > 1 ? '<span class="gap"></span>' + plan.bands.map(b => '<button class="pill band' + (b === state.band ? ' on' : '') + '" data-act="band" data-v="' + b + '">' + esc(b) + '</button>').join('') : '');
+      (plan ? '<span class="gap"></span>' + plan.bands.map(b => '<button class="pill band' + (b === state.band ? ' on' : '') + '" data-act="band" data-v="' + b + '">' + esc(b) + '</button>').join('') : '');
   }
   return '<header><div class="brand">Kayplan</div><div class="muted">' + label + '</div>' +
     '<div class="tabs"><button class="tab' + (state.view === 'sheet' ? ' on' : '') + '" data-act="view" data-v="sheet">' + tr('Plan') + '</button>' +
     '<button class="tab' + (state.view === 'events' ? ' on' : '') + '" data-act="view" data-v="events">' + tr('Events') + '</button></div>' +
     '<button class="b" data-act="today"' + (usable(data) && weekOf(data.season, now()) ? '' : ' disabled') + '>' + tr('Today') + '</button>' +
-    '<div id="status">' + statusHtml() + '</div><div class="pills">' + pills + '<span class="gap"></span>' + langs + '</div></header>';
+    '<div class="pills">' + pills + '</div><div id="status">' + statusHtml() + '</div>' + langs + '</header>';
 }
 
 function problemsPanel() {
@@ -353,7 +354,7 @@ function gridRows(grid, weeks) {
     }).join('');
     // a zone the course's long-term table does not give this age is dimmed
     return '<div class="row"><button class="lab zlab' + (r.suggested === false ? ' off' : '') + '" data-tip="' + r.zone + '" style="height:20px"><i class="sw" style="background:' + Z[r.zone].bg + '"></i><u>' + r.zone + '</u></button>' + cells +
-      '<div class="capsum mono"' + (r.yearly === null ? '' : ' title="' + tr("{0}: {1} km from this season's sessions, {2} km a year in the course's table", r.zone, dec(r.km, 1), dec(r.yearly)) + '"') + '>' +
+      '<div class="capsum mono"' + (r.yearly === null ? '' : ' title="' + tr("{0}: {1} km this season, {2} km a year recommended", r.zone, dec(r.km, 1), dec(r.yearly)) + '"') + '>' +
       (km ? kmText(r.km) + (r.yearly === null ? '' : ' / ' + dec(r.yearly)) : r.sessions) + '</div></div>';
   }).join('');
 }
@@ -561,7 +562,7 @@ let pinned = null;   // the zone whose card was clicked open
 function hideTip() { tipEl.hidden = true; }
 function unpin() { pinned = null; tipEl.classList.remove('pinned'); hideTip(); }
 function showTip(el) {
-  const card = data ? zoneCard(el.dataset.tip, data.tables, state.band) : null;
+  const card = data ? zoneCard(el.dataset.tip, data.tables) : null;
   if (!card) return;
   tipEl.innerHTML = '<h4><i style="background:' + Z[card.zone].bg + '"></i>' + card.zone + ' · ' + esc(card.name) + '</h4><p>' + esc(card.what) + '</p><dl>' +
     card.rows.map(([label, v]) => '<dt>' + esc(label) + '</dt><dd>' + (Array.isArray(v) ? '<ul>' + v.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul>' : esc(v)) + '</dd>').join('') +

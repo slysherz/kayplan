@@ -88,7 +88,7 @@ try {
   // in km, a zone's season sum stands next to the course's km a year in that zone
   assert.equal(await text('.zlab[data-tip="R2"] ~ .capsum'), '6 / 961');
   assert.equal(await text('.zlab[data-tip="R4"] ~ .capsum'), '0');
-  assert.equal(await ff.js('return document.querySelector(".zlab[data-tip=\\"R2\\"] ~ .capsum").title'), "R2: 5.9 km from this season's sessions, 961 km a year in the course's table");
+  assert.equal(await ff.js('return document.querySelector(".zlab[data-tip=\\"R2\\"] ~ .capsum").title'), 'R2: 5.9 km this season, 961 km a year recommended');
   await ff.click('.segb[data-v="sessions"]');
   assert.equal(await text('.zlab[data-tip="R2"] ~ .capsum'), '1');
   // the zone card opens when the zone name gets the focus
@@ -258,8 +258,12 @@ try {
   await ff.click('.pill.band[data-v="menor"]');
   assert.equal(await text('.cap[data-v="1"]'), '·');
   assert.equal(await text('.capsum'), '0');
+  // a plan with one band shows it too, and the plan buttons stay where they were
+  const where = () => ff.js('return [...document.querySelectorAll(".pill:not(.band)")].map(b => Math.round(b.getBoundingClientRect().left)).join(" ")');
+  const before = await where();
   await ff.click('.pill[data-v="cadetes"]');
-  assert.equal(await count('.pill.band'), 0);
+  assert.deepEqual(await ff.js('return [...document.querySelectorAll(".pill.band")].map(b => b.textContent + (b.classList.contains("on") ? "*" : ""))'), ['cadete*']);
+  assert.equal(await where(), before);
   await ff.click('.pill[data-v="juniors"]');
   await ff.click('.pill.band[data-v="senior"]');
   await ff.click('.swk[data-v="1"]');
@@ -525,7 +529,7 @@ try {
   await ff.keys("1km R1 + 5x 4' R3/2'");
   await saved();
   assert.deepEqual(await ff.js('return [...document.querySelectorAll("[data-id=s-checks] div")].map(d => d.textContent)'),
-    ["R3: 2'00'' of rest after 4'00'' of work; the course gives 1:1 or more", "R3 starts 6' into the session; the course says VO2max is only fully available after 30'"]);
+    ["R3: 2' of rest after 4', below the recommended minimum of 1:1", "R3 starts 6'19'' into the session: at least 30' before it is recommended"]);
   assert.deepEqual(await ff.js('return [...document.querySelectorAll(".swk.warn")].map(b => b.textContent)'), ['2']);
   // the course's own way of writing: the zone once, before the set, with the multiplication sign
   await ff.click('.day:nth-child(2) .add[data-v="am"]');
@@ -536,7 +540,7 @@ try {
   assert.equal(await count('[data-id=s-checks]'), 0);
   assert.deepEqual(await ff.js('return [...document.querySelectorAll("[data-id=w-checks] div")].map(d => d.textContent)'),
     ['Mon AM (R3) and Tue AM (R3+) are less than 48 h apart', "R1 is the block's content and has no session this week", "R2 is the block's content and has no session this week",
-      "Mon AM · R3: 2'00'' of rest after 4'00'' of work; the course gives 1:1 or more", "Mon AM · R3 starts 6' into the session; the course says VO2max is only fully available after 30'"]);
+      "Mon AM · R3: 2' of rest after 4', below the recommended minimum of 1:1", "Mon AM · R3 starts 6'19'' into the session: at least 30' before it is recommended"]);
   await shot('12-checks');
   // the other band of the plan has its own sessions: its week 2 says nothing, only its week 1 is marked
   await ff.click('.pill.band[data-v="senior"]');
