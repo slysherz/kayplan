@@ -13,6 +13,8 @@ export const KINDS = ['race', 'test', 'camp', 'holiday', 'no-water'];
 export const RACE_TYPES = ['sprint', 'fundo', 'maratona'];
 export const BOATS = ['solo', 'crew', 'mixed'];
 export const SLOTS = ['am', 'pm'];
+// where a session happens; km are only counted on the water
+export const PLACES = ['water', 'pool', 'gym', 'land'];
 
 const SLUG = /^[a-z0-9][a-z0-9-]*$/;
 
@@ -92,6 +94,14 @@ export function serializeSeason(season) {
 // load  I 60  C 80  CH 100  R 50  AT 55  CT 40
 // reference  R0 60'  R1 120'  …  R5 4'30''
 // pace default  R0 7  R1 9.5  …        km/h; "pace junior …" gives a band its own speeds
+// yearly  junior 2220  cadete 1605      water km per season, per band
+// hard  R1 12  R2 12  R3 6  …           km of work in a typical hard session with that content
+// race  sprint 1.4  fundo 6  maratona 13.5    the same for race pace (R7), by the race aimed at
+// warmup 2                              km added to every session for warm-up and cool-down
+// develop  R1 4-6  R2 3-4  R3-R3+ 2-3  R4-R5 2-4  R6 3-4      sessions a week to develop a content
+// maintain  R1 3  R2 2  R3-R3+ 1  R4-R5 1  R6 1-2             and to maintain it; zones joined with
+//                                       "-" are one content and are counted together
+// zones junior  R1 R2 R3 R3+ R5 R6 R7   the zones suggested for a band's age
 // place 1km Sede-Foz
 
 function duration(s) {
@@ -116,8 +126,9 @@ function distanceText(m) {
 
 export function parseTables(source) {
   const { blocks, errors } = readBlocks(source);
-  const value = { load: {}, reference: {}, pace: {}, places: [] };
+  const value = { load: {}, reference: {}, pace: {}, yearly: {}, hard: {}, race: {}, warmup: null, develop: {}, maintain: {}, zones: {}, places: [] };
   const seen = {};
+  const number = v => /^\d+(\.\d+)?$/.test(v);
   for (const b of blocks) {
     noSub(b, errors);
     const err = message => errors.push({ line: b.line, message });
@@ -150,6 +161,40 @@ export function parseTables(source) {
         if (!ZONES.includes(z) || !/^\d+(\.\d+)?$/.test(v) || +v <= 0) err('cannot read "' + z + ' ' + v + '": a zone and a speed in km/h');
         else value.pace[band][z] = +v;
       });
+    } else if (kind === 'yearly') {
+      once('yearly');
+      pairs(1, (band, v) => {
+        if (!SLUG.test(band) || !number(v) || +v <= 0) err('cannot read "' + band + ' ' + v + '": a band and its water km per season');
+        else value.yearly[band] = +v;
+      });
+    } else if (kind === 'hard') {
+      once('hard');
+      pairs(1, (z, v) => {
+        if (!CONTENT_ZONES.includes(z) || z === 'R7' || !number(v)) err('cannot read "' + z + ' ' + v + '": a zone from R1 to R6 and the km of a hard session');
+        else value.hard[z] = +v;
+      });
+    } else if (kind === 'race') {
+      once('race');
+      pairs(1, (type, v) => {
+        if (!RACE_TYPES.includes(type) || !number(v)) err('cannot read "' + type + ' ' + v + '": sprint, fundo or maratona and the km of a race-pace session');
+        else value.race[type] = +v;
+      });
+    } else if (kind === 'warmup') {
+      once('warmup');
+      if (words.length !== 2 || !number(words[1])) err('warmup is one number of km, like "warmup 2"');
+      else value.warmup = +words[1];
+    } else if (kind === 'develop' || kind === 'maintain') {
+      once(kind);
+      pairs(1, (content, v) => {
+        const zones = content.split('-'), m = /^(\d+)(?:-(\d+))?$/.exec(v);
+        if (zones.some(z => !CONTENT_ZONES.includes(z)) || new Set(zones).size !== zones.length || !m || (m[2] !== undefined && +m[2] < +m[1])) err('cannot read "' + content + ' ' + v + '": a content like R1 or R3-R3+ and sessions a week like 3 or 2-3');
+        else value[kind][content] = [+m[1], m[2] === undefined ? +m[1] : +m[2]];
+      });
+    } else if (kind === 'zones') {
+      const band = words[1], zones = words.slice(2);
+      if (!band || !SLUG.test(band) || !zones.length || zones.some(z => !CONTENT_ZONES.includes(z))) { err('zones needs a band and its zones from R1 to R7, like "zones iniciado R1 R6"'); continue; }
+      once('zones ' + band);
+      value.zones[band] = CONTENT_ZONES.filter(z => zones.includes(z));
     } else if (kind === 'place') {
       const m = /^place\s+(\S+)\s+(.+)$/.exec(b.head), dist = m ? distance(m[1]) : null;
       if (!dist) err('cannot read "' + b.head + '": place, a distance like 300m or 1km, then the name');
@@ -166,6 +211,12 @@ export function serializeTables(tables) {
     join('load', tables.load),
     join('reference', tables.reference, durationText),
     ...bands.map(b => join('pace ' + b, tables.pace[b])),
+    ...(Object.keys(tables.yearly).length ? [join('yearly', tables.yearly)] : []),
+    ...(Object.keys(tables.hard).length ? [join('hard', tables.hard)] : []),
+    ...(Object.keys(tables.race).length ? [join('race', tables.race)] : []),
+    ...(tables.warmup === null ? [] : ['warmup ' + tables.warmup]),
+    ...['develop', 'maintain'].filter(k => Object.keys(tables[k]).length).map(k => join(k, tables[k], r => r[0] === r[1] ? r[0] : r[0] + '-' + r[1])),
+    ...Object.keys(tables.zones).map(b => 'zones ' + b + '  ' + tables.zones[b].join(' ')),
     ...tables.places.map(p => 'place ' + distanceText(p.m) + ' ' + p.name)
   ]);
 }
@@ -334,17 +385,19 @@ export function serializeWeeks(hand) {
 // 2026-10-11 am junior: 1km R1 + 8x 4' R2/1' R0 + 1km R1
 //   K2 on the last four reps
 // 2026-10-14 pm junior not-done: 6km R1
+// 2026-10-15 pm junior pool: 3x 10' R2/3'
 //
-// Date, slot, band, and "not-done" when it did not happen. Everything after the first colon is the
-// plan text, on one line. Indented lines are notes.
+// Date, slot, band, then the place when it is not the water (pool, gym, land), then "not-done" when
+// it did not happen. Everything after the first colon is the plan text, on one line. Indented lines
+// are notes.
 
 export function parseSessions(source) {
   const { blocks, errors } = readBlocks(source);
   const value = [];
   for (const b of blocks) {
-    const m = /^(\S+) (am|pm) ([a-z0-9][a-z0-9-]*)( not-done)?:(?: (.*))?$/.exec(b.head);
+    const m = /^(\S+) (am|pm) ([a-z0-9][a-z0-9-]*)(?: (pool|gym|land))?( not-done)?:(?: (.*))?$/.exec(b.head);
     if (!m || !isDate(m[1])) { errors.push({ line: b.line, message: 'a session is written "date slot band: plan", like "2026-10-11 am junior: 6km R1"' }); continue; }
-    value.push({ date: m[1], slot: m[2], band: m[3], notDone: !!m[4], text: (m[5] || '').trim(), notes: b.sub.map(s => s.text).join('\n'), line: b.line });
+    value.push({ date: m[1], slot: m[2], band: m[3], place: m[4] || 'water', notDone: !!m[5], text: (m[6] || '').trim(), notes: b.sub.map(s => s.text).join('\n'), line: b.line });
   }
   return { value, errors };
 }
@@ -367,7 +420,7 @@ export function serializeSessions(sessions, bands) {
   const lines = [];
   for (const s of sortSessions(sessions, bands)) {
     const plan = String(s.text || '').replace(/\s+/g, ' ').trim();
-    lines.push(s.date + ' ' + s.slot + ' ' + s.band + (s.notDone ? ' not-done' : '') + ':' + (plan ? ' ' + plan : ''));
+    lines.push(s.date + ' ' + s.slot + ' ' + s.band + (s.place && s.place !== 'water' ? ' ' + s.place : '') + (s.notDone ? ' not-done' : '') + ':' + (plan ? ' ' + plan : ''));
     const notes = String(s.notes || '').split(/\r?\n/).map(n => n.trim());
     while (notes.length && notes[0] === '') notes.shift();
     while (notes.length && notes[notes.length - 1] === '') notes.pop();

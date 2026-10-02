@@ -7,8 +7,15 @@ export const ZONES = ['R0', 'R1', 'R2', 'R3', 'R3+', 'R4', 'R5', 'R6', 'R7'];
 // Work with no zone is under '?', rest with no zone under 'rest'.
 // places is a list of { name, m }: a place name stands for its distance.
 export function parsePlan(text, places) {
+  return readPlan(text, places).totals;
+}
+
+// The same reading, with each piece of work or rest as written, in order:
+// pieces: [{ text, zone, sec, m, rest }], one repetition each.
+export function readPlan(text, places) {
   const s = String(text || '').replace(/[‘’′´`]/g, "'").replace(/[“”″"]/g, "''");
   const landmarks = (places || []).slice().sort((a, b) => b.name.length - a.name.length);
+  const pieces = [];
   let pos = 0;
   function peek(re) { return re.exec(s.slice(pos)); }
   function ws() { const m = peek(/^\s+/); if (m) pos += m[0].length; }
@@ -38,9 +45,10 @@ export function parsePlan(text, places) {
   }
   function effort(isRest) {
     const a = { sec: 0, m: 0 };
-    let k = 1, z = null, got = false, m;
+    let k = 1, z = null, got = false, m, start = null;
     while (pos < s.length) {
       ws();
+      if (start === null) start = pos;
       const ch = s.charAt(pos);
       if (ch === '' || ch === '+' || ch === '/' || ch === ')' || ch === '(') break;
       const zz = zone();
@@ -52,7 +60,10 @@ export function parsePlan(text, places) {
       pos += m ? m[0].length : 1;
     }
     const tot = {};
-    if (got) add(tot, z || (isRest ? 'rest' : '?'), a, k);
+    if (got) {
+      add(tot, z || (isRest ? 'rest' : '?'), a, k);
+      pieces.push({ text: s.slice(start, pos).trim(), zone: z, sec: a.sec, m: a.m, rest: isRest });
+    }
     return tot;
   }
   function block() {
@@ -83,28 +94,64 @@ export function parsePlan(text, places) {
     }
     return tot;
   }
-  return sequence(false);
+  return { totals: sequence(false), pieces };
 }
 
-// The main zone of a session, from its text. tables holds reference (seconds per zone), pace (km/h per zone,
-// per band with a default) and places.
-// Returns { main, parts: [{ zone, min, share }], unzoned: { sec, m } | null }.
-export function infer(text, tables, band) {
-  const tot = parsePlan(text, tables.places);
+// What a session's text works out to. tables holds reference (seconds per zone), pace (km/h per zone,
+// per band with a default) and places. offWater: the session is in the pool, the gym or on land.
+//
+// main      the main zone (DESIGN.md 8.1.1), or null
+// parts     [{ zone, min, share }]: time per zone, and its share of one full session of that zone
+// unzoned   { sec, m } written with no zone, or null
+// km        { zone: km } and totalKm (7.0): distances as written, times at the zone's pace.
+//           R0 is left out. Distance with no zone counts toward the total only. Nothing off the water.
+// offMin    minutes of work off the water
+// pieces    [{ text, approx }]: each piece with a zone, and its other unit (8.2)
+export function infer(text, tables, band, offWater) {
+  const { totals: tot, pieces } = readPlan(text, tables.places);
   const own = tables.pace[band] || {}, shared = tables.pace.default || {};
-  const parts = [];
+  const speed = z => own[z] || shared[z] || 0;
+  const parts = [], km = {};
+  let totalKm = 0, offMin = 0;
   for (const z of ZONES) {
     if (!tot[z]) continue;
-    const speed = own[z] || shared[z] || 0;
-    const min = tot[z].sec / 60 + (speed ? tot[z].m / 1000 / speed * 60 : 0);
+    // off the water a distance is not paddled, so only written time counts
+    const min = tot[z].sec / 60 + (speed(z) && !offWater ? tot[z].m / 1000 / speed(z) * 60 : 0);
     if (min <= 0) continue;
     // each zone is measured against one full session of that zone
     parts.push({ zone: z, min, share: min / (tables.reference[z] / 60) });
+    if (offWater) offMin += min;
+    else if (z !== 'R0') { km[z] = tot[z].m / 1000 + tot[z].sec / 3600 * speed(z); totalKm += km[z]; }
   }
+  if (tot['?']) { if (offWater) offMin += tot['?'].sec / 60; else totalKm += tot['?'].m / 1000; }
   let main = null, best = 0;
   for (const p of parts) { if (p.zone !== 'R0' && p.share > best) { best = p.share; main = p.zone; } }
   if (!main && parts.length) main = 'R0';
-  return { main, parts, unzoned: tot['?'] || null };
+
+  const shown = [];
+  for (const p of offWater ? [] : pieces) {
+    const v = p.zone ? speed(p.zone) : 0;
+    if (!v || (p.sec > 0) === (p.m > 0)) continue;
+    const approx = p.m > 0 ? durationText(p.m / 1000 / v * 3600) : distanceText(p.sec / 3600 * v * 1000);
+    if (!shown.some(x => x.text === p.text)) shown.push({ text: p.text, approx });
+  }
+  return { main, parts, unzoned: tot['?'] || null, km, totalKm, offMin, pieces: shown };
+}
+
+// 10'55'' or 45''
+export function durationText(sec) {
+  const s = Math.round(sec);
+  return s < 60 ? s + "''" : Math.floor(s / 60) + "'" + String(s % 60).padStart(2, '0') + "''";
+}
+
+// 730 m or 5.9 km
+export function distanceText(m) {
+  return m >= 1000 ? (m / 1000).toFixed(1) + ' km' : Math.round(m / 10) * 10 + ' m';
+}
+
+// km as shown on the sheet: whole numbers, "<1" under half a km
+export function kmText(km) {
+  return km >= 0.5 ? String(Math.round(km)) : (km > 0 ? '<1' : '0');
 }
 
 // 32' or 40''

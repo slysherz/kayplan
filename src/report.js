@@ -1,8 +1,11 @@
 // The command line's text output. Everything printed here comes from the engine.
 
 import { DAYS, addDays, weekday } from './dates.js';
-import { minutesText, amountText } from './notation.js';
+import { minutesText, amountText, kmText } from './notation.js';
 import { sheet, weekView, eventView, check } from './engine.js';
+import { kmView } from './km.js';
+import { gridView } from './grid.js';
+import { zoneCard } from './zones.js';
 import { sortEvents } from './format.js';
 
 // rows of cells -> aligned columns; right lists the columns aligned to the right
@@ -27,10 +30,13 @@ function planHead(data, plan, today, current) {
     s.weeks + ' weeks, ' + s.start + ' to ' + addDays(s.start, s.weeks * 7 - 1) + ' · today ' + today + (current ? ', week ' + current : ', outside the season');
 }
 
+const one = km => km.toFixed(1);
+
 // the annual sheet as a table, one row per week
 export function seasonReport(data, planId, today) {
   const sh = sheet(data, planId, today);
-  const rows = [['', 'wk', 'monday', 'macrocycle', 'mesocycle', 'content', 'type', 'load', 'sessions', 'events']];
+  const kms = sh.plan.bands.map(b => kmView(data, planId, b, today));
+  const rows = [['', 'wk', 'monday', 'macrocycle', 'mesocycle', 'content', 'type', 'load', 'sessions', 'km', 'events']];
   for (const w of sh.weeks) {
     const meso = w.meso === null ? null : sh.mesos[w.meso];
     rows.push([
@@ -38,35 +44,83 @@ export function seasonReport(data, planId, today) {
       w.macro === null ? '' : sh.macros[w.macro].name, meso ? meso.name : '', meso ? meso.label : '',
       w.type === null ? '-' : w.type + (w.hand ? '*' : ''), w.load === null ? '-' : w.load,
       sh.plan.bands.filter(b => w.sessions[b]).map(b => b + ' ' + w.sessions[b]).join(', '),
+      // km from the week's sessions / the week's estimate
+      kms.filter(k => k.weeks[w.n - 1].km > 0 || k.weeks[w.n - 1].estimate !== null).map(k => {
+        const x = k.weeks[w.n - 1];
+        return k.band + ' ' + kmText(x.km) + (x.estimate === null ? '' : '/' + Math.round(x.estimate));
+      }).join(', '),
       w.events.map(eventText).join('; ')
     ]);
   }
-  return planHead(data, sh.plan, today, sh.current) + '\n' +
-    '> current week · * type set by hand · ' + (sh.ended ? 'weeks 1 to ' + sh.ended + ' have ended' : 'no week has ended') + '\n\n' + table(rows, [1, 7]);
+  const totals = kms.map(k => {
+    const s = k.season;
+    return 'km ' + k.band + ': ' + one(s.done) + ' done + ' + one(s.planned) + ' planned' + (s.yearly === null ? ', no yearly km' : ' of ' + s.yearly + ' yearly') +
+      (sh.ended && s.yearly !== null ? ' · weeks that have ended: ' + one(s.endedKm) + ' of ' + one(s.endedEstimate) + ' estimated' : '');
+  });
+  return planHead(data, sh.plan, today, sh.current) + '\n' + totals.join('\n') + '\n' +
+    '> current week · * type set by hand · km: from sessions/estimate · ' + (sh.ended ? 'weeks 1 to ' + sh.ended + ' have ended' : 'no week has ended') + '\n\n' + table(rows, [1, 7]);
 }
 
-// one week: its sessions with the zone working, and its events
+// one week: its sessions with the zone working and km, its totals, and its events
 export function weekReport(data, planId, n, today, band) {
   const w = weekView(data, planId, n, today);
   const where = w.mesoInfo ? w.macroInfo.name + ' / ' + w.mesoInfo.name + ' / content ' + w.mesoInfo.label : 'no mesocycle';
   const out = [
     w.plan.id + ' · week ' + n + ' · ' + w.monday + ' to ' + w.sunday + (w.current ? ' · current week' : (w.ended ? ' · ended' : '')),
-    where + ' · type ' + (w.type === null ? '-' : w.type + (w.hand ? ' (set by hand, pattern gives ' + (w.pattern || '-') + ')' : '')) + ' · load ' + (w.load === null ? '-' : w.load + '%'),
-    ''
+    where + ' · type ' + (w.type === null ? '-' : w.type + (w.hand ? ' (set by hand, pattern gives ' + (w.pattern || '-') + ')' : '')) + ' · load ' + (w.load === null ? '-' : w.load + '%')
   ];
+  for (const b of w.plan.bands) {
+    if (band && b !== band) continue;
+    const x = kmView(data, planId, b, today).weeks[n - 1];
+    const zones = Object.keys(x.zones).map(z => z + ' ' + one(x.zones[z]));
+    out.push('km ' + b + ': ' + one(x.km) + (x.estimate === null ? '' : ' of ' + one(x.estimate) + ' estimated' + (x.planned ? ' (load ' + x.load + '% × content ' + x.factor.toFixed(2) + ')' : ' (not planned yet: an average week)')) +
+      (zones.length ? ' · ' + zones.join(' · ') : '') + (x.offMin > 0 ? ' · off the water ' + minutesText(x.offMin) : ''));
+  }
+  out.push('');
   for (const d of w.days) {
     out.push(DAYS[d.weekday] + ' ' + d.date + (d.today ? ' · today' : ''));
     for (const e of d.events) out.push('  ' + eventText(e));
     for (const s of d.sessions) {
       if (band && s.band !== band) continue;
-      out.push('  ' + s.slot + ' ' + s.band + ' · ' + s.status + ' · main zone ' + (s.main || 'none') + ' · ' + (s.text || '(empty)'));
+      out.push('  ' + s.slot + ' ' + s.band + (s.place !== 'water' ? ' ' + s.place : '') + ' · ' + s.status + ' · main zone ' + (s.main || 'none') + ' · ' + (s.text || '(empty)'));
       const work = s.parts.slice().reverse().map(p => p.zone + ' ' + minutesText(p.min));
       if (s.unzoned) work.push('no zone ' + amountText(s.unzoned));
+      if (s.place === 'water' && s.totalKm > 0) work.push(one(s.totalKm) + ' km');
       if (work.length) out.push('      ' + work.join(' · '));
+      if (s.pieces.length) out.push('      ' + s.pieces.map(p => p.text + ' ≈ ' + p.approx).join(' · '));
       for (const line of s.notes ? s.notes.split('\n') : []) out.push(('      note: ' + line).trimEnd());
     }
   }
   return out.join('\n');
+}
+
+const STATE_LETTER = { developing: 'D', maintaining: 'M', 'below maintenance': 'b', trained: '', absent: '' };
+
+// the capacity grid of one band: sessions a week by main zone with their state, and km in the zone
+export function gridReport(data, planId, band, today) {
+  const sh = sheet(data, planId, today), g = gridView(data, planId, band, today);
+  // a zone the course does not suggest for the band's age is in brackets
+  const rows = [['', 'wk', 'monday', 'content', ...g.rows.map(r => r.suggested === false ? '(' + r.zone + ')' : r.zone)]];
+  for (const w of sh.weeks) {
+    rows.push([w.current ? '>' : '', w.n, w.monday, w.meso === null ? '' : sh.mesos[w.meso].label, ...g.rows.map(r => {
+      const x = r.weeks[w.n - 1];
+      if (!x.sessions && !x.km) return '·';
+      return (x.sessions ? x.sessions + STATE_LETTER[x.state] : '-') + (x.km > 0 ? ' ' + kmText(x.km) : '');
+    })]);
+  }
+  rows.push(['', '', 'season', '', ...g.rows.map(r => r.sessions + ' ' + kmText(r.km))]);
+  const counted = g.rows.filter(r => r.content).map(r => r.content.key).filter((k, i, a) => a.indexOf(k) === i);
+  return planId + ' · ' + band + ' · sessions a week by main zone, then km in the zone\n' +
+    'D developing, M maintaining, b below maintenance, by the course\'s sessions a week' + (counted.some(k => k.includes('-')) ? '; ' + counted.filter(k => k.includes('-')).join(' and ') + ' are counted together' : '') + '\n' +
+    (g.rows.some(r => r.suggested === false) ? '(zone) not in the course\'s long-term table for this age\n' : '') + '\n' +
+    table(rows, [1]);
+}
+
+// the card of one zone
+export function zoneReport(zone, tables) {
+  const c = zoneCard(zone, tables);
+  if (!c) return null;
+  return [c.zone + ' · ' + c.name, c.what, ...c.rows.map(([label, v]) => label + ':' + (Array.isArray(v) ? v.map(x => '\n  - ' + x).join('') : ' ' + v)), c.source].join('\n');
 }
 
 // the races and events table, for every plan

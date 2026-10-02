@@ -24,11 +24,13 @@ test('a week set by hand, and back to its pattern', () => {
 
 test('sessions: add, replace, remove', () => {
   const added = ed.putSession(plan(), { date: '2026-01-21', slot: 'am', band: 'younger', text: ' 4km\n R1 ', notes: 'easy' });
-  assert.deepEqual(added.sessions[1], { date: '2026-01-21', slot: 'am', band: 'younger', notDone: false, text: '4km R1', notes: 'easy' });
+  assert.deepEqual(added.sessions[1], { date: '2026-01-21', slot: 'am', band: 'younger', place: 'water', notDone: false, text: '4km R1', notes: 'easy' });
   const replaced = ed.putSession(plan(), { date: '2026-01-20', slot: 'pm', band: 'older', text: '8km R1', notDone: true });
-  assert.deepEqual(replaced.sessions, [{ date: '2026-01-20', slot: 'pm', band: 'older', notDone: true, text: '8km R1', notes: '' }]);
+  assert.deepEqual(replaced.sessions, [{ date: '2026-01-20', slot: 'pm', band: 'older', place: 'water', notDone: true, text: '8km R1', notes: '' }]);
   assert.deepEqual(ed.removeSession(plan(), '2026-01-20 pm older').sessions, []);
   assert.equal(ed.removeSession(plan(), '2026-01-20 am older').sessions.length, 1);
+  assert.equal(ed.putSession(plan(), { date: '2026-01-20', slot: 'pm', band: 'older', place: 'pool', text: "30' R2" }).sessions[0].place, 'pool');
+  assert.throws(() => ed.putSession(plan(), { date: '2026-01-20', slot: 'pm', band: 'older', place: 'lake', text: '' }), /on the water, or in the pool/);
   assert.throws(() => ed.putSession(plan(), { date: '2026-01-20', slot: 'pm', band: 'guest', text: '' }), /no band "guest"/);
   assert.throws(() => ed.putSession(plan(), { date: '2026-01-20', slot: 'noon', band: 'older', text: '' }), /morning/);
   assert.throws(() => ed.putSession(plan(), { date: 'soon', slot: 'am', band: 'older', text: '' }), /needs a date/);

@@ -2,7 +2,7 @@
 // and throws an error with code 'not-allowed' when the change makes no sense.
 
 import { isDate } from './dates.js';
-import { KINDS, RACE_TYPES, BOATS, SLOTS, sessionKey } from './format.js';
+import { KINDS, RACE_TYPES, BOATS, SLOTS, PLACES, sessionKey } from './format.js';
 
 function fail(message) {
   const e = new Error(message);
@@ -33,7 +33,9 @@ export function putSession(plan, session) {
   if (!isDate(session.date)) fail('a session needs a date');
   if (!SLOTS.includes(session.slot)) fail('a session is in the morning (am) or the afternoon (pm)');
   if (!plan.bands.includes(session.band)) fail('plan ' + plan.id + ' has no band "' + session.band + '"');
-  const s = { date: session.date, slot: session.slot, band: session.band, notDone: !!session.notDone, text: oneLine(session.text), notes: String(session.notes || '') };
+  const place = session.place || 'water';
+  if (!PLACES.includes(place)) fail('a session is on the water, or in the pool, the gym or on land');
+  const s = { date: session.date, slot: session.slot, band: session.band, place, notDone: !!session.notDone, text: oneLine(session.text), notes: String(session.notes || '') };
   return { ...plan, sessions: [...plan.sessions.filter(x => sessionKey(x) !== sessionKey(s)), s] };
 }
 

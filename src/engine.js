@@ -113,7 +113,7 @@ export function eventsFor(data, planId, today) {
 // A session with what is worked out from its text, and whether it counts as done.
 // A session whose date has passed counts as done unless it is marked not done.
 export function sessionView(data, s, today) {
-  return { ...s, ...infer(s.text, data.tables, s.band), status: s.notDone ? 'not done' : (s.date < today ? 'done' : 'planned') };
+  return { ...s, ...infer(s.text, data.tables, s.band, s.place !== 'water'), status: s.notDone ? 'not done' : (s.date < today ? 'done' : 'planned') };
 }
 
 // ---- the annual sheet -------------------------------------------------------
@@ -184,6 +184,19 @@ export function check(data, today) {
     if (noRef.length) add('error', 'tables.txt', null, 'reference is missing for ' + noRef.join(', '));
     const noPace = ZONES.filter(z => !(data.tables.pace.default || {})[z]);
     if (noPace.length) add('error', 'tables.txt', null, 'pace default is missing for ' + noPace.join(', '));
+    const noHard = ['R1', 'R2', 'R3', 'R3+', 'R4', 'R5', 'R6'].filter(z => data.tables.hard[z] === undefined);
+    if (noHard.length) add('error', 'tables.txt', null, 'hard is missing for ' + noHard.join(', '));
+    const noRace = format.RACE_TYPES.filter(t => data.tables.race[t] === undefined);
+    if (noRace.length) add('error', 'tables.txt', null, 'race is missing for ' + noRace.join(', '));
+    if (data.tables.warmup === null) add('error', 'tables.txt', null, 'warmup is missing');
+    const dev = Object.keys(data.tables.develop), mnt = Object.keys(data.tables.maintain);
+    const odd = [...dev.filter(k => !mnt.includes(k)), ...mnt.filter(k => !dev.includes(k))];
+    if (odd.length) add('error', 'tables.txt', null, 'develop and maintain must list the same contents; only one has ' + odd.join(', '));
+    const all = dev.flatMap(k => k.split('-')), twice = all.filter((z, i) => all.indexOf(z) !== i);
+    if (twice.length) add('error', 'tables.txt', null, 'develop lists ' + [...new Set(twice)].join(', ') + ' in two contents');
+    const bands = data.plans.flatMap(p => p.bands);
+    for (const b of Object.keys(data.tables.yearly)) { if (!bands.includes(b)) add('warning', 'tables.txt', null, 'yearly km are given for "' + b + '", which is not a band of any plan'); }
+    for (const b of Object.keys(data.tables.zones)) { if (!bands.includes(b)) add('warning', 'tables.txt', null, 'zones are given for "' + b + '", which is not a band of any plan'); }
   }
 
   const ids = data.plans.map(p => p.id);

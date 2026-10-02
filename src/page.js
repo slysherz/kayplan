@@ -1,15 +1,18 @@
-// The page: layout B of the mockup, on the engine. It draws what the engine works out and turns
-// clicks and typing into the edits of cycles.js and edits.js. Nothing is computed only here.
+// The page: layout B of the mockup, on the engine. It draws what the engine (engine.js, km.js) works
+// out and turns clicks and typing into the edits of cycles.js and edits.js. Nothing is computed only here.
 //
 // Every change is applied to the plan in memory, drawn, and saved to its file. The page watches the
 // files, so a change made outside (by Claude, or in an editor) is drawn within a couple of seconds.
 
 import { clockToday, isDate, shortDate, DAYS, MONTHS } from './dates.js';
-import { minutesText, amountText } from './notation.js';
+import { minutesText, amountText, kmText } from './notation.js';
 import * as cycles from './cycles.js';
 import * as edits from './edits.js';
-import { KINDS, RACE_TYPES, BOATS, sessionKey, sortEvents } from './format.js';
+import { KINDS, RACE_TYPES, BOATS, PLACES, sessionKey, sortEvents } from './format.js';
 import { load, usable, planOf, planFiles, sheet, weekView, eventView, check, fileText, weekOf, endedWeeks } from './engine.js';
+import { kmView } from './km.js';
+import { gridView } from './grid.js';
+import { zoneCard } from './zones.js';
 import { httpStore } from './store-http.js';
 
 const CW = 26, LAB = 104;   // width of a week column and of the row labels, in px
@@ -33,6 +36,7 @@ const PATTERN_NAMES = {
 const KIND_NAMES = { race: 'Race', test: 'Test', camp: 'Camp', holiday: 'Holiday', 'no-water': 'No water' };
 const TYPE_LABEL = { sprint: 'Sprint', fundo: 'Fundo', maratona: 'Maratona' };
 const BOAT_LABEL = { solo: 'Solo', crew: 'Tripulações', mixed: 'Mixed' };
+const PLACE_NAMES = { water: 'Water', pool: 'Pool', gym: 'Gym', land: 'Land' };
 
 const store = httpStore();
 const params = new URLSearchParams(location.search);
@@ -45,7 +49,7 @@ let note = '';          // why the last edit was refused; cleared by the next cl
 let fault = '';         // the server cannot be reached; cleared when it answers again
 let reveal = true;      // scroll the sheet to the selected week on the next draw
 let uid = 0;
-const state = { plan: null, band: null, week: null, sel: null, view: 'sheet', edit: null, problems: false, event: null };
+const state = { plan: null, band: null, week: null, sel: null, view: 'sheet', edit: null, problems: false, event: null, grid: 'sessions' };
 
 // today comes from the clock; ?asof=YYYY-MM-DD shows the page as of another date
 function now() {
@@ -70,6 +74,7 @@ function readHash() {
   state.band = h.get('band') || saved.band || null;
   state.week = h.has('week') ? +h.get('week') : null;
   state.view = h.get('view') === 'events' ? 'events' : 'sheet';
+  state.grid = h.get('grid') === 'km' ? 'km' : 'sessions';
   state.sel = h.get('sel');
   const ed = /^(meso|macro):(\d+)$/.exec(h.get('edit') || '');
   state.edit = ed ? { kind: ed[1], i: +ed[2] } : null;
@@ -80,6 +85,7 @@ function writeHash() {
   const h = new URLSearchParams();
   for (const k of ['plan', 'band', 'week']) { if (state[k] !== null) h.set(k, state[k]); }
   if (state.view === 'events') h.set('view', 'events');
+  if (state.grid === 'km') h.set('grid', 'km');
   if (state.sel) h.set('sel', state.sel);
   if (state.edit) h.set('edit', state.edit.kind + ':' + state.edit.i);
   if (state.problems) h.set('problems', '1');
@@ -245,7 +251,7 @@ function banner(e) {
 function chip(s) {
   const c = zc(s.main);
   return '<button class="chip' + (sessionKey(s) === sessionKey(ctx.session) ? ' on' : '') + (s.notDone ? ' off' : '') + '" data-act="pick" data-v="' + sessionKey(s) + '" style="background:' + c.bg + ';color:' + c.fg + '">' +
-    '<span class="chip-h">' + s.slot.toUpperCase() + ' · ' + (s.main || 'no zone') + (s.notDone ? ' · not done' : '') + '</span><span class="chip-t mono">' + esc(s.text || 'Empty session') + '</span></button>';
+    '<span class="chip-h">' + s.slot.toUpperCase() + ' · ' + (s.main || 'no zone') + (s.place !== 'water' ? ' · ' + s.place : '') + (s.notDone ? ' · not done' : '') + '</span><span class="chip-t mono">' + esc(s.text || 'Empty session') + '</span></button>';
 }
 
 function statusHtml() {
@@ -286,8 +292,52 @@ function problemsPanel() {
 
 // ---- drawing: the annual sheet, the week and the session -------------------------
 
+// One cell of the Km row: the number is the week's estimate, and the cell fills from the bottom as
+// the week's sessions cover it. With no estimate, the number is the km from the sessions.
+function kmCell(w, x) {
+  let cls = 'cap mono', style = '', text, tip;
+  if (x.estimate !== null) {
+    const pct = x.estimate > 0 ? Math.min(1, x.km / x.estimate) : 0;
+    text = Math.round(x.estimate);
+    tip = 'estimate ' + x.estimate.toFixed(1) + ' km (' + (x.planned ? 'load ' + x.load + '% × content ' + x.factor.toFixed(2) : 'not planned yet: an average week') + '), sessions ' + x.km.toFixed(1) + ' km' + (x.estimate > 0 ? ' (' + Math.round(x.km / x.estimate * 100) + '%)' : '');
+    if (pct >= 0.95) cls += ' dev';
+    else { cls += ' tg'; if (pct > 0) style = ' style="background-image:linear-gradient(to top, #BCD9E6 ' + Math.round(pct * 100) + '%, transparent ' + Math.round(pct * 100) + '%)"'; }
+  } else {
+    text = x.km > 0 ? kmText(x.km) : '·';
+    tip = 'sessions ' + x.km.toFixed(1) + ' km';
+    if (x.km >= 0.5) cls += ' tg';
+  }
+  return '<button class="' + cls + (w.n === state.week ? ' cur' : '') + '" data-act="week" data-v="' + w.n + '"' + style + ' title="Week ' + w.n + ': ' + tip + '">' + text + '</button>';
+}
+
+const STATE_CLASS = { developing: ' dev', maintaining: ' mnt', 'below maintenance': ' low', trained: ' tg', absent: '' };
+const span = r => r[0] === r[1] ? String(r[0]) : r[0] + '–' + r[1];
+
+// The capacity grid: one row per zone, one cell per week, showing sessions or km. The shade of a
+// sessions cell is the content's state that week, by the course's sessions a week.
+function gridRows(grid, weeks) {
+  const km = state.grid === 'km';
+  const head = '<div class="row" style="margin-top:8px"><div class="lab" style="height:20px"><span class="seg">' +
+    '<button class="segb' + (km ? '' : ' on') + '" data-act="grid" data-v="sessions">Sessions</button><button class="segb' + (km ? ' on' : '') + '" data-act="grid" data-v="km">Km</button></span></div>' +
+    '<div class="legend" style="width:' + (weeks * CW + 96) + 'px"><span>Season</span></div></div>';
+  return head + grid.rows.map(r => {
+    const c = r.content;
+    const cells = r.weeks.map(x => {
+      const cur = x.n === state.week ? ' cur' : '';
+      if (km) return '<button class="cap mono' + (x.km >= 0.5 ? ' tg' : '') + cur + '" data-act="week" data-v="' + x.n + '" title="Week ' + x.n + ': ' + r.zone + ' ' + x.km.toFixed(1) + ' km">' + (x.km > 0 ? kmText(x.km) : '·') + '</button>';
+      const tip = 'Week ' + x.n + ': ' + x.sessions + (x.sessions === 1 ? ' session' : ' sessions') + ' of ' + r.zone +
+        (c && c.zones.length > 1 && x.sessions ? ', ' + x.together + ' of ' + c.key + ' together' : '') + (x.sessions ? ': ' + x.state : '') +
+        (c ? ' (develop ' + span(c.develop) + ', maintain ' + span(c.maintain) + ')' : '') + (r.suggested === false ? ' · not suggested at this age' : '');
+      return '<button class="cap mono' + STATE_CLASS[x.state] + cur + '" data-act="week" data-v="' + x.n + '" title="' + tip + '">' + (x.sessions || '·') + '</button>';
+    }).join('');
+    // a zone the course's long-term table does not give this age is dimmed
+    return '<div class="row"><button class="lab zlab' + (r.suggested === false ? ' off' : '') + '" data-tip="' + r.zone + '" style="height:20px"><i class="sw" style="background:' + Z[r.zone].bg + '"></i><u>' + r.zone + '</u></button>' + cells +
+      '<div class="capsum mono">' + (km ? kmText(r.km) : r.sessions) + '</div></div>';
+  }).join('');
+}
+
 function sheetView() {
-  const { sh, wk, plan, session } = ctx, W = sh.weeks, ed = state.edit;
+  const { sh, wk, plan, session, km } = ctx, W = sh.weeks, ed = state.edit;
   const lab = (text, h) => '<div class="lab" style="height:' + h + 'px">' + text + '</div>';
   const per = fn => W.map(fn).join('');
   const width = m => 'width:' + ((m.to - m.from + 1) * CW) + 'px';
@@ -303,9 +353,13 @@ function sheetView() {
   };
   const mesoHandles = sh.mesos.slice(0, -1).map((m, i) => handle(i, m.to)).join('');
   const on = w => w.n === state.week ? ' on' : '';
+  // season km from sessions against the yearly km
+  const se = km.season;
+  const seasonTip = 'Season: ' + se.done.toFixed(1) + ' km done, ' + se.planned.toFixed(1) + ' km planned' + (se.yearly === null ? '' : ', of ' + se.yearly + ' km a year') +
+    (sh.ended && se.yearly !== null ? '. Weeks that have ended: ' + se.endedKm.toFixed(1) + ' of ' + se.endedEstimate.toFixed(1) + ' km estimated' : '');
 
   const top =
-    '<div class="panel sx" data-scroll="sheet" style="margin:12px 16px 0;flex-shrink:0"><div class="sheet" style="width:' + (LAB + W.length * CW + 8) + 'px">' +
+    '<div class="panel sx" data-scroll="sheet" style="margin:12px 16px 0;flex-shrink:0"><div class="sheet" style="width:' + (LAB + W.length * CW + 104) + 'px">' +
     '<div class="row">' + lab('Month', 18) + months.map(m => '<div class="month" style="width:' + (m.count * CW) + 'px">' + m.label + '</div>').join('') + '</div>' +
     '<div class="row">' + lab('Monday', 18) + per(w => '<div class="cell mono' + (w.current ? ' now' : '') + '">' + +w.monday.slice(8) + '</div>') + '</div>' +
     '<div class="row">' + lab('Races', 24) + per(raceCell) + '</div>' +
@@ -320,6 +374,9 @@ function sheetView() {
     '<div class="row">' + lab('Microcycle', 26) + per(w => '<button class="swk mono' + on(w) + '" data-act="week" data-v="' + w.n + '" aria-label="Week ' + w.n + '">' + w.n + '</button>') + '</div>' +
     '<div class="row">' + lab('Type', 22) + per(w => '<button class="sty mono' + on(w) + (w.hand ? ' hand' : '') + '" data-act="week" data-v="' + w.n + '" aria-label="Week ' + w.n + ' type"' + (w.hand ? ' title="Set by hand"' : '') + '>' + (w.type || '') + '</button>') + '</div>' +
     '<div class="row">' + lab('Load %', 60) + per(w => '<button class="sld' + on(w) + '" data-act="week" data-v="' + w.n + '" aria-label="Week ' + w.n + ' load ' + (w.load === null ? 'not set' : w.load + ' percent') + '"' + (w.load === null ? '' : ' title="' + w.load + '%"') + '><span style="height:' + Math.round((w.load || 0) * 0.56) + 'px"></span></button>') + '</div>' +
+    '<div class="row">' + lab('Km', 20) + per(w => kmCell(w, km.weeks[w.n - 1])) +
+    '<div class="capsum mono" title="' + seasonTip + '">' + Math.round(se.done + se.planned) + (se.yearly === null ? '' : ' / ' + se.yearly) + '</div></div>' +
+    gridRows(ctx.grid, W.length) +
     '</div></div>';
 
   const types = Object.keys(data.tables.load);
@@ -328,6 +385,8 @@ function sheetView() {
     types.map(t => '<option value="' + t + '"' + (wk.hand && wk.type === t ? ' selected' : '') + '>' + t + (TYPE_NAMES[t] ? ' · ' + TYPE_NAMES[t] : '') + '</option>').join('') + '</select></label>';
   const loadInput = '<label class="inline"><span>Load</span><input type="text" inputmode="numeric" class="mono" data-input="load" data-fid="w-load" value="' + (wk.load === null ? '' : wk.load) + '"' + (wk.type === null ? ' disabled' : '') + '><span>%</span></label>';
   const where = wk.mesoInfo ? esc(wk.mesoInfo.name) + ' · ' + (wk.mesoInfo.zones.length ? wk.mesoInfo.label : '–') : '';
+  const wkm = km.weeks[wk.n - 1];
+  const weekKm = '<span class="mono" data-id="week-km">' + kmText(wkm.km) + (wkm.estimate === null ? '' : ' of ' + Math.round(wkm.estimate)) + ' km' + (wkm.offMin > 0 ? ' · ' + minutesText(wkm.offMin) + ' off the water' : '') + '</span>';
 
   const days = wk.days.map(d => {
     const slots = ['am', 'pm'].map(slot => {
@@ -342,12 +401,16 @@ function sheetView() {
     let work = session.parts.slice().reverse().map(p => p.zone + ' ≈ ' + minutesText(p.min));
     if (session.unzoned) work.push('no zone ' + amountText(session.unzoned));
     if (!session.main) work = session.text ? ['No zone found'] : [];
+    if (session.place === 'water' && session.totalKm > 0) work.push('≈ ' + session.totalKm.toFixed(1) + ' km');
+    // each piece with a zone, and its other unit
+    const other = session.pieces.map(x => x.text + ' ≈ ' + x.approx).join(' · ');
     const c = zc(session.main);
     right = '<div class="ed-col"><div class="eyebrow">Session</div><div class="when">' + DAYS[wk.days.findIndex(d => d.date === session.date)] + ' ' + shortDate(session.date) + ' · ' + session.slot.toUpperCase() + '</div>' +
-      '<div class="fld"><span>Main zone</span><div class="inf"><b class="zpill" style="background:' + c.bg + ';color:' + c.fg + '">' + (session.main || '–') + '</b><small>' + esc(work.join(' · ')) + '</small></div></div>' +
+      '<div class="fld"><span>Main zone</span><div class="inf"><b class="zpill" style="background:' + c.bg + ';color:' + c.fg + '">' + (session.main || '–') + '</b><small>' + esc(work.join(' · ')) + (other ? '<span class="mono other">' + esc(other) + '</span>' : '') + '</small></div></div>' +
       '<label class="fld f-plan"><span>Plan</span><textarea class="mono plan" data-input="text" data-fid="s-text" spellcheck="false">' + esc(session.text) + '</textarea></label>' +
       '<label class="fld f-notes"><span>Notes</span><textarea data-input="notes" data-fid="s-notes">' + esc(session.notes) + '</textarea></label>' +
-      '<div class="pop-r"><label class="inline"><input type="checkbox" data-change="notdone" data-fid="s-notdone"' + (session.notDone ? ' checked' : '') + '><span>Not done</span></label>' +
+      '<div class="pop-r"><label class="inline"><span>Place</span><select data-change="place" data-fid="s-place">' + PLACES.map(x => '<option value="' + x + '"' + (x === session.place ? ' selected' : '') + '>' + PLACE_NAMES[x] + '</option>').join('') + '</select></label>' +
+      '<label class="inline"><input type="checkbox" data-change="notdone" data-fid="s-notdone"' + (session.notDone ? ' checked' : '') + '><span>Not done</span></label>' +
       '<button class="del" data-act="del">Delete session</button></div></div>';
   }
 
@@ -355,7 +418,7 @@ function sheetView() {
     '<div class="lower"><div class="left"><div class="sec-h" style="margin:0">' +
     '<button class="nav" data-act="prev" aria-label="Previous week"' + (state.week > 1 ? '' : ' disabled') + '>‹</button><button class="nav" data-act="next" aria-label="Next week"' + (state.week < W.length ? '' : ' disabled') + '>›</button>' +
     '<b style="font-size:16px">Week ' + wk.n + '</b><span class="muted">' + shortDate(wk.monday) + ' – ' + shortDate(wk.sunday) + (where ? ' · ' + where : '') + '</span>' +
-    '<span class="push"></span>' + typeSelect + loadInput + '</div>' +
+    '<span class="push"></span>' + typeSelect + loadInput + weekKm + '</div>' +
     '<div class="sx" style="flex:1 1 auto;display:flex"><div class="days">' + days + '</div></div></div>' +
     '<div class="panel right">' + right + '</div></div>';
   return top + lower;
@@ -428,9 +491,31 @@ function eventsView() {
 
 // ---- drawing: everything -----------------------------------------------------------
 
+// ---- the zone cards: hovering or focusing a zone name in the grid opens its card -----------
+
+const tipEl = document.getElementById('tip');
+function hideTip() { tipEl.hidden = true; }
+function showTip(el) {
+  const card = data ? zoneCard(el.dataset.tip, data.tables, state.band) : null;
+  if (!card) return;
+  tipEl.innerHTML = '<h4><i style="background:' + Z[card.zone].bg + '"></i>' + card.zone + ' · ' + esc(card.name) + '</h4><p>' + esc(card.what) + '</p><dl>' +
+    card.rows.map(([label, v]) => '<dt>' + label + '</dt><dd>' + (Array.isArray(v) ? '<ul>' + v.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul>' : esc(v)) + '</dd>').join('') +
+    '</dl><div class="src">' + esc(card.source) + '</div>';
+  tipEl.hidden = false;
+  const r = el.getBoundingClientRect();
+  tipEl.style.left = (r.right + 8) + 'px';
+  tipEl.style.top = Math.max(8, Math.min(r.top - 12, window.innerHeight - tipEl.offsetHeight - 8)) + 'px';
+}
+const tipTarget = e => e.target.closest ? e.target.closest('[data-tip]') : null;
+document.addEventListener('mouseover', e => { const t = tipTarget(e); if (t) showTip(t); });
+document.addEventListener('mouseout', e => { const t = tipTarget(e); if (t && !(e.relatedTarget && t.contains(e.relatedTarget))) hideTip(); });
+document.addEventListener('focusin', e => { const t = tipTarget(e); if (t) showTip(t); });
+document.addEventListener('focusout', e => { if (tipTarget(e)) hideTip(); });
+
 function render() {
   const root = document.getElementById('root');
   if (!data) return;
+  hideTip();
   // remember what is focused and how far the sheet is scrolled, to put both back
   const a = document.activeElement, fid = a && a.dataset ? a.dataset.fid : null;
   const held = fid ? { value: a.value, from: a.selectionStart, to: a.selectionEnd, top: a.scrollTop } : null;
@@ -447,7 +532,7 @@ function render() {
   }
   const today = now(), sh = sheet(data, plan.id, today), wk = weekView(data, plan.id, state.week, today);
   const mine = wk.days.flatMap(d => d.sessions).filter(s => s.band === state.band);
-  ctx = { today, plan, sh, wk, session: mine.find(s => sessionKey(s) === state.sel) || mine[0] || null };
+  ctx = { today, plan, sh, wk, session: mine.find(s => sessionKey(s) === state.sel) || mine[0] || null, km: kmView(data, plan.id, state.band, today), grid: gridView(data, plan.id, state.band, today) };
   root.innerHTML = header() + '<div id="app">' + (state.view === 'events' ? eventsView() : sheetView()) + '</div>' + popover() + problemsPanel();
 
   const pop = document.getElementById('pop');
@@ -524,6 +609,7 @@ document.addEventListener('click', e => {
   if (act === 'problems') state.problems = !state.problems;
   else if (act === 'pop-close') { state.edit = null; state.problems = false; }
   else if (act === 'view') { state.view = v; state.edit = null; state.event = null; reveal = true; }
+  else if (act === 'grid') state.grid = v;
   else if (!ctx) { /* the rest needs a plan on screen */ }
   else if (act === 'today') { state.week = weekOf(data.season, now()); state.view = 'sheet'; state.sel = null; reveal = true; }
   else if (act === 'plan') { state.plan = v; state.band = null; state.sel = null; state.edit = null; settle(); }
@@ -537,7 +623,7 @@ document.addEventListener('click', e => {
   else if (act === 'edit-macro') { state.edit = { kind: 'macro', i: +v }; state.problems = false; }
   else if (/^m-|^mac-/.test(act)) { planAct(act, v); return; }
   else if (act === 'add') {
-    const s = { date: t.dataset.date, slot: v, band: state.band, text: '', notes: '' };
+    const s = { date: t.dataset.date, slot: v, band: state.band, place: 'water', text: '', notes: '' };
     state.sel = sessionKey(s);
     if (change([planFiles(ctx.plan.id).sessions], () => setPlan(edits.putSession(ctx.plan, s)))) {
       const ta = document.querySelector('[data-fid="s-text"]');
@@ -604,6 +690,7 @@ document.addEventListener('change', e => {
   if (c === 'type') change([f.weeks], () => setPlan(edits.setWeek(ctx.plan, ctx.wk.monday, el.value || null, null, data.tables)));
   else if (c === 'pat' && state.edit) change([f.cycles], () => setPlan(cycles.setMeso(ctx.plan, state.edit.i, { pat: el.value })));
   else if (c === 'notdone' && ctx.session) change([f.sessions], () => setPlan(edits.putSession(ctx.plan, { ...ctx.session, notDone: el.checked })));
+  else if (c === 'place' && ctx.session) change([f.sessions], () => setPlan(edits.putSession(ctx.plan, { ...ctx.session, place: el.value })));
 });
 
 document.addEventListener('input', e => {

@@ -22,6 +22,13 @@ export function memoryStore(files) {
 export const TABLES = `load  I 60  C 80  CH 100  R 50  AT 55  CT 40
 reference  R0 60'  R1 120'  R2 60'  R3 30'  R3+ 15'  R4 10'  R5 4'30''  R6 2'  R7 10'
 pace default  R0 7  R1 9.5  R2 11  R3 12  R3+ 12.8  R4 13.5  R5 14.5  R6 16  R7 13
+yearly  older 1000
+hard  R1 12  R2 12  R3 6  R3+ 3.2  R4 2.2  R5 1  R6 0.5
+race  sprint 1.4  fundo 6  maratona 13.5
+warmup 2
+develop  R1 4-6  R2 3-4  R3-R3+ 2-3  R4-R5 2-4  R6 3-4
+maintain  R1 3  R2 2  R3-R3+ 1  R4-R5 1  R6 1-2
+zones younger  R1 R6
 `;
 
 export const CYCLES = `First macro

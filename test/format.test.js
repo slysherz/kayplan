@@ -13,7 +13,9 @@ test('every canonical file reads and writes back to the same text', () => {
     assert.equal(serialize(r.value, ...more), text);
   };
   round(files['season.txt'], f.parseSeason, f.serializeSeason);
-  round(TABLES + "pace older  R1 10  R2 11.5\nplace 1km Dock-Bridge\nplace 300m Island lap\n", f.parseTables, f.serializeTables);
+  round(TABLES.replace('yearly', 'pace older  R1 10  R2 11.5\nyearly') + 'place 1km Dock-Bridge\nplace 300m Island lap\n', f.parseTables, f.serializeTables);
+  // a file from before the km tables still reads and writes back unchanged
+  round(TABLES.split('\n').slice(0, 3).join('\n') + '\n', f.parseTables, f.serializeTables);
   round(files['events.txt'], f.parseEvents, f.serializeEvents);
   round(files['plans/group-a/plan.txt'], f.parsePlanFile, f.serializePlanFile);
   round(CYCLES, f.parseCycles, f.serializeCycles);
@@ -43,6 +45,15 @@ test('tables', () => {
   assert.equal(t.reference.R1, 7200);
   assert.equal(t.pace.default['R3+'], 12.8);
   assert.deepEqual(t.places, [{ name: 'Long reach', m: 1500 }]);
+  assert.deepEqual(t.yearly, { older: 1000 });
+  assert.deepEqual(t.hard, { R1: 12, R2: 12, R3: 6, 'R3+': 3.2, R4: 2.2, R5: 1, R6: 0.5 });
+  assert.deepEqual(t.race, { sprint: 1.4, fundo: 6, maratona: 13.5 });
+  assert.equal(t.warmup, 2);
+  assert.equal(f.parseTables('load  C 80\n').value.warmup, null);
+  assert.match(f.parseTables('yearly  older lots\n').errors[0].message, /water km per season/);
+  assert.match(f.parseTables('hard  R7 5\n').errors[0].message, /R1 to R6/);
+  assert.match(f.parseTables('race  slalom 5\n').errors[0].message, /sprint, fundo or maratona/);
+  assert.match(f.parseTables('warmup 2 km\n').errors[0].message, /one number/);
   assert.match(f.parseTables('load  C\n').errors[0].message, /pairs/);
   assert.match(f.parseTables('load  C 180\n').errors[0].message, /0 to 100/);
   assert.match(f.parseTables('reference  R9 10\'\n').errors[0].message, /zone/);
@@ -138,15 +149,21 @@ test('weeks set by hand', () => {
 test('sessions', () => {
   const sessions = f.parseSessions(files['plans/group-a/sessions.txt']).value;
   assert.deepEqual(strip(sessions), [
-    { date: '2026-01-20', slot: 'pm', band: 'older', notDone: false, text: "1km R1 + 8x 4' R2/1' R0 + 1km R1", notes: 'crew boats on the last four\n\nwatch the stroke rate' },
-    { date: '2026-01-20', slot: 'pm', band: 'younger', notDone: false, text: '2x2000m', notes: '' },
-    { date: '2026-01-22', slot: 'am', band: 'older', notDone: true, text: "6km R1 + 4x(15'' R7 + 15'' R0)", notes: 'no water' },
-    { date: '2026-01-24', slot: 'am', band: 'older', notDone: false, text: "20' R1 + 4x 10'' R6/2' + 10' R1", notes: '' }
+    { date: '2026-01-20', slot: 'pm', band: 'older', place: 'water', notDone: false, text: "1km R1 + 8x 4' R2/1' R0 + 1km R1", notes: 'crew boats on the last four\n\nwatch the stroke rate' },
+    { date: '2026-01-20', slot: 'pm', band: 'younger', place: 'water', notDone: false, text: '2x2000m', notes: '' },
+    { date: '2026-01-22', slot: 'am', band: 'older', place: 'water', notDone: true, text: "6km R1 + 4x(15'' R7 + 15'' R0)", notes: 'no water' },
+    { date: '2026-01-24', slot: 'am', band: 'older', place: 'water', notDone: false, text: "20' R1 + 4x 10'' R6/2' + 10' R1", notes: '' }
   ]);
   assert.equal(sessions[2].line, 6);
   // the plan text is kept as typed, colons and bars included
   assert.equal(f.parseSessions('2026-01-20 am older: unilateral (D | E): 2x 300m\n').value[0].text, 'unilateral (D | E): 2x 300m');
   assert.equal(f.parseSessions('2026-01-20 am older:\n').value[0].text, '');
+  // the place, when it is not the water
+  const pool = f.parseSessions("2026-01-20 am older pool: 3x 10' R2/3'\n2026-01-21 am older gym not-done: circuit\n").value;
+  assert.deepEqual(pool.map(x => [x.place, x.notDone, x.text]), [['pool', false, "3x 10' R2/3'"], ['gym', true, 'circuit']]);
+  assert.equal(f.serializeSessions(pool, ['older']), "2026-01-20 am older pool: 3x 10' R2/3'\n2026-01-21 am older gym not-done: circuit\n");
+  assert.equal(f.serializeSessions([{ date: '2026-01-20', slot: 'am', band: 'older', place: 'water', text: '6km R1' }]), '2026-01-20 am older: 6km R1\n');
+  assert.match(f.parseSessions('2026-01-20 am older lake: 6km R1\n').errors[0].message, /a session is written/);
   assert.match(f.parseSessions('2026-01-20 noon older: 6km R1\n').errors[0].message, /a session is written/);
   assert.match(f.parseSessions('2026-01-32 am older: 6km R1\n').errors[0].message, /a session is written/);
   assert.match(f.parseSessions('6km R1\n').errors[0].message, /a session is written/);

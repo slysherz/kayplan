@@ -146,8 +146,13 @@ test('check: tables, missing files and an unreadable season', async () => {
   assert.deepEqual(problems(data), [
     'error tables.txt load is missing for week type CH, R, AT, CT',
     'error tables.txt reference is missing for R0, R2, R3, R3+, R4, R5, R6, R7',
-    'error tables.txt pace default is missing for R0, R2, R3, R3+, R4, R5, R6, R7'
+    'error tables.txt pace default is missing for R0, R2, R3, R3+, R4, R5, R6, R7',
+    'error tables.txt hard is missing for R1, R2, R3, R3+, R4, R5, R6',
+    'error tables.txt race is missing for sprint, fundo, maratona',
+    'error tables.txt warmup is missing'
   ]);
+  data = await load({ 'tables.txt': fixture()['tables.txt'].replace('older 1000', 'older 1000  guest 500') });
+  assert.deepEqual(problems(data), ['warning tables.txt yearly km are given for "guest", which is not a band of any plan']);
   const files = fixture();
   delete files['plans/group-b/plan.txt'];
   delete files['plans/group-b/weeks.txt'];
@@ -169,51 +174,58 @@ test('check: a past race with an unconfirmed date is a warning', async () => {
 
 test('show season prints the sheet', async () => {
   const lines = seasonReport(await load(), 'group-a', '2026-01-21').split('\n');
-  assert.deepEqual(lines.slice(0, 5), [
+  assert.deepEqual(lines.slice(0, 7), [
     'group-a · Group A · bands older, younger',
     '12 weeks, 2026-01-05 to 2026-03-29 · today 2026-01-21, week 3',
-    '> current week · * type set by hand · weeks 1 to 2 have ended',
+    'km older: 7.9 done + 4.9 planned of 1000 yearly · weeks that have ended: 0.0 of 217.2 estimated',
+    'km younger: 4.0 done + 0.0 planned, no yearly km',
+    '> current week · * type set by hand · km: from sessions/estimate · weeks 1 to 2 have ended',
     '',
-    '   wk  monday      macrocycle    mesocycle    content  type  load  sessions            events'
+    '   wk  monday      macrocycle    mesocycle    content  type  load  sessions            km                      events'
   ]);
-  assert.equal(lines[5], '    1  2026-01-05  First macro   General one  R1-R2    I       60');
-  assert.equal(lines[7], '>   3  2026-01-19  First macro   General one  R1-R2    R*      50  older 3, younger 1');
-  assert.equal(lines[10], '    6  2026-02-09  First macro   General two  R2       CH     100                      S1 Spring regatta (Sat 2026-02-14, sprint, solo, importance 1, date not confirmed)');
-  assert.equal(lines[11], '    7  2026-02-16  First macro   General two  R2       R       50                      h Carnival break (Mon 2026-02-16 to 2026-02-22, holiday)');
-  assert.equal(lines.length, 17);
+  assert.equal(lines[7], '    1  2026-01-05  First macro   General one  R1-R2    I       60                      older 0/93');
+  assert.equal(lines[9], '>   3  2026-01-19  First macro   General one  R1-R2    R*      50  older 3, younger 1  older 13/78, younger 4');
+  assert.equal(lines[12], '    6  2026-02-09  First macro   General two  R2       CH     100                      older 0/155             S1 Spring regatta (Sat 2026-02-14, sprint, solo, importance 1, date not confirmed)');
+  assert.equal(lines[13], '    7  2026-02-16  First macro   General two  R2       R       50                      older 0/78              h Carnival break (Mon 2026-02-16 to 2026-02-22, holiday)');
+  assert.equal(lines.length, 19);
   assert.match(seasonReport(await load(), 'group-b', '2026-05-01'), /today 2026-05-01, outside the season/);
-  assert.match(seasonReport(await load(), 'group-b', '2026-01-07'), /\* type set by hand · no week has ended\n/);
-  assert.match(seasonReport(await load(), 'group-b', '2026-01-21').split('\n')[5], /^\s+1  2026-01-05  Only macro  Unplanned  -        -        -$/);
+  assert.match(seasonReport(await load(), 'group-b', '2026-01-07'), /\* type set by hand · km: from sessions\/estimate · no week has ended\n/);
+  assert.match(seasonReport(await load(), 'group-b', '2026-01-21').split('\n')[6], /^\s+1  2026-01-05  Only macro  Unplanned  -        -        -$/);
 });
 
 test('show week prints the sessions with the zone working', async () => {
   assert.equal(weekReport(await load(), 'group-a', 3, '2026-01-21'), `group-a · week 3 · 2026-01-19 to 2026-01-25 · current week
 First macro / General one / content R1-R2 · type R (set by hand, pattern gives R) · load 50%
+km older: 12.8 of 77.6 estimated (load 50% × content 1.00) · R1 6.8 · R2 5.9 · R6 0.2
+km younger: 4.0
 
 Mon 2026-01-19
 Tue 2026-01-20
   pm older · done · main zone R2 · 1km R1 + 8x 4' R2/1' R0 + 1km R1
-      R2 32' · R1 13' · R0 8'
+      R2 32' · R1 13' · R0 8' · 7.9 km
+      1km R1 ≈ 6'19'' · 4' R2 ≈ 730 m · 1' R0 ≈ 120 m
       note: crew boats on the last four
       note:
       note: watch the stroke rate
   pm younger · done · main zone none · 2x2000m
-      no zone 4 km
+      no zone 4 km · 4.0 km
 Wed 2026-01-21 · today
 Thu 2026-01-22
   am older · not done · main zone R1 · 6km R1 + 4x(15'' R7 + 15'' R0)
-      R7 1' · R1 38' · R0 1'
+      R7 1' · R1 38' · R0 1' · 6.2 km
+      6km R1 ≈ 37'54'' · 15'' R7 ≈ 50 m · 15'' R0 ≈ 30 m
       note: no water
 Fri 2026-01-23
 Sat 2026-01-24
   am older · planned · main zone R6 · 20' R1 + 4x 10'' R6/2' + 10' R1
-      R6 40'' · R1 30'
+      R6 40'' · R1 30' · 4.9 km
+      20' R1 ≈ 3.2 km · 10'' R6 ≈ 40 m · 10' R1 ≈ 1.6 km
 Sun 2026-01-25`);
   const younger = weekReport(await load(), 'group-a', 3, '2026-01-21', 'younger');
   assert.match(younger, /pm younger/);
   assert.doesNotMatch(younger, /older ·/);
-  assert.match(weekReport(await load(), 'group-a', 1, '2026-01-21'), /week 1 · 2026-01-05 to 2026-01-11 · ended\n.* type I · load 60%/);
-  assert.match(weekReport(await load(), 'group-b', 9, '2026-01-21'), /type - · load -\n[^]*Sat 2026-03-07\n  M\+ Long race \(Sat 2026-03-07 to 2026-03-08, maratona, mixed, importance 3\)\nSun 2026-03-08\n  M\+ Long race/);
+  assert.match(weekReport(await load(), 'group-a', 1, '2026-01-21'), /week 1 · 2026-01-05 to 2026-01-11 · ended\n.* type I · load 60%\nkm older: 0\.0 of 93\.1 estimated \(load 60% × content 1\.00\)\nkm younger: 0\.0\n/);
+  assert.match(weekReport(await load(), 'group-b', 9, '2026-01-21'), /type - · load -\nkm masters: 0\.0\n[^]*Sat 2026-03-07\n  M\+ Long race \(Sat 2026-03-07 to 2026-03-08, maratona, mixed, importance 3\)\nSun 2026-03-08\n  M\+ Long race/);
 });
 
 test('show events prints the table', async () => {

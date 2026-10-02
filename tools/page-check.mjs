@@ -65,7 +65,37 @@ try {
   assert.equal(await text('.day.now .day-h b'), 'Fri');
   assert.equal(await ff.js('return [...document.querySelectorAll(".sty")].slice(0, 9).map(b => b.textContent).join(" ")'), 'I C R CH R C C CH R');
   assert.equal(await count('.sty.hand'), 1);
-  ok('opens on the current week; today is marked; types follow the patterns, the hand-set one is marked');
+  // km, checked by hand: week 1 has 6 + 7.87 + 4 km of sessions (the one marked not done is left out);
+  // its estimate is 2220 x 0.6 / 22.95, the sum of load x content over the season
+  assert.equal(await text('[data-id=week-km]'), '18 of 58 km');
+  assert.equal(await text('.cap[data-v="1"]'), '58');
+  assert.match(await ff.js('return document.querySelector(".cap[data-v=\\"1\\"]").title'), /estimate 58\.0 km \(load 60% × content 1\.00\), sessions 17\.9 km \(31%\)/);
+  assert.match(await ff.js('return document.querySelector(".cap[data-v=\\"30\\"]").title'), /not planned yet: an average week/);
+  assert.equal(await text('.capsum'), '18 / 2220');
+  assert.match(await ff.js('return document.querySelector(".capsum").title'), /6\.0 km done, 11\.9 km planned, of 2220 km a year/);
+  ok('opens on the current week; today is marked; types follow the patterns, the hand-set one is marked; km row');
+
+  // the capacity grid: always a row for each zone
+  assert.deepEqual(await ff.js('return [...document.querySelectorAll(".zlab")].map(b => b.dataset.tip)'), ['R1', 'R2', 'R3', 'R3+', 'R4', 'R5', 'R6', 'R7']);
+  assert.deepEqual(await ff.js('return [...document.querySelectorAll(".zlab.off")].map(b => b.dataset.tip)'), ['R4']);   // juniors: every zone but R4
+  const cell = (zone, week) => '.zlab[data-tip="' + zone + '"] ~ .cap[data-v="' + week + '"]';
+  assert.equal(await text(cell('R1', 1)), '1');
+  assert.equal(await ff.js('return document.querySelector(arguments[0]).className', cell('R1', 1)), 'cap mono low cur');
+  assert.match(await ff.js('return document.querySelector(arguments[0]).title', cell('R1', 1)), /1 session of R1: below maintenance \(develop 4–6, maintain 3\)/);
+  assert.equal(await text(cell('R3', 1)), '·');
+  await ff.click('.segb[data-v="km"]');
+  assert.equal(await text(cell('R1', 1)), '8');
+  assert.equal(await text('.zlab[data-tip="R2"] ~ .capsum'), '6');
+  await ff.click('.segb[data-v="sessions"]');
+  assert.equal(await text('.zlab[data-tip="R2"] ~ .capsum'), '1');
+  // the zone card opens when the zone name gets the focus
+  await ff.js('document.querySelector(".zlab[data-tip=\\"R3+\\"]").focus()');
+  assert.equal(await ff.js('return document.getElementById("tip").hidden'), false);
+  assert.match(await text('#tip'), /R3\+ · Aerobic power[^]*Develop: 2–3 sessions\. Maintain: 1\. Counted together with R3\./);
+  await shot('01-zone-card');
+  await ff.js('document.activeElement.blur()');
+  assert.equal(await ff.js('return document.getElementById("tip").hidden'), true);
+  ok('capacity grid: rows, counts, sessions and km modes, zone card');
 
   await ff.click('.swk[data-v="3"]');
   assert.match(await text('.lower .sec-h b'), /Week 3/);
@@ -89,7 +119,10 @@ try {
   await ff.click('.day:nth-child(2) .add[data-v="pm"]');
   await ff.keys("1km R1 + 8x 4' R2/1' R0 + 1km R1");
   assert.equal(await text('.zpill'), 'R2');
-  assert.match(await text('.inf small'), /R2 ≈ 32' · R1 ≈ 13' · R0 ≈ 8'/);
+  assert.match(await text('.inf small'), /R2 ≈ 32' · R1 ≈ 13' · R0 ≈ 8' · ≈ 7\.9 km/);
+  assert.equal(await text('.inf .other'), "1km R1 ≈ 6'19'' · 4' R2 ≈ 730 m · 1' R0 ≈ 120 m");
+  assert.equal(await text('[data-id=week-km]'), '8 of 76 km');
+  assert.equal(await text('.cap[data-v="3"]'), '76');
   await saved();
   assert.match(file('plans/juniors/sessions.txt'), /^2026-10-13 pm junior: 1km R1 \+ 8x 4' R2\/1' R0 \+ 1km R1$/m);
   await ff.click('[data-fid=s-notes]');
@@ -109,9 +142,23 @@ try {
   assert.match(file('plans/juniors/sessions.txt'), /1km R1 \+ 4x 10'' R6\/2'$/m);
   ok('spaces can be typed at the end of the plan; Enter does nothing there');
 
+  await choose('[data-fid=s-place]', 'pool');
+  await saved();
+  assert.match(file('plans/juniors/sessions.txt'), /^2026-10-13 pm junior pool: 1km R1 /m);
+  assert.equal(await text('.zpill'), 'R2');
+  assert.match(await text('.chip.on .chip-h'), /PM · R2 · pool/);
+  assert.equal(await text('[data-id=week-km]'), "0 of 76 km · 41' off the water");
+  assert.equal(await count('.inf .other'), 0);
+  await shot('02-pool');
+  await choose('[data-fid=s-place]', 'water');
+  await saved();
+  assert.match(file('plans/juniors/sessions.txt'), /^2026-10-13 pm junior: 1km R1 /m);
+  ok('a session in the pool: no km, minutes off the water, the main zone still worked out');
+
   await ff.click('[data-fid=s-notdone]');
   await saved();
   assert.match(file('plans/juniors/sessions.txt'), /^2026-10-13 pm junior not-done: /m);
+  assert.match(await text('[data-id=week-km]'), /^0 of 76 km$/);
   assert.match(await text('.chip.on .chip-h'), /not done/);
   await shot('02-session');
   await ff.click('.del');
@@ -186,6 +233,13 @@ try {
   await ff.click('.pill[data-v="iniciados"]');
   assert.equal(await text('.pill.band.on'), 'iniciado');
   assert.equal(await count('.rc'), 7);
+  // the zones the course's long-term table does not give this age are dimmed: Iniciados have R1 and R6
+  assert.deepEqual(await ff.js('return [...document.querySelectorAll(".zlab.off")].map(b => b.dataset.tip)'), ['R2', 'R3', 'R3+', 'R4', 'R5', 'R7']);
+  await shot('05-not-suggested');
+  // a band with no yearly km has no estimates
+  await ff.click('.pill.band[data-v="menor"]');
+  assert.equal(await text('.cap[data-v="1"]'), '·');
+  assert.equal(await text('.capsum'), '0');
   await ff.click('.pill[data-v="cadetes"]');
   assert.equal(await count('.pill.band'), 0);
   await ff.click('.pill[data-v="juniors"]');
@@ -286,6 +340,30 @@ try {
   await ff.wait('return !/problem/.test(document.getElementById("status").textContent)');
   ok('a line that cannot be read: shown as a problem, the file is not saved over, other files still save');
 
+  // ================= the capacity grid, with the course's counts =================
+  fresh();
+  put('plans/juniors/sessions.txt', [
+    "2026-10-05 pm junior: 2km R1 + 8x 4' R2/1' R0",            // week 2: three R2 sessions
+    "2026-10-06 pm junior: 2km R1 + 3x 2000m R2/3'",
+    "2026-10-08 pm junior pool: 10' R1 + 3x 10' R2/3'",          // one of them in the pool
+    "2026-10-10 am junior: 2km R1 + 4x 4' R3/4' R1",            // one R3 and one R3+
+    "2026-10-11 am junior: 2km R1 + 5x 3' R3+/3' R1",
+    "2026-10-13 pm junior: 2km R1 + 8x 4' R2/1' R0",            // week 3: two R2, one R6
+    "2026-10-15 pm junior: 2km R1 + 3x 2000m R2/3'",
+    "2026-10-17 am junior: 20' R1 + 6x 10'' R6/2' + 10' R1",
+    "2026-10-18 am junior not-done: 2km R1 + 8x 4' R2/1' R0"     // not done: not counted
+  ].join('\n') + '\n');
+  await open('plan=juniors&week=2');
+  const g = (zone, week) => ff.js('const c = document.querySelector(arguments[0]); return c.textContent + " " + c.className.replace(/cap mono ?| ?cur/g, "")', '.zlab[data-tip="' + zone + '"] ~ .cap[data-v="' + week + '"]');
+  assert.deepEqual([await g('R2', 2), await g('R3', 2), await g('R3+', 2)], ['3 dev', '1 dev', '1 dev']);   // 3 of R2; R3 and R3+ make 2 together
+  assert.deepEqual([await g('R2', 3), await g('R6', 3), await g('R1', 3)], ['2 mnt', '1 mnt', '· ']);
+  assert.match(await ff.js('return document.querySelector(arguments[0]).title', '.zlab[data-tip="R3"] ~ .cap[data-v="2"]'), /1 session of R3, 2 of R3-R3\+ together: developing \(develop 2–3, maintain 1\)/);
+  await shot('05-grid');
+  await ff.click('.segb[data-v="km"]');
+  assert.deepEqual([await g('R2', 2), await g('R3+', 2)], ['12 tg', '3 tg']);   // 5.87 + 6 km of R2 on the water, none from the pool
+  await shot('05-grid-km');
+  ok('capacity grid: developing and maintaining by the course counts; R3 and R3+ together; the pool counts as a session, not as km');
+
   // ================= the past is locked =================
   fresh();
   await open('plan=juniors', '2026-11-18');   // week 8: weeks 1 to 7 have ended
@@ -314,6 +392,9 @@ try {
   assert.match(await text('.lower .sec-h b'), /Week 1/);
   assert.equal(await status(), '');
   assert.equal(await ff.js('return document.querySelector("[data-fid=w-load]").disabled'), true);
+  // the grid is there before anything is planned
+  assert.equal(await count('.zlab'), 8);
+  assert.equal(await count('.segb'), 2);
   await shot('09-unplanned');
   await ff.click('.meso[data-v="0"]');
   await choose('#splitw', '6');
@@ -337,7 +418,7 @@ try {
   await saved();
   assert.equal(file('plans/cadetes/sessions.txt'), '2026-10-03 am cadete: controlo 1km\n');
   assert.equal(await text('.zpill'), '–');
-  assert.equal(await text('.inf small'), 'No zone found');
+  assert.equal(await text('.inf small'), 'No zone found · ≈ 1.0 km');   // the distance still counts toward the week
   ok('the first session creates sessions.txt; a plan with no zone says so');
 
   server.closeAllConnections();

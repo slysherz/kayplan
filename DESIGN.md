@@ -1,6 +1,6 @@
 # Kayplan — design
 
-Status: design agreed for level 1 and the first parts of level 2, 2026-10-02. Level 1 is built and runs on one computer, with the plan in text files in `season/`: the engine, the command line and the page. The GitHub step (section 6.5) is not built. [CLAUDE.md](CLAUDE.md) says what is built, describes the file format and lists the decisions made while building. What is still undecided is listed in [Open questions](#10-open-questions).
+Status: design agreed for level 1 and the first parts of level 2, 2026-10-02. Level 1 is built and runs on one computer, with the plan in text files in `season/`: the engine, the command line and the page. The first cut of level 2 is built too: km (sections 7.0 and 8.2) and the capacity grid (7.1). The GitHub step (section 6.5) is not built. [CLAUDE.md](CLAUDE.md) says what is built, describes the file format and lists the decisions made while building. What is still undecided is listed in [Open questions](#10-open-questions).
 
 Kayplan is a planning tool for one kayak coach at a small club who trains children and teenagers of all ages, often several age groups in the same session. It shows the whole season at a glance and zooms into weeks and single sessions.
 
@@ -576,8 +576,8 @@ To settle before or while building level 1:
 2. **File format.** Settled on 2026-10-02: plain text files in `season/`, described in [CLAUDE.md](CLAUDE.md).
 3. **How it runs.** Settled: a web page over a private GitHub repository, with no names in it (section 6.5).
 4. **Paces.** Km and the main zone need a speed per zone for each group. Where do they come from: typed once per group, or worked out from a control test?
-5. **Yearly km per group.** The course figures are for a high-performance pathway (2220 km for second-year Juniors). What figure should each group use, and what about Mínimo and Menor, which have no column?
-6. **Sessions off the water.** Pool, gym, yoga and running appear in the coach's notes. How are they written, and do they count in minutes?
+5. **Yearly km per group.** The course figures are for a high-performance pathway (2220 km for second-year Juniors). Chosen as the starting point on 2026-10-02 (junior 2220, senior 2581, cadete 1605, iniciado 274; Menor has none and gets no estimate); to be corrected in `tables.txt` once real volumes are known.
+6. **Sessions off the water.** Settled on 2026-10-02: a session has a place (water, pool, gym, land). Off the water it is not counted for km, but it counts for capacities by its zones; its written time is shown as minutes.
 7. **Assumed figures in the content factor table** (section 7.0): 6 km for a hard fundo session, 2.2 km for R4, and 13.5 km for marathon race pace against 12 km for R1 and R2.
 
 Assumptions never confirmed:
@@ -585,7 +585,7 @@ Assumptions never confirmed:
 8. The meaning of R0, the F variants and Rg (section 3.1).
 9. The first/second-year mapping between club categories and the course table (section 3.3).
 10. The reference volumes for R4 and R7 used to find the main zone (section 8.1.1).
-11. The dummy thresholds for developing and maintaining a zone (section 7.1); the course's assume near-daily training.
+11. The thresholds for developing and maintaining a zone (section 7.1). Settled on 2026-10-02: the course's table (slide 188) for every band, with R3 and R3+, and R4 and R5, counted together as the course does. The course's counts assume near-daily training.
 
 For level 3:
 
