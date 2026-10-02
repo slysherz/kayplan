@@ -3,6 +3,7 @@
 // "today" is always passed in; it is never stored (6.7).
 
 import { addDays, daysBetween, weekday } from './dates.js';
+import { tr } from './lang.js';
 import { ZONES, infer } from './notation.js';
 import { layout, patType } from './cycles.js';
 import * as format from './format.js';
@@ -26,7 +27,7 @@ export async function load(store) {
     const f = await store.read(path);
     data.revs[path] = f ? f.rev : null;
     const r = parse(f ? f.text : '');
-    if (!f && r.errors.length) data.errors.push({ file: path, line: null, message: 'the file is missing' });
+    if (!f && r.errors.length) data.errors.push({ file: path, line: null, message: tr('the file is missing') });
     else for (const e of r.errors) data.errors.push({ file: path, line: e.line, message: e.message });
     return r.value;
   }
@@ -35,6 +36,10 @@ export async function load(store) {
   [data.season, data.tables, data.events] = await Promise.all([
     file('season.txt', format.parseSeason), file('tables.txt', format.parseTables), file('events.txt', format.parseEvents)
   ]);
+  // plans in the order season.txt lists them; any it does not list come after, by id
+  const order = data.season ? data.season.plans : [];
+  const rank = id => order.includes(id) ? order.indexOf(id) : order.length;
+  ids.sort((a, b) => rank(a) - rank(b));
   data.plans = await Promise.all(ids.map(async id => {
     const f = planFiles(id);
     const [head, macros, hand, sessions] = await Promise.all([
@@ -177,57 +182,60 @@ export function check(data, today) {
   const season = data.season, last = addDays(season.start, season.weeks * 7 - 1);
   const inSeason = date => date >= season.start && date <= last;
 
+  for (const id of season.plans) { if (!planOf(data, id)) add('warning', 'season.txt', null, tr('plans lists "{0}", which has no folder in plans/', id)); }
+
   if (!data.errors.some(e => e.file === 'tables.txt')) {
     const noLoad = PATTERN_TYPES.filter(t => data.tables.load[t] === undefined);
-    if (noLoad.length) add('error', 'tables.txt', null, 'load is missing for week type ' + noLoad.join(', '));
+    if (noLoad.length) add('error', 'tables.txt', null, tr('load is missing for week type {0}', noLoad.join(', ')));
     const noRef = ZONES.filter(z => !data.tables.reference[z]);
-    if (noRef.length) add('error', 'tables.txt', null, 'reference is missing for ' + noRef.join(', '));
+    if (noRef.length) add('error', 'tables.txt', null, tr('reference is missing for {0}', noRef.join(', ')));
     const noPace = ZONES.filter(z => !(data.tables.pace.default || {})[z]);
-    if (noPace.length) add('error', 'tables.txt', null, 'pace default is missing for ' + noPace.join(', '));
+    if (noPace.length) add('error', 'tables.txt', null, tr('pace default is missing for {0}', noPace.join(', ')));
     const noHard = ['R1', 'R2', 'R3', 'R3+', 'R4', 'R5', 'R6'].filter(z => data.tables.hard[z] === undefined);
-    if (noHard.length) add('error', 'tables.txt', null, 'hard is missing for ' + noHard.join(', '));
+    if (noHard.length) add('error', 'tables.txt', null, tr('hard is missing for {0}', noHard.join(', ')));
     const noRace = format.RACE_TYPES.filter(t => data.tables.race[t] === undefined);
-    if (noRace.length) add('error', 'tables.txt', null, 'race is missing for ' + noRace.join(', '));
-    if (data.tables.warmup === null) add('error', 'tables.txt', null, 'warmup is missing');
+    if (noRace.length) add('error', 'tables.txt', null, tr('race is missing for {0}', noRace.join(', ')));
+    if (data.tables.warmup === null) add('error', 'tables.txt', null, tr('warmup is missing'));
     const dev = Object.keys(data.tables.develop), mnt = Object.keys(data.tables.maintain);
     const odd = [...dev.filter(k => !mnt.includes(k)), ...mnt.filter(k => !dev.includes(k))];
-    if (odd.length) add('error', 'tables.txt', null, 'develop and maintain must list the same contents; only one has ' + odd.join(', '));
+    if (odd.length) add('error', 'tables.txt', null, tr('develop and maintain must list the same contents; only one has {0}', odd.join(', ')));
     const all = dev.flatMap(k => k.split('-')), twice = all.filter((z, i) => all.indexOf(z) !== i);
-    if (twice.length) add('error', 'tables.txt', null, 'develop lists ' + [...new Set(twice)].join(', ') + ' in two contents');
+    if (twice.length) add('error', 'tables.txt', null, tr('develop lists {0} in two contents', [...new Set(twice)].join(', ')));
     const bands = data.plans.flatMap(p => p.bands);
-    for (const b of Object.keys(data.tables.yearly)) { if (!bands.includes(b)) add('warning', 'tables.txt', null, 'yearly km are given for "' + b + '", which is not a band of any plan'); }
-    for (const b of Object.keys(data.tables.zones)) { if (!bands.includes(b)) add('warning', 'tables.txt', null, 'zones are given for "' + b + '", which is not a band of any plan'); }
+    for (const b of Object.keys(data.tables.yearly)) { if (!bands.includes(b)) add('warning', 'tables.txt', null, tr('yearly km are given for "{0}", which is not a band of any plan', b)); }
+    for (const b of Object.keys(data.tables.zoneKm)) { if (!bands.includes(b)) add('warning', 'tables.txt', null, tr('zone-km is given for "{0}", which is not a band of any plan', b)); }
+    for (const b of Object.keys(data.tables.zones)) { if (!bands.includes(b)) add('warning', 'tables.txt', null, tr('zones are given for "{0}", which is not a band of any plan', b)); }
   }
 
   const ids = data.plans.map(p => p.id);
   for (const e of data.events) {
     for (const id of Object.keys(e.plans || {})) {
-      if (!ids.includes(id)) add('error', 'events.txt', e.line, e.name + ': there is no plan "' + id + '"');
+      if (!ids.includes(id)) add('error', 'events.txt', e.line, e.name + ': ' + tr('there is no plan "{0}"', id));
     }
     const v = eventView(data, e, today);
-    if (!v.weeks.length) add('warning', 'events.txt', e.line, e.name + ' (' + e.date + ') is outside the season');
-    if (e.kind === 'race' && !Object.keys(e.plans).length) add('warning', 'events.txt', e.line, e.name + ' is in no plan');
-    if (v.unconfirmedPast) add('warning', 'events.txt', e.line, e.name + ' (' + e.date + ') is in the past and its date was never confirmed');
+    if (!v.weeks.length) add('warning', 'events.txt', e.line, tr('{0} ({1}) is outside the season', e.name, e.date));
+    if (e.kind === 'race' && !Object.keys(e.plans).length) add('warning', 'events.txt', e.line, tr('{0} is in no plan', e.name));
+    if (v.unconfirmedPast) add('warning', 'events.txt', e.line, tr('{0} ({1}) is in the past and its date was never confirmed', e.name, e.date));
   }
 
   for (const plan of data.plans) {
     const f = planFiles(plan.id);
     if (!data.errors.some(e => e.file === f.cycles)) {
       const covered = layout(plan.macros).weeks;
-      if (covered !== season.weeks) add('error', f.cycles, null, 'the mesocycles cover ' + covered + ' weeks and the season has ' + season.weeks);
+      if (covered !== season.weeks) add('error', f.cycles, null, tr('the mesocycles cover {0} weeks and the season has {1}', covered, season.weeks));
     }
     for (const h of plan.hand) {
-      if (weekday(h.monday) !== 0 || !inSeason(h.monday)) add('error', f.weeks, h.line, h.monday + ' is not the Monday of a week in the season');
+      if (weekday(h.monday) !== 0 || !inSeason(h.monday)) add('error', f.weeks, h.line, tr('{0} is not the Monday of a week in the season', h.monday));
       // a missing pattern type is already reported once, for tables.txt
-      if (data.tables.load[h.type] === undefined && !PATTERN_TYPES.includes(h.type)) add('error', f.weeks, h.line, 'there is no week type "' + h.type + '" in tables.txt');
+      if (data.tables.load[h.type] === undefined && !PATTERN_TYPES.includes(h.type)) add('error', f.weeks, h.line, tr('there is no week type "{0}" in tables.txt', h.type));
     }
     const seen = new Set();
     for (const s of plan.sessions) {
       const key = format.sessionKey(s);
-      if (seen.has(key)) add('error', f.sessions, s.line, 'there are two sessions for ' + key);
+      if (seen.has(key)) add('error', f.sessions, s.line, tr('there are two sessions for {0}', key));
       seen.add(key);
-      if (!inSeason(s.date)) add('error', f.sessions, s.line, s.date + ' is outside the season');
-      if (!plan.bands.includes(s.band)) add('error', f.sessions, s.line, 'plan ' + plan.id + ' has no band "' + s.band + '"');
+      if (!inSeason(s.date)) add('error', f.sessions, s.line, tr('{0} is outside the season', s.date));
+      if (!plan.bands.includes(s.band)) add('error', f.sessions, s.line, tr('plan {0} has no band "{1}"', plan.id, s.band));
     }
   }
   return out;

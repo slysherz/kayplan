@@ -5,6 +5,7 @@
 // Every edit returns a new plan and throws when it is not allowed; nothing is changed in place.
 
 import { addDays, daysBetween } from './dates.js';
+import { tr } from './lang.js';
 
 // 'none' is for time that is not planned yet: its weeks have no type and no load.
 export const PATTERNS = ['build', 'intro', 'restart', 'comp', 'recovery', 'none'];
@@ -46,8 +47,9 @@ export function layout(macros) {
 // ended is the number of weeks that have ended. A boundary can only sit, move or disappear
 // at or after the end of the last ended week (DESIGN.md 6.7).
 
-const LOCKED = 'weeks that have ended cannot be moved';
+const locked = () => fail(tr('weeks that have ended cannot be moved'));
 
+// what the coach reads when an edit is refused, in the language in use
 function fail(message) {
   const e = new Error(message);
   e.code = 'not-allowed';
@@ -83,7 +85,7 @@ function runOf(f, i) {
 }
 
 function mesoAt(f, i) {
-  if (!Number.isInteger(i) || i < 0 || i >= f.mesos.length) fail('no such mesocycle');
+  if (!Number.isInteger(i) || i < 0 || i >= f.mesos.length) fail(tr('no such mesocycle'));
   return f.mesos[i];
 }
 
@@ -98,11 +100,11 @@ export function boundaryLimits(plan, i, ended) {
 // Move the boundary after mesocycle i by delta weeks: one block grows and its neighbour shrinks.
 export function moveBoundary(plan, i, delta, ended) {
   const f = open(plan), a = mesoAt(f, i), b = mesoAt(f, i + 1);
-  if (!Number.isInteger(delta)) fail('whole weeks only');
+  if (!Number.isInteger(delta)) fail(tr('whole weeks only'));
   if (delta === 0) return plan;
-  if (a.len + delta < 1 || b.len - delta < 1) fail('a block needs at least one week');
+  if (a.len + delta < 1 || b.len - delta < 1) fail(tr('a block needs at least one week'));
   const at = fromOf(f, i) + a.len - 1;
-  if (Math.min(at, at + delta) < ended) fail(LOCKED);
+  if (Math.min(at, at + delta) < ended) locked();
   a.len += delta;
   b.len -= delta;
   return close(plan, f);
@@ -112,9 +114,9 @@ export function moveBoundary(plan, i, delta, ended) {
 // Splitting time that is not planned yet leaves both parts with its name.
 export function splitMeso(plan, i, week, ended) {
   const f = open(plan), m = mesoAt(f, i), from = fromOf(f, i), first = week - from;
-  if (!Number.isInteger(week) || first < 1 || first >= m.len) fail('the new block must start inside the block');
-  if (week - 1 < ended) fail(LOCKED);
-  f.mesos.splice(i + 1, 0, { name: m.pat === 'none' ? m.name : 'New block', zones: m.zones.slice(), len: m.len - first, pat: m.pat });
+  if (!Number.isInteger(week) || first < 1 || first >= m.len) fail(tr('the new block must start inside the block'));
+  if (week - 1 < ended) locked();
+  f.mesos.splice(i + 1, 0, { name: m.pat === 'none' ? m.name : tr('New block'), zones: m.zones.slice(), len: m.len - first, pat: m.pat });
   m.len = first;
   f.runs[runOf(f, i)].count++;
   return close(plan, f);
@@ -123,9 +125,9 @@ export function splitMeso(plan, i, week, ended) {
 // Delete mesocycle i: its weeks join the previous block (the next one, for the first block).
 export function deleteMeso(plan, i, ended) {
   const f = open(plan), m = mesoAt(f, i);
-  if (f.mesos.length < 2) fail('the last block cannot be deleted');
+  if (f.mesos.length < 2) fail(tr('the last block cannot be deleted'));
   const from = fromOf(f, i), gone = i > 0 ? from - 1 : from + m.len - 1;
-  if (gone < ended) fail(LOCKED);
+  if (gone < ended) locked();
   f.mesos[i > 0 ? i - 1 : 1].len += m.len;
   f.runs[runOf(f, i)].count--;
   f.mesos.splice(i, 1);
@@ -139,9 +141,9 @@ export function moveMeso(plan, i, dir, ended, start) {
   const f = open(plan);
   mesoAt(f, i);
   const a = dir < 0 ? i - 1 : i;
-  if (a < 0 || a + 1 >= f.mesos.length) fail('there is no block on that side');
+  if (a < 0 || a + 1 >= f.mesos.length) fail(tr('there is no block on that side'));
   const from = fromOf(f, a), la = f.mesos[a].len, lb = f.mesos[a + 1].len;
-  if (from - 1 < ended) fail(LOCKED);
+  if (from - 1 < ended) locked();
   const x = f.mesos[a];
   f.mesos[a] = f.mesos[a + 1];
   f.mesos[a + 1] = x;
@@ -167,20 +169,30 @@ export function newMacro(plan, i, ended) {
   const r = runOf(f, i);
   let first = 0;
   for (let k = 0; k < r; k++) first += f.runs[k].count;
-  if (i === first) fail('this block already starts a macrocycle');
-  if (fromOf(f, i) - 1 < ended) fail(LOCKED);
+  if (i === first) fail(tr('this block already starts a macrocycle'));
+  if (fromOf(f, i) - 1 < ended) locked();
   const old = f.runs[r];
-  f.runs.splice(r, 1, { name: old.name, count: i - first }, { name: 'New macrocycle', count: old.count - (i - first) });
+  f.runs.splice(r, 1, { name: old.name, count: i - first }, { name: tr('New macrocycle'), count: old.count - (i - first) });
   return close(plan, f);
+}
+
+// Split macrocycle j: a new macrocycle starts at this week. A block that holds the week is split there too.
+export function splitMacro(plan, j, week, ended) {
+  const lay = layout(plan.macros), mc = lay.macros[j];
+  if (!mc) fail(tr('no such macrocycle'));
+  if (!Number.isInteger(week) || week <= mc.from || week > mc.to) fail(tr('the new macrocycle must start inside the macrocycle'));
+  const m = lay.mesos.find(x => week >= x.from && week <= x.to);
+  if (week === m.from) return newMacro(plan, m.index, ended);
+  return newMacro(splitMeso(plan, m.index, week, ended), m.index + 1, ended);
 }
 
 // Macrocycle j joins the previous macrocycle.
 export function mergeMacro(plan, j, ended) {
   const f = open(plan);
-  if (!Number.isInteger(j) || j < 1 || j >= f.runs.length) fail('there is no previous macrocycle');
+  if (!Number.isInteger(j) || j < 1 || j >= f.runs.length) fail(tr('there is no previous macrocycle'));
   let first = 0;
   for (let k = 0; k < j; k++) first += f.runs[k].count;
-  if (fromOf(f, first) - 1 < ended) fail(LOCKED);
+  if (fromOf(f, first) - 1 < ended) locked();
   f.runs[j - 1].count += f.runs[j].count;
   f.runs.splice(j, 1);
   return close(plan, f);
@@ -191,15 +203,15 @@ export function setMeso(plan, i, changes) {
   const f = open(plan), m = mesoAt(f, i);
   if (changes.name !== undefined) {
     const name = String(changes.name).replace(/\s+/g, ' ').trim();
-    if (!name) fail('a block needs a name');
+    if (!name) fail(tr('a block needs a name'));
     m.name = name;
   }
   if (changes.pat !== undefined) {
-    if (!PATTERNS.includes(changes.pat)) fail('unknown load pattern');
+    if (!PATTERNS.includes(changes.pat)) fail(tr('unknown load pattern'));
     m.pat = changes.pat;
   }
   if (changes.zones !== undefined) {
-    for (const z of changes.zones) { if (!CONTENT_ZONES.includes(z)) fail('unknown zone ' + z); }
+    for (const z of changes.zones) { if (!CONTENT_ZONES.includes(z)) fail(tr('unknown zone {0}', z)); }
     m.zones = CONTENT_ZONES.filter(z => changes.zones.includes(z));
   }
   return close(plan, f);
@@ -207,7 +219,7 @@ export function setMeso(plan, i, changes) {
 
 export function setMacroName(plan, j, value) {
   const name = String(value).replace(/\s+/g, ' ').trim();
-  if (!name) fail('a macrocycle needs a name');
-  if (!plan.macros[j]) fail('no such macrocycle');
+  if (!name) fail(tr('a macrocycle needs a name'));
+  if (!plan.macros[j]) fail(tr('no such macrocycle'));
   return { ...plan, macros: plan.macros.map((mc, k) => k === j ? { ...mc, name } : mc) };
 }

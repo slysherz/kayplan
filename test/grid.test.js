@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as e from '../src/engine.js';
 import { gridView, contents, stateOf } from '../src/grid.js';
-import { zoneCard } from '../src/zones.js';
+import { zoneCard, ZINFO } from '../src/zones.js';
+import { infer } from '../src/notation.js';
 import { gridReport, zoneReport } from '../src/report.js';
 import { parseTables, serializeTables } from '../src/format.js';
 import { memoryStore, fixture, TABLES } from './helpers.js';
@@ -90,9 +91,10 @@ test('the grid marks the zones the course does not suggest for the band', async 
   // a band with no zones line has nothing marked
   assert.deepEqual([...new Set(gridView(data, 'group-a', 'older', TODAY).rows.map(r => r.suggested))], [null]);
   assert.match(gridReport(data, 'group-a', 'younger', TODAY), /\(zone\) not in the course's long-term table for this age\n\n   wk  monday      content  R1 +\(R2\) +\(R3\) +\(R3\+\) +\(R4\) +\(R5\) +R6 +\(R7\)\n/);
-  assert.match(zoneCard('R3', data.tables, 'younger').rows[5][1], /Not suggested for younger\.$/);
-  assert.doesNotMatch(zoneCard('R1', data.tables, 'younger').rows[5][1], /Not suggested/);
-  assert.doesNotMatch(zoneCard('R3', data.tables, 'older').rows[5][1], /Not suggested/);
+  const ages = (zone, band) => zoneCard(zone, data.tables, band).rows.find(r => r[0] === 'Ages')[1];
+  assert.match(ages('R3', 'younger'), /Not suggested for younger\.$/);
+  assert.doesNotMatch(ages('R1', 'younger'), /Not suggested/);
+  assert.doesNotMatch(ages('R3', 'older'), /Not suggested/);
   const odd = await load({ 'tables.txt': fixture()['tables.txt'] + 'zones guest  R1\n' });
   assert.deepEqual(e.check(odd, TODAY).map(p => p.message), ['zones are given for "guest", which is not a band of any plan']);
 });
@@ -129,6 +131,36 @@ D developing, M maintaining, b below maintenance, by the course's sessions a wee
        season               0 7  1 6   0 0  0 0  0 0  0 0  1 <1   0 0`);
 });
 
+test("zone cards: every model session reads as a session of its zone", () => {
+  for (const zone of Object.keys(ZINFO)) {
+    for (const text of ZINFO[zone].models || []) {
+      const r = infer('5km R1 + ' + text, tables, 'any');
+      assert.equal(r.main, zone, text);
+      assert.equal(r.unzoned, null, text);
+    }
+  }
+  // the course counts this R2 session as 60' of work and this R3+ one as 12'
+  const part = (text, zone) => Math.round(infer(text, tables, 'any').parts.find(p => p.zone === zone).min);
+  assert.equal(part(ZINFO.R2.models[0], 'R2'), 60);
+  assert.equal(part(ZINFO['R3+'].models[0], 'R3+'), 12);
+  assert.equal(zoneCard('R6', tables).rows.find(r => r[0] === 'Km a year')[1], 'Iniciado 7.2, Infantil 11.5, Cadete 21, Junior 9.6, Senior 9–10.2');
+});
+
+test("the course's km a year in each zone stand at the end of the rows", async () => {
+  const none = gridView(await load(), 'group-a', 'older', TODAY);
+  assert.deepEqual(none.rows.map(r => r.yearly), [null, null, null, null, null, null, null, null]);
+  const text = TABLES + 'zone-km older  R1 580  R2 415.5  R6 21\n';
+  const t = parseTables(text);
+  assert.deepEqual([t.errors, t.value.zoneKm], [[], { older: { R1: 580, R2: 415.5, R6: 21 } }]);
+  assert.equal(serializeTables(t.value), text);
+  assert.match(parseTables('zone-km older  R0 5\n').errors[0].message, /a zone from R1 to R7 and its km a year/);
+  const data = await load({ 'tables.txt': text + 'zone-km nobody  R1 5\n' });
+  const g = gridView(data, 'group-a', 'older', TODAY);
+  assert.deepEqual(g.rows.map(r => r.zone + ' ' + r.yearly), ['R1 580', 'R2 415.5', 'R3 null', 'R3+ null', 'R4 null', 'R5 null', 'R6 21', 'R7 null']);
+  assert.match(gridReport(data, 'group-a', 'older', TODAY), /\n +season +\S.*\n +a year +580 +415\.5 +21$/);
+  assert.deepEqual(e.check(data, TODAY).map(x => x.message), ['zone-km is given for "nobody", which is not a band of any plan']);
+});
+
 test('zone cards: the sessions per week follow the table', () => {
   const perWeek = z => zoneCard(z, tables).rows.find(r => r[0] === 'Per week')[1];
   assert.equal(perWeek('R1'), 'Develop: 4–6 sessions. Maintain: 3. Recovery after a session: 24 h.');
@@ -137,6 +169,6 @@ test('zone cards: the sessions per week follow the table', () => {
   assert.equal(perWeek('R6'), 'Develop: 3–4 sessions. Maintain: 1–2. Recovery after a session: 24 h.');
   assert.equal(perWeek('R7'), 'At most 2 sessions per microcycle in preparation, 4 in the competitive period.');
   assert.equal(zoneCard('R0', tables), null);
-  assert.match(zoneReport('R2', tables), /^R2 · Aerobic–anaerobic transition\n[^]*\nHow to train:\n  - Continuous and interval methods\n[^]*\nPer week: Develop: 3–4 sessions\. Maintain: 2\./);
+  assert.match(zoneReport('R2', tables), /^R2 · Aerobic glycolytic\n[^]*\nHow to train:\n  - Continuous and interval methods\n[^]*\nPer week: Develop: 3–4 sessions\. Maintain: 2\./);
   assert.equal(zoneReport('R9', tables), null);
 });

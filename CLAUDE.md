@@ -19,6 +19,8 @@ Built:
 - **Level 1** (accepted by the coach on 2026-10-02): the engine, the command line `kayplan.js`, and the page served by `serve.js` from the files on this computer: the annual sheet, cycle editing, the selected week and session, the races and events table, live reload.
 - **Level 2, step 1: km** (DESIGN.md 7.0 and 8.2). Km counted from the sessions, per zone, week and season; one km estimate per microcycle from the yearly km; the Km row on the sheet; the week's km against its estimate; each piece of a session with its other unit; a place per session, so that work off the water gives minutes and no km.
 - **Level 2, step 2: the capacity grid** (DESIGN.md 7.1). Under the Km row, one row per zone and one cell per week, showing sessions or km with a switch. A sessions cell is shaded developing, maintaining or below maintenance by the course's sessions a week. Hovering or focusing a zone name opens its card.
+- **Level 2, step 3: checks of sessions and weeks** (the coach asked for these from DESIGN.md section 9 on 2026-10-02). What the course would question about a session (a zone not for that age, the order of contents, repetition length, rest, too much of a zone, R3 before the warm-up is done) and about a week (hard sessions under 48 h apart, quality in the afternoon, too many R7 sessions, a block content with no session, intensity in a recovery week, the days around a race, the taper). They are words on the page and in `show week` and `show checks`; nothing is refused. The season-level checks of section 9 (order of blocks, residual effects before a race, build times) were offered and turned down.
+- **Zone cards from the course reference** (`docs/course-reference.md`): intensity markers, model sessions in the course's notation, place in the session and the season, kinds of work for R6 and R7, the resisted variants inside each card, km a year per category. A click keeps a card open.
 - Tests for the engine, the command line and the server (`npm test`), and a check of the page in headless Firefox (`npm run page-check`).
 - The real 2026–27 season in `season/`: 45 weeks from Monday 28 Sep 2026, three plans, last season's races moved to the matching 2027 weekends as unconfirmed guesses.
 
@@ -27,7 +29,7 @@ Next: nothing is agreed yet. The first cut of level 2 (sections 7.0, 7.1 and 8.2
 Not built:
 
 - **Frozen estimates.** DESIGN.md 6.7 says estimates of weeks that have ended are frozen. They are not: every estimate follows the plan as it is now, so changing a future block also changes past estimates. Freezing needs the estimate of each ended week to be stored, and the design stores nothing that is worked out. The coach has been told; it waits for a decision.
-- The checks of DESIGN.md section 9, and anything from level 3.
+- The rest of DESIGN.md section 9 (season-level checks, monitoring, load curves), and anything from level 3.
 - The GitHub store, for use from two computers and a phone (DESIGN.md 6.5). It implements the store interface described in `src/store-disk.js`, and the page then needs a sign-in and a layout for the phone.
 - A commit per save. On this computer a save only writes the file; commits are made by hand (ask first).
 
@@ -47,7 +49,9 @@ src/format.js        the plan's text files <-> data
 src/engine.js        load, sheet, weekView, eventsFor, check, fileText
 src/km.js            km counted from sessions; the km estimate per microcycle
 src/grid.js          the capacity grid: sessions and km per zone and week, and their state
+src/checks.js        what the course would question about a session and a week
 src/zones.js         the zone cards: what each zone is, from the course slides
+src/lang.js          the page's words in English and Portuguese: tr(), dec(), the Portuguese table
 src/report.js        the command line's text output
 src/store-disk.js    file access on disk; describes the store interface
 src/store-http.js    the same interface for the page, through serve.js
@@ -57,7 +61,10 @@ tools/check-names.sh the names check
 tools/page-check.mjs the page check; tools/firefox.mjs drives headless Firefox for it
 season/              the plan: only what was typed
 mockups/             the layout mockup with dummy data (reference for look and behaviour)
+docs/                the course slides as text: course-reference.md by topic, course-slides-1.md in slide order
 ```
+
+For a training rule or number, look in `docs/course-reference.md` first (one card per zone, then session, microcycle, mesocycle, season, ages, monitoring; every figure has its slide number). `docs/course-slides-1.md` has the full tables and the slides' own wording. Both cover part 1 of the course only.
 
 ## Commands
 
@@ -66,6 +73,7 @@ node serve.js                                          the page, at http://127.0
 node kayplan.js show season [--plan <id>]              the annual sheet as a table
 node kayplan.js show week [n] [--plan <id>] [--band <name>]   a week's sessions with the zone working
 node kayplan.js show grid [--plan <id>] [--band <name>]   the capacity grid: sessions and km per zone and week
+node kayplan.js show checks [--plan <id>] [--band <name>]   what the course would question, week by week
 node kayplan.js show zone <zone>                       a zone's card: what it is and how the course trains it
 node kayplan.js show events                            the races and events table
 node kayplan.js check                                  errors and warnings; exit code 1 on errors
@@ -97,9 +105,10 @@ One shape throughout: a head line, then indented lines that belong to it. No com
 ```
 start: 2026-09-28
 weeks: 45
+plans: iniciados, cadetes, juniors
 ```
 
-`start` must be a Monday. Week 1 starts there; weeks are a fixed grid.
+`start` must be a Monday. Week 1 starts there; weeks are a fixed grid. `plans` is optional: the order the plans are shown in, everywhere (the pills, the events table and its rows of races, `show season`). Plans it does not list come after, by id.
 
 ### `season/tables.txt`
 
@@ -114,7 +123,14 @@ race  sprint 1.4  fundo 6  maratona 13.5
 warmup 2
 develop  R1 4-6  R2 3-4  R3-R3+ 2-3  R4-R5 2-4  R6 3-4
 maintain  R1 3  R2 2  R3-R3+ 1  R4-R5 1  R6 1-2
+rep  R2 2'-60'  R3 1'-7'  R3+ 20''-3'  R4 20''-3'  R5 10''-1'30''  R6 4''-30''
+rest  R3 1  R3+ 1  R4 3  R5 3'  R6 3'
+recovery  R1 24  R2 24  R3-R3+ 48  R4-R5 48  R6 24
+warm  R3 30'  R3+ 30'
+race-pace 2 4
+most 1.5
 zones junior  R1 R2 R3 R3+ R5 R6 R7
+zone-km junior  R1 892  R2 961  R3 245.5  R3+ 75.35  R5 8.6  R6 9.6  R7 28
 place 1km Sede-Foz
 ```
 
@@ -124,7 +140,9 @@ place 1km Sede-Foz
 - `yearly`: water km per season for a band. A band with no figure gets no estimates.
 - `hard`, `race`, `warmup`: the content factor table of DESIGN.md 7.0. `hard` is the km of work in a hard session of each content, `race` the same for race pace by the type of race aimed at, `warmup` the km added to every session.
 - `develop`, `maintain`: sessions a week to develop and to maintain each content, as ranges. They are the course's table (slide 188, "Nº Sessões/CT"). Zones joined with `-` are one content and are counted together. One table for every band.
+- `rep`, `rest`, `recovery`, `warm`, `race-pace`, `most`: what the checks compare with (`src/checks.js`). All are optional, and a check whose line is missing is off: delete a line to silence that check. `rep` is how long one repetition of a zone lasts; the ranges take in everything the course writes for the zone (its zone slides, its methods table and its model sessions), so they are wider than the single figure of slide 145. `rest` is the least rest after a repetition, as times the repetition (`1`, `3`) or as a time (`3'`). `recovery` is the hours after a session of a content (slide 188). `warm` is the paddling needed before the zone's work starts (slide 137). `race-pace` is the most R7 sessions a week in preparation and in a competitive block (slide 146). `most` is how many times a zone's `reference` one session may hold before it is questioned; 1.5 is Kayplan's own margin, not the course's.
 - `zones`: the zones suggested for a band's age: those with km in that category's column of the course's long-term table (slide 172). The grid dims the others. A band with no line has nothing dimmed.
+- `zone-km <band>`: the course's km a year in each zone for a band (slide 172), in Kayplan's zones: R1 includes R1F, R2 includes R2+ and R2F, R3 includes R3F, so a band's line adds up to its `yearly`. In km mode the grid shows each zone's season sum next to it. Optional; a band with no line shows the sum alone.
 - `place`: a landmark distance. Its name, written in a session, stands for the distance.
 
 ### `season/events.txt`
@@ -208,12 +226,18 @@ Only weeks whose type was set by hand: the week's Monday, the type, and a load %
 - One session per date, slot and band.
 - A session whose date has passed counts as done unless it is marked `not-done`.
 - Write the zone next to the work (`6km R1`): the main zone and the km are worked out from the text and never stored. Work with no zone has no main zone; `show week` prints it as "no zone".
+- The zone can also be written once for a set, before it or just after its bracket (`R2 3x(4'-6'-6'-4'/1')/3'`, `3x(4'-6'/1') R2/3'`), or once for the session with a colon (`R2: 3x(4'-6'/1')/3' + 2km`). It is then the zone of the work that has none of its own; rest never takes it. A zone after the rest of a set (`…/3' R1`) is the rest's zone. The course's `×` is read as `x`.
 - Off the water, write the work in time with its zone (`3x 10' R2/3'`). It counts for the main zone, gives minutes and no km.
 
 ## Rules the engine applies
 
 - **Main zone** (`infer` in `src/notation.js`): time per zone, distances turned into time with the band's pace, divided by the zone's reference volume; the largest share wins; R0 only when no other zone appears. Rest with a zone counts toward it; rest without one counts toward nothing. An F variant (`R1F`) is read as its base zone; `R2+` as R2, `R6+` as R6; only `R3+` is its own zone.
 - **Rep ranges** `(7-10)x` count as their middle. `OU` (alternatives) is not understood.
+- **Ladders** (`4'-6'-4' R2/1'`): each amount takes the zone written after it, or else the last zone written in the effort (`4' R2-2' R3` is 4' of R2 and 2' of R3). The rest comes after every amount, so this one has three rests.
+- **The reader keeps every effort** (`readPlan` in `src/notation.js`): its repetitions, the rest written after it, whether it is inside brackets, and what is paddled before it first comes up. The checks are worked out from these.
+- **Checks** (`sessionChecks`, `checksView` in `src/checks.js`), per age band, never for a session marked `not-done`:
+  - a session: a zone not in the band's `zones` line; contents out of the course's order (R5 and R6, then R3, R3+ and R4, then R2 and R1; R1 at the start is the warm-up, R7 has no place in the order); a repetition outside `rep`; the rest after a repetition under `rest`, only for repetitions outside brackets; time in a zone over `most` times its `reference`; work of a `warm` zone starting too early (not off the water). Distances are turned into time with the band's pace.
+  - a week: two sessions that both need 48 h or more on the same or the next day, or two of the same content on one day when it needs 24 h; R1 or R2 in the morning and R3 to R6 in the afternoon of one day; more R7 sessions than `race-pace` (the second number in a `comp` block); a content of the block with no session, in a week that has sessions and is not a recovery week; a recovery week with a session that needs 48 h; such a session the day before a race of importance 1 or 2, or any session the day after it; an AT or CT week with fewer sessions than the week before.
 - **Km of a session** (`infer`): distances as written, times at the band's pace for the zone. R0 is left out. A distance with no zone counts toward the session's total and toward no zone; a time with no zone gives no km. A session off the water gives no km: its written time counts as minutes off the water, and its distances count for nothing.
 - **Km of a week and a season** (`kmView` in `src/km.js`): the sum over the band's sessions on the water that are not marked `not-done`. Season km are split into done (sessions before today) and planned (from today on).
 - **Km estimate per microcycle** (`kmView`): yearly km × coefficient ÷ sum of all coefficients, with coefficient = load % × content factor. The content factor is (hard-session km of the content + warm-up) ÷ (the same for R2); several contents average; no content is 1. An R7 block takes its km from the race it is aimed at: the most important race inside the block, else the next one after it, else the season's last race. A week that is not planned yet (no load) counts as an average planned week.
@@ -224,7 +248,11 @@ Only weeks whose type was set by hand: the week's Monday, the type, and a load %
 ## Decisions made while building, not yet in DESIGN.md
 
 - The pattern `none` for unplanned time (DESIGN.md 6.4 lists five patterns).
+- The block-content check only fires when a content has no session at all that week. Comparing with `maintain` was tried in thought and set aside: with two or three sessions a week it would fire every week, and the grid already shows it.
+- R2 is named "aerobic glycolytic" in its card, as slide 145 and the coach's reference document do.
 - Splitting a block copies its pattern to the new block (the mockup always gave the new block `build`). Splitting unplanned time (`none`) leaves both parts with its name.
+- A macrocycle's panel has Split, like a block's: a new macrocycle starts at the chosen week, and the block that holds that week is split there too (`splitMacro` in `src/cycles.js`). The design only had "start a new macrocycle here" on a block, which needed the block split first. In both panels the week offered for the split is the one that was clicked on the cycle's bar (the week after, for a click on its first week); opened from the keyboard, it is the selected week if it is inside the cycle, else the middle.
+- A new event starts as a race in no plan. Changed to another kind, it applies to every plan, because an event that is not a race cannot be in no plan.
 - `check` reports invalid files and plan-level warnings (a race outside the season, a race in no plan, a past race whose date was never confirmed). A session with no zone is shown in `show week` and is not a `check` warning, so that off-water sessions (yoga, pool) do not flood it.
 - Events that are not races have a one-letter code: `t` test, `c` camp, `h` holiday, `x` no water.
 - Saving checks the revision that was read (`store.write(path, text, rev)`), so a stale copy never overwrites newer text. GitHub's file API works the same way.
@@ -243,6 +271,7 @@ Only weeks whose type was set by hand: the week's Monday, the type, and a load %
 - The `load` percentages are the mockup's. The figures in `hard`, `race` and `warmup` are the table of DESIGN.md 7.0, of which three are assumptions (open question 7).
 - In `events.txt`, every race has importance 2 and a guessed `boats`; `type` is guessed from the name. The three Esperanças races are entered as `fundo`, `mixed` (mass-start lap races of 1 to 6 km by age). Dates are last season's weekends moved to 2027, all `confirmed: no`.
 - No landmarks yet (the coach chose to start without them).
+- The Iniciados plan has an `infantil` band, added at the coach's request on 2026-10-02 with the course's first-year figures (822 km, zones R1 R2 R3 R6 R7). By last season's birth years nobody is 13 or 14 in 2027, so it may stay empty. The plan's blocks are R1 and R6 only (the Iniciado zones); an Infantil would also train R2, R3 and R7, in its own sessions.
 - Changing a block's length or pattern can change the type of weeks that have already ended, because types follow the pattern. The design does not say whether past week types should be frozen. The same goes for km estimates (see State).
 - The thresholds of the capacity grid are the course's for every band (the coach's choice, 2026-10-02). The course's counts assume near-daily training; if a band needs its own, the table has to grow a band, like `pace`.
 
@@ -254,6 +283,11 @@ Only weeks whose type was set by hand: the week's Monday, the type, and a load %
 - **Live reload.** The page asks the server every two seconds whether any file changed and reloads the plan when one did. Edit the files while the page is open and the change appears.
 - **Where you are** (plan, band, week, view) is kept in the address after `#`, so a reload stays put.
 - **On the sheet:** a week type set by hand is bold; the current week has its Monday underlined; a boundary that cannot move has no handle. Events that are not races show as one plain letter in the Races row.
+- **Language.** English and Portuguese (Portugal). The page starts in the browser's language, and the EN/PT switch in the header changes it and is remembered on that device (`?lang=pt` in the address forces one, for checks). Every text the page can show goes through `tr('English text', …)` in `src/lang.js`, with the English as the key and `{0}`, `{1}` for what is filled in; numbers with decimals go through `dec()`, which writes a comma in Portuguese. `test/lang.test.js` fails when a text handed to `tr()` has no Portuguese, or a translation is left over, so add the Portuguese with every new text. The Portuguese of the zone cards uses the course slides' own words. Not translated: the words of the plan files (they are the format), the messages about a file line that cannot be read (`src/format.js`), and the command line.
+- **Cycle panels:** a cycle's own properties (name, content, load pattern) are on white at the top; what changes the structure (move, split, new macrocycle, merge, delete) is in a grey strip below a line (`.pop-acts`). Keep new controls on the right side of that line.
+- **Events view:** the season runs across the top as on the sheet (Month, Monday), with one row of race and event codes for each plan, drawn by the same `raceCell` as the sheet's Races row. Clicking a code selects its entry in the table below; the selected event's code is filled like the selected week. The entry under the pointer has its code ringed in the rows above (a class put on the cells, not a redraw; `markPointed` puts it back after each draw). A race in no plan is in no row.
+- **Checks:** a week where the course would question something has its number in the Microcycle row in dark red and underlined, for the selected band. The selected week lists them in words above its days, and the selected session lists its own under the main zone.
+- **Zone cards:** hovering or focusing a zone name shows its card; a click keeps it open and scrollable until Escape or a click elsewhere.
 - **Km row:** the number in a cell is the week's estimate, and the cell fills from the bottom as the week's sessions cover it. With no estimate it shows the km from the sessions. How an estimate was worked out is in the cell's hover text.
 - **Capacity grid:** dark is developing, light is maintaining, an outline is below maintenance. A zone that is not suggested for the band's age has its name dimmed; its sessions are still counted and shaded. The Sessions/Km switch changes what the cells show, not the rows. The counts behind a shade are in the cell's hover text.
 - **Checking it.** `npm run page-check` clicks, types and drags through the page in headless Firefox on a copy of `test/page-season`, and checks the files that were saved. It leaves screenshots in a temporary folder and prints the path: look at them after changing the page. Add a step there for each new behaviour. The one-shot `firefox --screenshot` is of little use here, because it captures the page before the plan has loaded.

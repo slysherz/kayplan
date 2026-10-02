@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parsePlan, infer, minutesText, amountText } from '../src/notation.js';
+import { parsePlan, readPlan, infer, minutesText, amountText } from '../src/notation.js';
 import { parseTables } from '../src/format.js';
 import { TABLES } from './helpers.js';
 
@@ -36,7 +36,52 @@ test('accepts typographic quotes, decimal commas and pyramids', () => {
   assert.deepEqual(parsePlan('6x 30″ R5'), { R5: { sec: 180, m: 0 } });
   assert.deepEqual(parsePlan('6x 30” R5'), { R5: { sec: 180, m: 0 } });
   assert.deepEqual(parsePlan('1,5km R1'), { R1: { sec: 0, m: 1500 } });
-  assert.deepEqual(parsePlan("3x(4'-6'-4' R2/1')/3'"), { R2: { sec: 2520, m: 0 }, rest: { sec: 720, m: 0 } });
+  // the rest of a ladder comes after each of its amounts
+  assert.deepEqual(parsePlan("3x(4'-6'-4' R2/1')/3'"), { R2: { sec: 2520, m: 0 }, rest: { sec: 1080, m: 0 } });
+});
+
+test("the course's way of writing a session", () => {
+  // the multiplication sign
+  assert.deepEqual(parsePlan("3 × (4′-6′-6′-4′ R2/1′)/3′"), parsePlan("3x(4'-6'-6'-4' R2/1')/3'"));
+  assert.deepEqual(parsePlan('4 × 500m R3'), { R3: { sec: 0, m: 2000 } });
+  // a zone after each amount: none is lost, and each amount keeps its own
+  assert.deepEqual(parsePlan("3x(4' R2-6' R2/1')/3'"), { R2: { sec: 1800, m: 0 }, rest: { sec: 900, m: 0 } });
+  assert.deepEqual(parsePlan("2x(4' R2-2' R3/1')"), { R2: { sec: 480, m: 0 }, R3: { sec: 240, m: 0 }, rest: { sec: 240, m: 0 } });
+  assert.deepEqual(parsePlan("4'-6' R2-2' R3"), { R2: { sec: 600, m: 0 }, R3: { sec: 120, m: 0 } });
+  // a zone written once for a set, before it or just after its bracket
+  const set = { R2: { sec: 3600, m: 0 }, rest: { sec: 1260, m: 0 } };
+  assert.deepEqual(parsePlan("R2 3 × (4′-6′-6′-4′/1′)/3′"), set);
+  assert.deepEqual(parsePlan("3x(4'-6'-6'-4'/1') R2/3'"), set);
+  assert.deepEqual(parsePlan("1km R1 + R3+ 4x(6x 30''/30'')/8' + 1km R1"), { R1: { sec: 0, m: 2000 }, 'R3+': { sec: 720, m: 0 }, rest: { sec: 2640, m: 0 } });
+  // the set's zone is for work with none of its own; rest never takes it
+  assert.deepEqual(parsePlan("R4 5x(250-200/100)/8' R0"), { R4: { sec: 0, m: 2250 }, rest: { sec: 0, m: 1000 }, R0: { sec: 2400, m: 0 } });
+  assert.deepEqual(parsePlan("R2 2x(4' + 1' R6)"), { R2: { sec: 480, m: 0 }, R6: { sec: 120, m: 0 } });
+  // a zone after the rest of a set is still the rest's zone
+  assert.deepEqual(parsePlan("3x(4'-6'/1')/3' R1"), { '?': { sec: 1800, m: 0 }, rest: { sec: 360, m: 0 }, R1: { sec: 540, m: 0 } });
+  // a zone and a colon at the head is the zone of all work with no zone
+  assert.deepEqual(parsePlan("R2: 3x(4'-6'/1')/3' + 2km + 1km R1"), { R2: { sec: 1800, m: 2000 }, rest: { sec: 900, m: 0 }, R1: { sec: 0, m: 1000 } });
+  assert.deepEqual(parsePlan("r3+: 4x 2'/2'"), { 'R3+': { sec: 480, m: 0 }, rest: { sec: 480, m: 0 } });
+  // a zone before plain work is as before
+  assert.deepEqual(parsePlan('R1 2x 500m'), { R1: { sec: 0, m: 1000 } });
+  assert.deepEqual(parsePlan("20' R1-R2"), { R1: { sec: 1200, m: 0 } });
+});
+
+test('each effort is kept: its repetitions, its rest, and what comes before it', () => {
+  const p = readPlan("2km R1 + 6x 3' R3/3' R1 + R6 2x(3x 50/3')/6'", []).pieces;
+  assert.deepEqual(p.map(x => x.text), ['2km R1', "3' R3", "3' R1", '50', "3'", "6'"]);
+  const [warm, work, rest, sprint] = p;
+  assert.deepEqual([warm.zone, warm.times, warm.set, warm.restAfter], ['R1', 1, false, null]);
+  assert.deepEqual([work.zone, work.times, work.set, work.rest], ['R3', 6, false, false]);
+  assert.deepEqual(work.restAfter, { sec: 180, m: 0, zone: 'R1' });
+  assert.deepEqual(work.before, { R1: { sec: 0, m: 2000 } });
+  assert.equal(rest.rest, true);
+  // the first sprint comes after the warm-up and all six repetitions with their rests
+  assert.deepEqual([sprint.zone, sprint.times, sprint.set], ['R6', 3, true]);
+  assert.deepEqual(sprint.before, { R1: { sec: 1080, m: 2000 }, R3: { sec: 1080, m: 0 } });
+  assert.deepEqual(sprint.restAfter, { sec: 180, m: 0, zone: null });
+  // a ladder keeps each amount
+  assert.deepEqual(readPlan("3x(4'-6'-4' R2/1')", []).pieces[0].reps, [{ sec: 240, m: 0, zone: 'R2' }, { sec: 360, m: 0, zone: 'R2' }, { sec: 240, m: 0, zone: 'R2' }]);
+  assert.equal(readPlan("4' R2-2' R3", []).pieces[0].zone, null);
 });
 
 test('zone variants are read as their base zone', () => {

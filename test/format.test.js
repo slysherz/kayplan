@@ -29,7 +29,13 @@ test('every canonical file reads and writes back to the same text', () => {
 });
 
 test('season', () => {
-  assert.deepEqual(f.parseSeason('start: 2026-09-28\nweeks: 45\n').value, { start: '2026-09-28', weeks: 45 });
+  assert.deepEqual(f.parseSeason('start: 2026-09-28\nweeks: 45\n').value, { start: '2026-09-28', weeks: 45, plans: [] });
+  // the order of the plans, when it is given
+  const ordered = f.parseSeason('start: 2026-09-28\nplans:  group-b,group-a\nweeks: 45\n');
+  assert.deepEqual(ordered.value, { start: '2026-09-28', weeks: 45, plans: ['group-b', 'group-a'] });
+  assert.equal(f.serializeSeason(ordered.value), 'start: 2026-09-28\nweeks: 45\nplans: group-b, group-a\n');
+  assert.match(f.parseSeason('start: 2026-09-28\nweeks: 45\nplans: a, a\n').errors[0].message, /listed twice/);
+  assert.match(f.parseSeason('start: 2026-09-28\nweeks: 45\nplans: Group A\n').errors[0].message, /cannot be a plan/);
   assert.match(f.parseSeason('start: 2026-09-29\nweeks: 45\n').errors[0].message, /Monday/);
   assert.match(f.parseSeason('start: 2026-02-30\nweeks: 45\n').errors[0].message, /date/);
   assert.match(f.parseSeason('start: 2026-09-28\nweeks: many\n').errors[0].message, /weeks/);

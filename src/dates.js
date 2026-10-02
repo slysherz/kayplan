@@ -1,5 +1,7 @@
 // Dates are ISO strings (YYYY-MM-DD). All arithmetic is in UTC, so daylight saving never shifts a day.
 
+import { tr } from './lang.js';
+
 const DAY_MS = 86400000;
 
 export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -38,7 +40,7 @@ export function clockToday() {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 
-// "5 Oct"
+// "5 Oct", in the language in use
 export function shortDate(iso) {
-  return +iso.slice(8) + ' ' + MONTHS[+iso.slice(5, 7) - 1];
+  return +iso.slice(8) + ' ' + tr(MONTHS[+iso.slice(5, 7) - 1]);
 }

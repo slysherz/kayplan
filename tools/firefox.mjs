@@ -57,11 +57,22 @@ export async function firefox(profile, size = [1440, 900]) {
 
   const key = c => [{ type: 'keyDown', value: c }, { type: 'keyUp', value: c }];
   const ff = {
-    ENTER: '', END: '',
+    ENTER: '', END: '', ESCAPE: '',
     nav: url => cmd('WebDriver:Navigate', { url }),
     // run script in the page; "return x" gives x back; arguments[] holds args
     js: async (script, ...args) => (await cmd('WebDriver:ExecuteScript', { script, args })).value,
     click: async sel => cmd('WebDriver:ElementClick', { id: (await cmd('WebDriver:FindElement', { using: 'css selector', value: sel })).value[ELEMENT] }),
+    // click the element at this part of its width (0 is its left edge, 1 its right)
+    clickAt: async (sel, part) => {
+      const r = await ff.js('const r = document.querySelector(arguments[0]).getBoundingClientRect(); return [Math.round(r.left + r.width * arguments[1]), Math.round(r.top + r.height / 2)];', sel, part);
+      await cmd('WebDriver:PerformActions', { actions: [{ type: 'pointer', id: 'mouse', parameters: { pointerType: 'mouse' }, actions: [{ type: 'pointerMove', duration: 0, x: r[0], y: r[1] }, { type: 'pointerDown', button: 0 }, { type: 'pointerUp', button: 0 }] }] });
+      await cmd('WebDriver:ReleaseActions');
+    },
+    // move the pointer over the element's centre
+    hover: async sel => {
+      const r = await ff.js('const r = document.querySelector(arguments[0]).getBoundingClientRect(); return [Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2)];', sel);
+      await cmd('WebDriver:PerformActions', { actions: [{ type: 'pointer', id: 'mouse', parameters: { pointerType: 'mouse' }, actions: [{ type: 'pointerMove', duration: 0, x: r[0], y: r[1] }] }] });
+    },
     // type into whatever has the focus, one key at a time, as a keyboard does
     keys: text => cmd('WebDriver:PerformActions', { actions: [{ type: 'key', id: 'keys', actions: [...text].flatMap(key) }] }),
     // press on the element's centre, move sideways by dx px, release

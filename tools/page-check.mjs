@@ -45,10 +45,10 @@ const selectAll = sel => ff.js('document.querySelector(arguments[0]).select()', 
 // typing is saved after a pause; wait until nothing is waiting to be saved
 const saved = async () => { await ff.sleep(900); await ff.wait('return !document.querySelector("#status .muted")'); };
 const shot = name => ff.shot(path.join(TMP, name + '.png'));
-async function open(hash, asof = TODAY) {
+async function open(hash, asof = TODAY, lang = '') {
   // through a blank page, because going to the same address with another #part does not reload
   await ff.nav('about:blank');
-  await ff.nav(BASE + '?asof=' + asof + '#' + hash);
+  await ff.nav(BASE + '?asof=' + asof + (lang ? '&lang=' + lang : '') + '#' + hash);
   await ff.js('window.__errs = []; window.addEventListener("error", e => __errs.push(String(e.message))); window.addEventListener("unhandledrejection", e => __errs.push("rejection: " + String(e.reason)));');
   await ff.wait('return !!document.querySelector(".sheet")');
 }
@@ -85,7 +85,10 @@ try {
   assert.equal(await text(cell('R3', 1)), '·');
   await ff.click('.segb[data-v="km"]');
   assert.equal(await text(cell('R1', 1)), '8');
-  assert.equal(await text('.zlab[data-tip="R2"] ~ .capsum'), '6');
+  // in km, a zone's season sum stands next to the course's km a year in that zone
+  assert.equal(await text('.zlab[data-tip="R2"] ~ .capsum'), '6 / 961');
+  assert.equal(await text('.zlab[data-tip="R4"] ~ .capsum'), '0');
+  assert.equal(await ff.js('return document.querySelector(".zlab[data-tip=\\"R2\\"] ~ .capsum").title'), "R2: 5.9 km from this season's sessions, 961 km a year in the course's table");
   await ff.click('.segb[data-v="sessions"]');
   assert.equal(await text('.zlab[data-tip="R2"] ~ .capsum'), '1');
   // the zone card opens when the zone name gets the focus
@@ -94,6 +97,20 @@ try {
   assert.match(await text('#tip'), /R3\+ · Aerobic power[^]*Develop: 2–3 sessions\. Maintain: 1\. Counted together with R3\./);
   await shot('01-zone-card');
   await ff.js('document.activeElement.blur()');
+  assert.equal(await ff.js('return document.getElementById("tip").hidden'), true);
+  // a click keeps the card open, so it can be scrolled; Escape or a click elsewhere closes it
+  await ff.js('document.activeElement.blur()');
+  assert.equal(await ff.js('return document.getElementById("tip").hidden'), true);
+  await ff.click('.zlab[data-tip="R2"]');
+  await ff.hover('.tab');
+  assert.match(await text('#tip'), /R2 · Aerobic glycolytic[^]*Model sessions[^]*R2 3×\(4'-6'-6'-4'\/1'\)\/3'[^]*In a session[^]*In the season[^]*Resisted[^]*Km a year[^]*Infantil 267, Cadete 415–455/);
+  assert.equal(await ff.js('const t = document.getElementById("tip"); return !t.hidden && t.classList.contains("pinned") && t.getBoundingClientRect().bottom <= window.innerHeight'), true);
+  await shot('01-zone-card-open');
+  await ff.keys(ff.ESCAPE);
+  assert.equal(await ff.js('return document.getElementById("tip").hidden'), true);
+  await ff.click('.zlab[data-tip="R7"]');
+  assert.match(await text('#tip'), /R7 · Competition pace[^]*Kinds of work[^]*Simulation series/);
+  await ff.click('.brand');
   assert.equal(await ff.js('return document.getElementById("tip").hidden'), true);
   ok('capacity grid: rows, counts, sessions and km modes, zone card');
 
@@ -255,7 +272,25 @@ try {
   await ff.click('.racecell .rc');
   const row = '.events tr.on ';
   assert.equal(await value(row + '[data-f=name]'), 'Campeonato Regional de Fundo Norte');
+  // the season across the top of the events view: a row of races for each plan, the chosen one marked
+  assert.deepEqual(await ff.js('return [...document.querySelectorAll("[data-races]")].map(r => r.dataset.races + " " + r.querySelectorAll(".rc").length + " " + r.querySelectorAll(".racecell").length)'), ['cadetes 9 45', 'iniciados 7 45', 'juniors 9 45']);
+  assert.equal(await count('.racecell.on'), 3);
+  assert.equal(await count('.cell.now'), 1);
   await shot('05-events');
+  // the entry under the pointer is ringed in the rows of the plans it is in, and stays so when the page is drawn again
+  const ringed = () => ff.js('return [...document.querySelectorAll(".racecell.hov")].map(c => c.parentNode.dataset.races + " " + ([...c.parentNode.children].indexOf(c)))');
+  await ff.hover('.events tbody tr:nth-child(4) td.place');   // Taça de Portugal de Regatas em Linha: week 29, not for Iniciados
+  assert.deepEqual(await ringed(), ['cadetes 29', 'juniors 29']);
+  await shot('05-events-hover');
+  await ff.js('document.querySelector("[data-act=view][data-v=events]").click()');   // drawn again, the pointer has not moved
+  assert.deepEqual(await ringed(), ['cadetes 29', 'juniors 29']);
+  await ff.hover('.events thead th');
+  assert.deepEqual(await ringed(), []);
+  await ff.click('[data-races=juniors] .racecell:nth-child(26) .rc');
+  assert.equal(await value(row + '[data-f=name]'), 'Campeonato Nacional de Fundo');
+  assert.equal(await count('.racecell.on'), 3);
+  await ff.click('[data-races=cadetes] .racecell:nth-child(24) .rc');
+  assert.equal(await value(row + '[data-f=name]'), 'Campeonato Regional de Fundo Norte');
   await choose(row + '[data-f=confirmed]', true);
   await choose(row + '[data-f=boats]', 'solo');
   await choose(row + '[data-f="plan:juniors"]', '1');
@@ -394,7 +429,7 @@ try {
   assert.equal(await ff.js('return document.querySelector("[data-fid=w-load]").disabled'), true);
   // the grid is there before anything is planned
   assert.equal(await count('.zlab'), 8);
-  assert.equal(await count('.segb'), 2);
+  assert.equal(await count('.lab .segb'), 2);
   await shot('09-unplanned');
   await ff.click('.meso[data-v="0"]');
   await choose('#splitw', '6');
@@ -412,6 +447,45 @@ try {
   await ff.click('[data-act=pop-close]');
   assert.equal(await ff.js('return [...document.querySelectorAll(".sty")].slice(0, 7).map(b => b.textContent).join(" ")'), 'I C C CH R  ');
   ok('carving the first block out of unplanned time');
+
+  // a new macrocycle from the macrocycle's own panel, at the week that was clicked, inside a block
+  await ff.clickAt('.macro[data-v="0"]', 19.5 / 45);
+  assert.equal(await ff.js('return document.getElementById("splitw").options.length'), 44);
+  assert.equal(await value('#splitw'), '20');
+  await shot('10-split-macro');
+  await ff.click('[data-act=mac-split]');
+  await saved();
+  assert.equal(file('plans/cadetes/cycles.txt'), 'Macrocycle I\n   5 intro  R1-R2  General I\n  14 none   -      Unplanned\nNew macrocycle\n  26 none   -      Unplanned\n');
+  assert.equal(await value('[data-fid=pop-name]'), 'New macrocycle');
+  assert.equal(await text('.pop-h .muted'), 'weeks 20–45');
+  await ff.click('[data-act=mac-merge]');
+  await saved();
+  assert.doesNotMatch(file('plans/cadetes/cycles.txt'), /New macrocycle/);
+  await ff.click('[data-act=pop-close]');
+  ok('split a macrocycle at the week that was clicked: one step, the block is split there too');
+
+  // the first week cannot start a new cycle, so the next one is offered; a block offers its clicked week too
+  await ff.clickAt('.macro[data-v="0"]', 0.5 / 45);
+  assert.equal(await value('#splitw'), '2');
+  await ff.click('[data-act=pop-close]');
+  await ff.clickAt('.meso[data-v="1"]', 10.5 / 14);   // weeks 6 to 19
+  assert.equal(await value('#splitw'), '16');
+  await ff.clickAt('.content[data-v="1"]', 4.5 / 14);
+  assert.equal(await value('#splitw'), '10');
+  // a week chosen by hand stays when the panel is drawn again
+  await choose('#splitw', '12');
+  await ff.click('.ztog[data-v="R1"]');
+  await saved();
+  assert.equal(await value('#splitw'), '12');
+  await ff.click('.ztog[data-v="R1"]');
+  await saved();
+  await ff.click('[data-act=pop-close]');
+  // from the keyboard there is no position: the middle is offered
+  await ff.js('document.querySelector(".macro[data-v=\\"0\\"]").focus()');
+  await ff.keys(ff.ENTER);
+  assert.equal(await value('#splitw'), '24');
+  await ff.click('[data-act=pop-close]');
+  ok('the week under the click is offered for a split, on a macrocycle and on a block');
 
   await ff.click('.day:nth-child(6) .add[data-v="am"]');
   await ff.keys('controlo 1km');
@@ -440,6 +514,84 @@ try {
   put('season.txt', 'start: 2026-09-28\nweeks: 45\n');
   await ff.wait('return !!document.querySelector(".sheet")');
   ok('a season that cannot be read shows only the problem, and the page comes back when it is fixed');
+
+  // ================= what the course would question =================
+  fresh();
+  await open('plan=juniors&week=2');
+  assert.equal(await count('.swk.warn'), 0);
+  assert.equal(await count('.chks'), 0);
+  await ff.click('.day:nth-child(1) .add[data-v="am"]');
+  await ff.keys("1km R1 + 5x 4' R3/2'");
+  await saved();
+  assert.deepEqual(await ff.js('return [...document.querySelectorAll("[data-id=s-checks] div")].map(d => d.textContent)'),
+    ["R3: 2'00'' of rest after 4'00'' of work; the course gives 1:1 or more", "R3 starts 6' into the session; the course says VO2max is only fully available after 30'"]);
+  assert.deepEqual(await ff.js('return [...document.querySelectorAll(".swk.warn")].map(b => b.textContent)'), ['2']);
+  // the course's own way of writing: the zone once, before the set, with the multiplication sign
+  await ff.click('.day:nth-child(2) .add[data-v="am"]');
+  await ff.keys("6km R1 + R3+ 4 × (6×30''/30'')/8' + 1km R1");
+  await saved();
+  assert.equal(await text('.zpill'), 'R3+');
+  assert.match(await text('.inf small'), /R3\+ ≈ 12' · R1 ≈ 44'/);
+  assert.equal(await count('[data-id=s-checks]'), 0);
+  assert.deepEqual(await ff.js('return [...document.querySelectorAll("[data-id=w-checks] div")].map(d => d.textContent)'),
+    ['Mon AM (R3) and Tue AM (R3+) are less than 48 h apart', "R1 is the block's content and has no session this week", "R2 is the block's content and has no session this week",
+      "Mon AM · R3: 2'00'' of rest after 4'00'' of work; the course gives 1:1 or more", "Mon AM · R3 starts 6' into the session; the course says VO2max is only fully available after 30'"]);
+  await shot('12-checks');
+  // the other band of the plan has its own sessions: its week 2 says nothing, only its week 1 is marked
+  await ff.click('.pill.band[data-v="senior"]');
+  assert.equal(await count('.swk.warn'), 1);
+  assert.equal(await count('.chks'), 0);
+  ok('checks: a session and a week say what the course would question; the course notation is read');
+
+  // ================= in Portuguese =================
+  fresh();
+  await open('plan=juniors&week=6', '2026-11-18', 'pt');
+  assert.equal(await ff.js('return document.documentElement.lang'), 'pt-PT');
+  assert.deepEqual(await ff.js('return [...document.querySelectorAll(".tab, header > .b")].map(b => b.textContent)'), ['Plano', 'Eventos', 'Hoje']);
+  assert.deepEqual(await ff.js('return [...document.querySelectorAll(".sheet .row > div.lab")].map(l => l.textContent).slice(0, 10)'), ['Mês', 'Segunda', 'Provas', 'Macrociclo', 'Mesociclo', 'Conteúdo', 'Microciclo', 'Tipo', 'Carga %', 'Km']);
+  assert.equal(await text('.month'), 'Set');
+  assert.match(await text('.lower .sec-h b'), /Semana 6/);
+  assert.match(await text('.lower .sec-h .muted'), /2 Nov – 8 Nov/);
+  assert.equal(await text('.day-h b'), 'Seg');
+  assert.equal(await text('.add'), '+ Manhã');
+  assert.match(await text('[data-fid=w-type] option'), /^Padrão · /);
+  // a number written with a comma, and a hover text
+  await ff.click('.swk[data-v="1"]');
+  assert.match(await text('.inf small'), /≈ 6,0 km/);
+  assert.match(await ff.js('return document.querySelector(".row .cap[data-v=\\"1\\"]").title'), /^Semana 1: estimativa \d+,\d km \(carga 60% × conteúdo 1,00\), sessões \d+,\d km/);
+  // the edit panel, a refusal and the zone card
+  await ff.click('.meso[data-v="1"]');
+  assert.deepEqual(await ff.js('return [...document.querySelectorAll(".pop .b")].map(b => b.textContent)'), ['◀ Mais cedo', 'Mais tarde ▶', 'Dividir', 'Começar novo macrociclo aqui', 'Apagar']);
+  assert.match(await text('[data-fid=pop-pat]'), /Desenvolvimento: carga, choque, recuperação/);
+  await shot('11-portuguese');
+  await ff.click('[data-act=pop-close]');
+  await ff.js('document.querySelector(".zlab[data-tip=\\"R3+\\"]").focus()');
+  assert.match(await text('#tip'), /R3\+ · Potência aeróbia[^]*Desenvolver: 2–3 sessões\. Manter: 1\. Contado em conjunto com R3\./);
+  await shot('11-portuguese-card');
+  await ff.js('document.activeElement.blur()');
+  // the events view, and a new event's name
+  await ff.click('[data-act=view][data-v=events]');
+  assert.deepEqual(await ff.js('return [...document.querySelectorAll(".events th")].map(t => t.textContent).slice(0, 8)'), ['Data', 'Até', 'Confirmada', 'Nome', 'Local', 'Tipo', 'Tipo de prova', 'Embarcações']);
+  await ff.click('[data-act=ev-add]');
+  await saved();
+  assert.match(file('events.txt'), /^2026-11-18 Novo evento$/m);
+  assert.equal(await text('header .b.danger'), '1 problema');
+  await ff.click('[data-act=problems]');
+  assert.match(await text('.pop.problems'), /aviso · events\.txt · Novo evento não está em nenhum plano/);
+  await shot('11-portuguese-events');
+  await ff.click('[data-act=pop-close]');
+  await ff.click('.events tr.on [data-act=ev-del]');
+  await saved();
+  // the switch: English again, at once, and kept on this device
+  assert.deepEqual(await ff.js('return [...document.querySelectorAll("[data-act=lang]")].map(b => b.textContent + (b.classList.contains("on") ? "*" : ""))'), ['EN', 'PT*']);
+  await ff.click('[data-act=lang][data-v=en]');
+  assert.equal(await text('.tab.on'), 'Events');
+  assert.equal(await ff.js('return localStorage.getItem("kayplan-lang")'), 'en');
+  await ff.click('[data-act=lang][data-v=pt]');
+  assert.equal(await text('.tab.on'), 'Eventos');
+  await ff.click('[data-act=lang][data-v=en]');
+  await ff.js('localStorage.removeItem("kayplan-lang")');
+  ok('Portuguese: the sheet, the week, numbers, panels, the zone card, events and problems; the switch');
 
   // ================= afterwards =================
   assert.deepEqual(await ff.js('return window.__errs || []'), []);

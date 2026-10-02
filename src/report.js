@@ -7,6 +7,7 @@ import { kmView } from './km.js';
 import { gridView } from './grid.js';
 import { zoneCard } from './zones.js';
 import { sortEvents } from './format.js';
+import { checksView, sessionChecks } from './checks.js';
 
 // rows of cells -> aligned columns; right lists the columns aligned to the right
 function table(rows, right) {
@@ -61,6 +62,19 @@ export function seasonReport(data, planId, today) {
     '> current week · * type set by hand · km: from sessions/estimate · ' + (sh.ended ? 'weeks 1 to ' + sh.ended + ' have ended' : 'no week has ended') + '\n\n' + table(rows, [1, 7]);
 }
 
+// what the course would question, for one band of a plan: every week that has something
+export function checksReport(data, planId, band, today) {
+  const out = [planId + ' · ' + band + ' · what the course would question'];
+  for (const c of checksView(data, planId, band, today)) {
+    if (!c.count) continue;
+    out.push('week ' + c.n);
+    for (const t of c.week) out.push('  ' + t);
+    for (const key of Object.keys(c.sessions)) for (const t of c.sessions[key]) out.push('  ' + key.split(' ').slice(0, 2).join(' ') + ' · ' + t);
+  }
+  if (out.length === 1) out.push('nothing');
+  return out.join('\n');
+}
+
 // one week: its sessions with the zone working and km, its totals, and its events
 export function weekReport(data, planId, n, today, band) {
   const w = weekView(data, planId, n, today);
@@ -76,6 +90,10 @@ export function weekReport(data, planId, n, today, band) {
     out.push('km ' + b + ': ' + one(x.km) + (x.estimate === null ? '' : ' of ' + one(x.estimate) + ' estimated' + (x.planned ? ' (load ' + x.load + '% × content ' + x.factor.toFixed(2) + ')' : ' (not planned yet: an average week)')) +
       (zones.length ? ' · ' + zones.join(' · ') : '') + (x.offMin > 0 ? ' · off the water ' + minutesText(x.offMin) : ''));
   }
+  for (const b of w.plan.bands) {
+    if (band && b !== band) continue;
+    for (const t of checksView(data, planId, b, today)[n - 1].week) out.push('check ' + b + ': ' + t);
+  }
   out.push('');
   for (const d of w.days) {
     out.push(DAYS[d.weekday] + ' ' + d.date + (d.today ? ' · today' : ''));
@@ -88,6 +106,7 @@ export function weekReport(data, planId, n, today, band) {
       if (s.place === 'water' && s.totalKm > 0) work.push(one(s.totalKm) + ' km');
       if (work.length) out.push('      ' + work.join(' · '));
       if (s.pieces.length) out.push('      ' + s.pieces.map(p => p.text + ' ≈ ' + p.approx).join(' · '));
+      for (const t of sessionChecks(s, data.tables)) out.push('      check: ' + t);
       for (const line of s.notes ? s.notes.split('\n') : []) out.push(('      note: ' + line).trimEnd());
     }
   }
@@ -109,6 +128,8 @@ export function gridReport(data, planId, band, today) {
     })]);
   }
   rows.push(['', '', 'season', '', ...g.rows.map(r => r.sessions + ' ' + kmText(r.km))]);
+  // the course's km a year in each zone for this band, when the zone-km table gives them
+  if (g.rows.some(r => r.yearly !== null)) rows.push(['', '', 'a year', '', ...g.rows.map(r => r.yearly === null ? '' : String(r.yearly))]);
   const counted = g.rows.filter(r => r.content).map(r => r.content.key).filter((k, i, a) => a.indexOf(k) === i);
   return planId + ' · ' + band + ' · sessions a week by main zone, then km in the zone\n' +
     'D developing, M maintaining, b below maintenance, by the course\'s sessions a week' + (counted.some(k => k.includes('-')) ? '; ' + counted.filter(k => k.includes('-')).join(' and ') + ' are counted together' : '') + '\n' +

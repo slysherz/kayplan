@@ -21,7 +21,8 @@ export function stateOf(sessions, content) {
 // One row per zone, R1 to R7, for one age band of a plan. The rows are always the same, so the grid
 // is there before anything is planned and nothing moves when a session is typed.
 //
-// rows: [{ zone, content, suggested, weeks: [{ n, sessions, together, state, km }], sessions, km }]
+// rows: [{ zone, content, suggested, weeks: [{ n, sessions, together, state, km }], sessions, km, yearly }]
+//   yearly    the course's km a year in the zone for the band (the zone-km table), or null
 //   suggested whether the zone is one the course's long-term table gives the band's age (the zones
 //             table); null when the band has no line there
 //   sessions  the week's sessions whose main zone is this zone, on or off the water, not marked "not done"
@@ -38,6 +39,7 @@ export function gridView(data, planId, band, today) {
     counts[main] = counts[main] || {};
     counts[main][n] = (counts[main][n] || 0) + 1;
   }
+  const yearly = data.tables.zoneKm[band] || {};
   const rows = CONTENT_ZONES.map(zone => {
     const content = list.find(c => c.zones.includes(zone)) || null, group = content ? content.zones : [zone];
     const weeks = sh.weeks.map(w => {
@@ -45,7 +47,7 @@ export function gridView(data, planId, band, today) {
       const together = group.reduce((a, z) => a + ((counts[z] || {})[w.n] || 0), 0);
       return { n: w.n, sessions, together, state: sessions ? stateOf(together, content) : 'absent', km: km.weeks[w.n - 1].zones[zone] || 0 };
     });
-    return { zone, content, suggested: data.tables.zones[band] ? data.tables.zones[band].includes(zone) : null, weeks, sessions: weeks.reduce((a, w) => a + w.sessions, 0), km: weeks.reduce((a, w) => a + w.km, 0) };
+    return { zone, content, suggested: data.tables.zones[band] ? data.tables.zones[band].includes(zone) : null, weeks, sessions: weeks.reduce((a, w) => a + w.sessions, 0), km: weeks.reduce((a, w) => a + w.km, 0), yearly: yearly[zone] === undefined ? null : yearly[zone] };
   });
   return { band, rows };
 }

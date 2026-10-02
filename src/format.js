@@ -67,12 +67,19 @@ function text(lines) {
 
 export function parseSeason(source) {
   const { blocks, errors } = readBlocks(source);
-  const value = { start: null, weeks: null };
+  const value = { start: null, weeks: null, plans: [] };
   for (const b of blocks) {
     noSub(b, errors);
-    const m = /^(start|weeks):\s*(.*)$/.exec(b.head);
+    const m = /^(start|weeks|plans):\s*(.*)$/.exec(b.head);
     if (!m) { errors.push({ line: b.line, message: 'cannot read "' + b.head + '"' }); continue; }
-    if (m[1] === 'start') {
+    if (m[1] === 'plans') {
+      // the order the plans are shown in
+      const ids = m[2].split(',').map(x => x.trim()).filter(Boolean);
+      const bad = ids.find(id => !SLUG.test(id)), twice = ids.find((id, i) => ids.indexOf(id) !== i);
+      if (bad) errors.push({ line: b.line, message: '"' + bad + '" cannot be a plan: lower case letters, digits and hyphens' });
+      else if (twice) errors.push({ line: b.line, message: 'plan "' + twice + '" is listed twice' });
+      else value.plans = ids;
+    } else if (m[1] === 'start') {
       if (!isDate(m[2])) errors.push({ line: b.line, message: 'start must be a date like 2026-09-28' });
       else if (weekday(m[2]) !== 0) errors.push({ line: b.line, message: 'start must be a Monday' });
       else value.start = m[2];
@@ -87,7 +94,7 @@ export function parseSeason(source) {
 }
 
 export function serializeSeason(season) {
-  return text(['start: ' + season.start, 'weeks: ' + season.weeks]);
+  return text(['start: ' + season.start, 'weeks: ' + season.weeks, ...(season.plans && season.plans.length ? ['plans: ' + season.plans.join(', ')] : [])]);
 }
 
 // ---- tables.txt -------------------------------------------------------------
@@ -102,6 +109,15 @@ export function serializeSeason(season) {
 // maintain  R1 3  R2 2  R3-R3+ 1  R4-R5 1  R6 1-2             and to maintain it; zones joined with
 //                                       "-" are one content and are counted together
 // zones junior  R1 R2 R3 R3+ R5 R6 R7   the zones suggested for a band's age
+// zone-km junior  R1 892  R2 961        km a year in each zone for a band: the course's long-term table
+//
+// What the checks of a session and a week compare with (src/checks.js); a check with no line is off:
+// rep  R3 1'-7'  R6 4''-30''            how long one repetition of a zone lasts
+// rest  R3 1  R4 3  R5 3'               the least rest after a repetition: times the repetition, or a time
+// recovery  R1 24  R3-R3+ 48            hours to recover after a session of a content
+// warm  R3 30'                          paddling needed before the zone's work starts
+// race-pace 2 4                         most R7 sessions a week: in preparation, in a competitive block
+// most 1.5                              most work in a zone in one session, as times its reference
 // place 1km Sede-Foz
 
 function duration(s) {
@@ -126,7 +142,7 @@ function distanceText(m) {
 
 export function parseTables(source) {
   const { blocks, errors } = readBlocks(source);
-  const value = { load: {}, reference: {}, pace: {}, yearly: {}, hard: {}, race: {}, warmup: null, develop: {}, maintain: {}, zones: {}, places: [] };
+  const value = { load: {}, reference: {}, pace: {}, yearly: {}, hard: {}, race: {}, warmup: null, develop: {}, maintain: {}, zones: {}, places: [], zoneKm: {}, rep: {}, rest: {}, recovery: {}, warm: {}, racePace: null, most: null };
   const seen = {};
   const number = v => /^\d+(\.\d+)?$/.test(v);
   for (const b of blocks) {
@@ -190,6 +206,51 @@ export function parseTables(source) {
         if (zones.some(z => !CONTENT_ZONES.includes(z)) || new Set(zones).size !== zones.length || !m || (m[2] !== undefined && +m[2] < +m[1])) err('cannot read "' + content + ' ' + v + '": a content like R1 or R3-R3+ and sessions a week like 3 or 2-3');
         else value[kind][content] = [+m[1], m[2] === undefined ? +m[1] : +m[2]];
       });
+    } else if (kind === 'zone-km') {
+      const band = words[1];
+      if (!band || !SLUG.test(band)) { err('zone-km needs a band and its km a year per zone, like "zone-km iniciado R1 267 R6 7.2"'); continue; }
+      once('zone-km ' + band);
+      value.zoneKm[band] = {};
+      pairs(2, (z, v) => {
+        if (!CONTENT_ZONES.includes(z) || !number(v)) err('cannot read "' + z + ' ' + v + '": a zone from R1 to R7 and its km a year');
+        else value.zoneKm[band][z] = +v;
+      });
+    } else if (kind === 'rep') {
+      once('rep');
+      pairs(1, (z, v) => {
+        const ends = v.split('-').map(duration);
+        if (!CONTENT_ZONES.includes(z) || ends.length !== 2 || !ends[0] || !ends[1] || ends[1] < ends[0]) err('cannot read "' + z + ' ' + v + '": a zone and how long one repetition lasts, like 1\'-7\' or 20\'\'-3\'');
+        else value.rep[z] = ends;
+      });
+    } else if (kind === 'rest') {
+      once('rest');
+      pairs(1, (z, v) => {
+        const sec = duration(v);
+        if (!CONTENT_ZONES.includes(z) || (!sec && !(number(v) && +v > 0))) err('cannot read "' + z + ' ' + v + '": a zone and its least rest, as times the repetition like 3 or as a time like 3\'');
+        else value.rest[z] = sec ? { sec } : { ratio: +v };
+      });
+    } else if (kind === 'recovery') {
+      once('recovery');
+      pairs(1, (content, v) => {
+        const zones = content.split('-');
+        if (zones.some(z => !CONTENT_ZONES.includes(z)) || new Set(zones).size !== zones.length || !/^\d+$/.test(v) || +v < 1) err('cannot read "' + content + ' ' + v + '": a content like R1 or R3-R3+ and the hours to recover');
+        else value.recovery[content] = +v;
+      });
+    } else if (kind === 'warm') {
+      once('warm');
+      pairs(1, (z, v) => {
+        const sec = duration(v);
+        if (!CONTENT_ZONES.includes(z) || !sec) err('cannot read "' + z + ' ' + v + '": a zone and the paddling before it, like 30\'');
+        else value.warm[z] = sec;
+      });
+    } else if (kind === 'race-pace') {
+      once('race-pace');
+      if (words.length !== 3 || !/^\d+$/.test(words[1]) || !/^\d+$/.test(words[2])) err('race-pace is two numbers of sessions a week, like "race-pace 2 4"');
+      else value.racePace = [+words[1], +words[2]];
+    } else if (kind === 'most') {
+      once('most');
+      if (words.length !== 2 || !number(words[1]) || +words[1] <= 0) err('most is one number, like "most 1.5"');
+      else value.most = +words[1];
     } else if (kind === 'zones') {
       const band = words[1], zones = words.slice(2);
       if (!band || !SLUG.test(band) || !zones.length || zones.some(z => !CONTENT_ZONES.includes(z))) { err('zones needs a band and its zones from R1 to R7, like "zones iniciado R1 R6"'); continue; }
@@ -216,7 +277,14 @@ export function serializeTables(tables) {
     ...(Object.keys(tables.race).length ? [join('race', tables.race)] : []),
     ...(tables.warmup === null ? [] : ['warmup ' + tables.warmup]),
     ...['develop', 'maintain'].filter(k => Object.keys(tables[k]).length).map(k => join(k, tables[k], r => r[0] === r[1] ? r[0] : r[0] + '-' + r[1])),
+    ...(Object.keys(tables.rep).length ? [join('rep', tables.rep, r => durationText(r[0]) + '-' + durationText(r[1]))] : []),
+    ...(Object.keys(tables.rest).length ? [join('rest', tables.rest, r => r.sec ? durationText(r.sec) : r.ratio)] : []),
+    ...(Object.keys(tables.recovery).length ? [join('recovery', tables.recovery)] : []),
+    ...(Object.keys(tables.warm).length ? [join('warm', tables.warm, durationText)] : []),
+    ...(tables.racePace ? ['race-pace ' + tables.racePace.join(' ')] : []),
+    ...(tables.most === null ? [] : ['most ' + tables.most]),
     ...Object.keys(tables.zones).map(b => 'zones ' + b + '  ' + tables.zones[b].join(' ')),
+    ...Object.keys(tables.zoneKm).map(b => join('zone-km ' + b, tables.zoneKm[b])),
     ...tables.places.map(p => 'place ' + distanceText(p.m) + ' ' + p.name)
   ]);
 }

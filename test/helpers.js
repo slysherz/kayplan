@@ -28,6 +28,12 @@ race  sprint 1.4  fundo 6  maratona 13.5
 warmup 2
 develop  R1 4-6  R2 3-4  R3-R3+ 2-3  R4-R5 2-4  R6 3-4
 maintain  R1 3  R2 2  R3-R3+ 1  R4-R5 1  R6 1-2
+rep  R2 2'-60'  R3 1'-7'  R3+ 20''-3'  R4 20''-3'  R5 10''-1'30''  R6 4''-30''
+rest  R3 1  R3+ 1  R4 3  R5 3'  R6 3'
+recovery  R1 24  R2 24  R3-R3+ 48  R4-R5 48  R6 24
+warm  R3 30'  R3+ 30'
+race-pace 2 4
+most 1.5
 zones younger  R1 R6
 `;
 

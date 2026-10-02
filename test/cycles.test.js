@@ -158,6 +158,26 @@ test('macrocycles: start a new one, merge into the previous', () => {
   assert.deepEqual(c.mergeMacro(c.newMacro(plan(), 1, 0), 1, 0).macros, plan().macros);
 });
 
+test('macrocycles: split one at a week', () => {
+  // at the start of a block: only the macrocycle is split
+  assert.equal(shape(c.splitMacro(plan(), 0, 4, 0)), 'First macro: General one 3 | New macrocycle: General two 4 | Second macro: Specific 3, Racing 2');
+  // inside a block: the block is split at that week too
+  assert.equal(shape(c.splitMacro(plan(), 0, 6, 0)), 'First macro: General one 3, General two 2 | New macrocycle: New block 2 | Second macro: Specific 3, Racing 2');
+  assert.equal(shape(c.splitMacro(plan(), 1, 12, 0)), 'First macro: General one 3, General two 4 | Second macro: Specific 3, Racing 1 | New macrocycle: New block 1');
+  // time that is not planned yet keeps its name on both sides
+  const u = c.splitMacro({ macros: [{ name: 'M', mesos: [{ len: 12, pat: 'none', zones: [], name: 'Unplanned' }] }], hand: [], sessions: [] }, 0, 5, 0);
+  assert.equal(shape(u), 'M: Unplanned 4 | New macrocycle: Unplanned 8');
+  // only at a week after the macrocycle's first
+  assert.throws(() => c.splitMacro(plan(), 0, 1, 0), /inside the macrocycle/);
+  assert.throws(() => c.splitMacro(plan(), 0, 8, 0), /inside the macrocycle/);
+  assert.throws(() => c.splitMacro(plan(), 1, 8, 0), /inside the macrocycle/);
+  assert.throws(() => c.splitMacro(plan(), 2, 9, 0), /no such macrocycle/);
+  // the week before the new macrocycle must not have ended
+  assert.equal(c.splitMacro(plan(), 0, 6, 5).macros.length, 3);
+  assert.throws(() => c.splitMacro(plan(), 0, 6, 6), locked);
+  assert.throws(() => c.splitMacro(plan(), 0, 4, 4), locked);
+});
+
 test('names, contents and pattern', () => {
   const p = c.setMeso(plan(), 0, { name: '  Base   one ', zones: ['R3+', 'R1', 'R3'], pat: 'restart' });
   assert.deepEqual(p.macros[0].mesos[0], { len: 3, pat: 'restart', zones: ['R1', 'R3', 'R3+'], name: 'Base one' });

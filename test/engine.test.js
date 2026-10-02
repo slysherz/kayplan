@@ -15,6 +15,20 @@ test('the fixture loads without problems', async () => {
   assert.equal(Object.keys(data.revs).length, 11);
 });
 
+test('plans come in the order season.txt lists them, the rest after by id', async () => {
+  const files = fixture();
+  files['plans/group-c/plan.txt'] = 'name: Group C\nbands: masters\n';
+  files['plans/group-c/cycles.txt'] = 'Only macro\n  12 none  -  Unplanned\n';
+  const ids = async () => (await e.load(memoryStore(files))).plans.map(p => p.id);
+  assert.deepEqual(await ids(), ['group-a', 'group-b', 'group-c']);
+  files['season.txt'] += 'plans: group-c, group-a\n';
+  assert.deepEqual(await ids(), ['group-c', 'group-a', 'group-b']);
+  files['season.txt'] = files['season.txt'].replace('group-c, group-a', 'group-b, group-z');
+  const data = await e.load(memoryStore(files));
+  assert.deepEqual(data.plans.map(p => p.id), ['group-b', 'group-a', 'group-c']);
+  assert.deepEqual(e.check(data, '2026-01-05').filter(x => x.file === 'season.txt'), [{ level: 'warning', file: 'season.txt', line: null, message: 'plans lists "group-z", which has no folder in plans/' }]);
+});
+
 test('weeks: numbers, Mondays, and how many have ended', async () => {
   const { season } = await load();
   assert.equal(e.weekOf(season, '2026-01-05'), 1);
@@ -220,6 +234,7 @@ Sat 2026-01-24
   am older · planned · main zone R6 · 20' R1 + 4x 10'' R6/2' + 10' R1
       R6 40'' · R1 30' · 4.9 km
       20' R1 ≈ 3.2 km · 10'' R6 ≈ 40 m · 10' R1 ≈ 1.6 km
+      check: R6: 2'00'' of rest after a repetition; the course gives 3'00'' or more
 Sun 2026-01-25`);
   const younger = weekReport(await load(), 'group-a', 3, '2026-01-21', 'younger');
   assert.match(younger, /pm younger/);

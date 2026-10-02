@@ -86,6 +86,10 @@ test('events: changing the kind keeps the plans', () => {
   assert.equal(all.plans, null);
   assert.deepEqual(ed.setEvent(all, { kind: 'race' }, IDS).plans, { 'group-a': 2, 'group-b': 2 });
   assert.throws(() => ed.setEvent(race(), { kind: 'party' }, IDS), /unknown kind/);
+  // a new event is a race in no plan; as a holiday it is for every plan, and one plan can then be taken out
+  const holiday = ed.setEvent(ed.newEvent('2026-03-01'), { kind: 'holiday' }, IDS);
+  assert.equal(holiday.plans, null);
+  assert.deepEqual(ed.setEvent(holiday, { plan: { id: 'group-a', value: null } }, IDS).plans, { 'group-b': null });
   // every result can be written and read back
   for (const ev of [camp, again, all, ed.newEvent('2026-03-01')]) {
     const back = parseEvents(serializeEvents([ev]));
