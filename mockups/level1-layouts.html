@@ -1,0 +1,1071 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kayplan level 1 layouts</title>
+<style>
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0; display: flex; flex-direction: column;
+  background: #F3F5F7; color: #16202A;
+  font: 13px/1.3 "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", "Noto Sans", "DejaVu Sans", sans-serif;
+}
+button { font: inherit; color: inherit; cursor: pointer; }
+textarea, select { font: inherit; color: inherit; }
+button:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px solid #0F5C7A; outline-offset: 1px; }
+.mono { font-family: "IBM Plex Mono", ui-monospace, "DejaVu Sans Mono", Menlo, Consolas, monospace; }
+.muted { color: #52606D; }
+.eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: #52606D; }
+
+header { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; padding: 8px 16px; background: #FFFFFF; border-bottom: 1px solid #D8DEE4; flex-shrink: 0; }
+.brand { font-weight: 600; font-size: 17px; letter-spacing: .02em; }
+.tabs, .pills { display: flex; gap: 6px; flex-wrap: wrap; }
+.pills { margin-left: auto; }
+.tab { height: 40px; padding: 0 14px; border: 1px solid #C5CDD5; border-radius: 6px; background: #FFFFFF; font-weight: 500; }
+.tab.on { background: #0F5C7A; border-color: #0F5C7A; color: #FFFFFF; }
+.pill { height: 40px; padding: 0 16px; border: 1px solid #C5CDD5; border-radius: 20px; background: #FFFFFF; font-weight: 500; }
+.pill.on { background: #16202A; border-color: #16202A; color: #FFFFFF; }
+
+#app { flex: 1 1 auto; min-height: 0; overflow: auto; display: flex; flex-direction: column; }
+.panel { background: #FFFFFF; border: 1px solid #D8DEE4; border-radius: 6px; }
+.sx { overflow-x: auto; }
+.row { display: flex; }
+.row > * { flex-shrink: 0; }
+.sec { padding: 10px 16px 0; flex-shrink: 0; }
+.sec-h { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; margin-bottom: 5px; }
+.sec-h b { font-size: 13px; }
+.push { margin-left: auto; }
+
+/* shared timeline pieces */
+.month { font-size: 11px; color: #52606D; border-left: 1px solid #C5CDD5; padding-left: 4px; height: 16px; }
+.racecell { height: 24px; display: flex; align-items: center; justify-content: center; }
+.rc { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 22px; height: 20px; border-radius: 3px; font-size: 10px; font-weight: 600; cursor: default; }
+.rc.i1, .race.i1 { background: #16202A; color: #FFFFFF; }
+.rc.i2, .race.i2 { background: #C5CDD5; color: #16202A; }
+.rc.i3, .race.i3 { box-shadow: inset 0 0 0 1px #AEB8C2; color: #16202A; }
+.rc.tbc, .race.tbc { outline: 1px dashed #52606D; outline-offset: 1px; }
+.race small { display: block; font-size: 10px; font-weight: 400; }
+.rbbox { width: 26px; flex-shrink: 0; display: flex; justify-content: center; }
+.diamond { width: 8px; height: 8px; transform: rotate(45deg); border: 2px solid #B4232A; background: #FFFFFF; }
+.macro { height: 26px; border: 0; border-right: 2px solid #FFFFFF; border-radius: 4px; background: #E6EAEE; font-size: 12px; font-weight: 600; text-align: left; padding: 0 8px; overflow: hidden; white-space: nowrap; }
+.macro.on { background: #16202A; color: #FFFFFF; }
+.meso { height: 26px; border: 0; border-right: 2px solid #FFFFFF; border-radius: 4px; font-size: 11px; font-weight: 500; text-align: left; padding: 0 6px; overflow: hidden; white-space: nowrap; }
+.wk { height: 30px; border: 0; border-right: 1px solid #EEF1F4; border-radius: 3px; background: #FFFFFF; color: #52606D; font-size: 11px; padding: 0; }
+.wk.on { background: #0F5C7A; color: #FFFFFF; }
+.stack { display: flex; flex-direction: column; gap: 3px; padding: 8px; }
+
+/* A: macro strip */
+.mesohead { height: 24px; border-right: 2px solid #FFFFFF; border-radius: 4px; font-size: 12px; font-weight: 500; padding: 4px 8px; overflow: hidden; white-space: nowrap; }
+.racelab { width: 56px; height: 26px; display: flex; align-items: flex-end; justify-content: center; padding: 0 2px; overflow: hidden; font-size: 9px; line-height: 1.1; font-weight: 600; color: #16202A; text-align: center; overflow-wrap: anywhere; }
+.mwk { width: 56px; height: 100px; border: 0; border-right: 1px solid #EEF1F4; border-radius: 4px; background: #FFFFFF; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding: 4px 0; }
+.mwk.on { background: #DCEBF2; }
+.mwk .barbox { height: 46px; display: flex; align-items: flex-end; }
+.mwk .bar { width: 24px; background: #7C93A3; border-radius: 2px 2px 0 0; }
+.mwk.on .bar { background: #0F5C7A; }
+.mwk .t { font-size: 12px; font-weight: 500; margin-top: 2px; }
+.mwk .n { font-size: 11px; font-weight: 600; }
+.mwk .d { font-size: 10px; color: #52606D; }
+
+/* days and sessions */
+.days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; min-width: 760px; }
+.day { background: #FFFFFF; border: 1px solid #D8DEE4; border-radius: 6px; padding: 6px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.day-h { display: flex; justify-content: space-between; font-size: 12px; }
+.day-h b { font-weight: 600; }
+.race { border-radius: 4px; font-size: 11px; font-weight: 600; padding: 3px 6px; margin: 1px; }
+.chip { min-height: 44px; border: 0; border-radius: 4px; text-align: left; padding: 4px 6px; overflow: hidden; display: block; width: 100%; }
+.chip.on { box-shadow: 0 0 0 2px #FFFFFF, 0 0 0 4px #16202A; }
+.chip-h { display: block; font-size: 10px; font-weight: 600; }
+.chip-t { display: block; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chip.tall { min-height: 96px; }
+.chip.tall .chip-t { white-space: normal; overflow-wrap: anywhere; line-height: 1.35; }
+.add { height: 44px; width: 100%; border: 1px dashed #AEB8C2; border-radius: 4px; background: transparent; color: #52606D; font-size: 11px; }
+.add.small { height: 24px; margin-top: auto; padding: 0; }
+select { height: 40px; border: 1px solid #C5CDD5; border-radius: 4px; background: #FFFFFF; padding: 0 6px; }
+.inline { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #52606D; }
+
+/* session editor */
+.fld { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #52606D; min-width: 0; }
+.fld textarea { flex: 1 1 auto; min-height: 80px; resize: none; border: 1px solid #C5CDD5; border-radius: 4px; padding: 10px; color: #16202A; font-size: 13px; line-height: 1.5; }
+.fld textarea.plan { font-size: 15px; }
+.when { font-size: 17px; font-weight: 600; }
+.inf { display: flex; align-items: flex-start; gap: 10px; color: #16202A; }
+.inf small { font-size: 11.5px; line-height: 1.4; color: #52606D; }
+.zpill { flex-shrink: 0; min-width: 48px; text-align: center; padding: 6px 10px; border-radius: 4px; font-size: 15px; font-weight: 600; }
+.del { height: 44px; padding: 0 16px; border: 1px solid #C5CDD5; border-radius: 4px; background: #FFFFFF; color: #8E1B21; font-weight: 500; }
+.ed-row { display: flex; gap: 16px; padding: 14px; height: 100%; }
+.ed-row .meta { width: 200px; display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; }
+.ed-row .meta .del { margin-top: auto; }
+.ed-row .f-plan { flex: 1 1 auto; }
+.ed-row .f-notes { width: 280px; flex-shrink: 0; }
+.ed-col { display: flex; flex-direction: column; gap: 10px; padding: 14px; height: 100%; }
+.ed-col .f-plan { flex: 2 1 0; }
+.ed-col .f-notes { flex: 1 1 0; }
+.ed-col .del { align-self: flex-start; }
+.empty { height: 100%; min-height: 120px; display: flex; align-items: center; justify-content: center; text-align: center; padding: 24px; color: #52606D; }
+
+/* B: sheet */
+.lab { position: sticky; left: 0; z-index: 1; width: 104px; background: #FFFFFF; padding: 0 8px; font-size: 11px; font-weight: 600; color: #52606D; display: flex; align-items: center; }
+.sheet { display: flex; flex-direction: column; gap: 2px; padding: 8px 8px 8px 0; }
+.sheet .month { font-weight: 600; color: #16202A; height: 18px; }
+.sheet .macro, .sheet .meso { height: 22px; border-radius: 0; text-align: center; font-size: 11px; padding: 0 4px; }
+.sheet .macro.on { background: #E6EAEE; color: #16202A; }
+.cell { width: 26px; text-align: center; font-size: 10px; color: #52606D; height: 18px; }
+.content { height: 20px; border: 0; border-right: 2px solid #FFFFFF; background: #F3F5F7; font-size: 11px; text-align: center; padding: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.ztogs { display: flex; gap: 4px; }
+.ztog { flex: 1 1 0; height: 36px; padding: 0; border: 1px solid #C5CDD5; border-radius: 4px; background: #FFFFFF; font-size: 12px; font-weight: 500; }
+.content:hover { background: #E6EAEE; }
+.rel { position: relative; }
+.hdl { position: absolute; top: 0; bottom: 0; width: 8px; z-index: 2; cursor: col-resize; touch-action: none; border-radius: 2px; }
+.hdl:hover, body.dragging .hdl { background: rgba(15, 92, 122, .45); }
+body.dragging { cursor: col-resize; user-select: none; }
+.sheet .macro.editing, .sheet .meso.editing { box-shadow: inset 0 0 0 2px #16202A; }
+.pop { position: fixed; z-index: 9; width: 340px; max-width: calc(100vw - 16px); background: #FFFFFF; border: 1px solid #C5CDD5; border-radius: 8px; box-shadow: 0 10px 28px rgba(22, 32, 42, .2); padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 10px; }
+.pop-h { display: flex; align-items: center; gap: 8px; }
+.pop .x { margin-left: auto; width: 32px; height: 32px; border: 0; border-radius: 4px; background: transparent; font-size: 18px; line-height: 1; color: #52606D; }
+.pop .x:hover { background: #EEF1F4; }
+.pop input[type=text] { height: 40px; border: 1px solid #C5CDD5; border-radius: 4px; padding: 0 10px; font: inherit; font-size: 14px; color: #16202A; }
+.pop select { width: 100%; }
+.pop .two { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 10px; }
+.pop-r { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pop-r .inline select { width: auto; }
+.b { height: 36px; padding: 0 12px; border: 1px solid #C5CDD5; border-radius: 4px; background: #FFFFFF; font-weight: 500; }
+.b:hover { background: #F3F5F7; }
+.b:disabled { color: #AEB8C2; cursor: default; background: #FFFFFF; }
+.b.danger { color: #8E1B21; margin-left: auto; }
+.b.danger:disabled { color: #AEB8C2; }
+.swk { width: 26px; height: 26px; border: 0; border-right: 1px solid #EEF1F4; background: #FFFFFF; font-size: 11px; font-weight: 500; padding: 0; }
+.swk.on { background: #0F5C7A; color: #FFFFFF; }
+.sty { width: 26px; height: 22px; border: 0; border-right: 1px solid #EEF1F4; background: #FFFFFF; font-size: 10px; padding: 0; }
+.sld { width: 26px; height: 60px; border: 0; border-right: 1px solid #EEF1F4; background: #FFFFFF; display: flex; align-items: flex-end; justify-content: center; padding: 0; }
+.sld span { display: block; width: 18px; background: #7C93A3; }
+.sty.on, .sld.on { background: #DCEBF2; }
+.sld.on span { background: #0F5C7A; }
+.cap { width: 26px; height: 20px; border: 0; border-right: 1px solid #FFFFFF; padding: 0; font-size: 10px; background: transparent; color: #8A97A3; font-style: normal; }
+.cap.dev { background: #0F5C7A; color: #FFFFFF; font-weight: 600; }
+.cap.mnt { background: #BCD9E6; color: #16202A; }
+.cap.low { box-shadow: inset 0 0 0 1px #7C93A3; color: #16202A; }
+.cap.cur:not(.dev):not(.mnt) { background: #DCEBF2; }
+.lab .sw { display: block; width: 8px; height: 12px; border-radius: 2px; margin-right: 6px; flex-shrink: 0; }
+.lab small { margin-left: auto; font-weight: 400; font-size: 10px; }
+.legend { display: flex; align-items: center; gap: 14px; height: 20px; padding-left: 4px; font-size: 11px; color: #52606D; flex: 1 1 auto; flex-shrink: 1; min-width: 0; white-space: nowrap; }
+.legend span { display: inline-flex; align-items: center; }
+.legend .cap { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 16px; margin-right: 5px; border-right: 0; }
+.capsum { width: 88px; height: 20px; line-height: 20px; text-align: right; font-size: 11px; white-space: nowrap; }
+.cap.tg { color: #16202A; }
+.seg { display: inline-flex; border: 1px solid #C5CDD5; border-radius: 4px; overflow: hidden; }
+.segb { height: 18px; padding: 0 6px; border: 0; background: #FFFFFF; font-size: 10.5px; font-weight: 500; color: #52606D; }
+.segb.on { background: #16202A; color: #FFFFFF; }
+.zlab { border: 0; text-align: left; cursor: help; font-size: 11px; font-weight: 600; color: #52606D; }
+.zlab u { text-decoration: underline dotted; text-underline-offset: 3px; color: #16202A; }
+.zlab:hover, .zlab:focus-visible { background: #E6EAEE; }
+.tip { position: fixed; z-index: 10; width: 380px; max-width: calc(100vw - 24px); background: #FFFFFF; border: 1px solid #C5CDD5; border-radius: 8px; box-shadow: 0 10px 28px rgba(22, 32, 42, .2); padding: 14px 16px; font-size: 12.5px; line-height: 1.45; pointer-events: none; }
+.tip[hidden] { display: none; }
+.tip h4 { margin: 0 0 4px; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+.tip h4 i { display: block; width: 10px; height: 16px; border-radius: 2px; }
+.tip p { margin: 0 0 10px; color: #52606D; }
+.tip dl { margin: 0; display: grid; grid-template-columns: 82px minmax(0, 1fr); gap: 7px 10px; }
+.tip dt { font-size: 11px; font-weight: 600; color: #52606D; padding-top: 1px; }
+.tip dd { margin: 0; }
+.tip ul { margin: 0; padding-left: 15px; }
+.tip .src { margin-top: 10px; font-size: 11px; color: #52606D; }
+.lower { flex: 1 1 auto; min-height: 380px; display: flex; gap: 12px; padding: 12px 16px 16px; }
+.lower .left { flex: 3 1 0; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.lower .right { flex: 2 1 0; min-width: 320px; }
+.lower .days { flex: 1 1 auto; gap: 6px; min-width: 620px; }
+.nav { width: 40px; height: 40px; border: 1px solid #C5CDD5; border-radius: 4px; background: #FFFFFF; font-size: 16px; line-height: 1; }
+
+/* C: outline + calendar */
+.cols { flex: 1 1 auto; min-height: 0; display: flex; }
+.side { width: 244px; flex-shrink: 0; background: #FFFFFF; border-right: 1px solid #D8DEE4; overflow-y: auto; padding: 12px 10px; }
+.side .eyebrow { padding: 0 6px; }
+.side h3 { margin: 12px 0 4px; padding: 0 6px; font-size: 13px; font-weight: 600; }
+.side h3 span { font-size: 11px; font-weight: 400; color: #52606D; margin-left: 4px; }
+.item { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px; border: 0; border-radius: 6px; background: transparent; text-align: left; padding: 4px 6px; }
+.item.on { background: #DCEBF2; }
+.item i { display: block; width: 10px; height: 30px; border-radius: 2px; flex-shrink: 0; }
+.item b { display: block; font-weight: 500; }
+.item small { display: block; font-size: 11px; color: #52606D; }
+.item .dt { width: 46px; flex-shrink: 0; font-size: 11px; font-weight: 500; color: #B4232A; }
+.mid { flex: 1 1 auto; min-width: 0; overflow: auto; padding: 12px 14px 16px; }
+.calhead, .calrow { display: grid; grid-template-columns: 96px repeat(7, minmax(0, 1fr)); gap: 6px; min-width: 640px; }
+.calhead { padding: 0 6px 4px; font-size: 11px; font-weight: 600; color: #52606D; }
+.calrow { padding: 6px; border-radius: 6px; margin-bottom: 4px; }
+.calrow.on { background: #DCEBF2; }
+.cw { border: 0; background: transparent; text-align: left; padding: 2px; display: flex; flex-direction: column; gap: 4px; }
+.cw .n { font-size: 14px; font-weight: 600; }
+.cw .d { font-size: 11px; color: #52606D; }
+.cw .t { font-size: 12px; }
+.cw .track { display: block; height: 6px; border-radius: 3px; background: #C5CDD5; }
+.cw .track span { display: block; height: 6px; border-radius: 3px; background: #0F5C7A; }
+.calday { background: #FFFFFF; border: 1px solid #D8DEE4; border-radius: 4px; padding: 4px; display: flex; flex-direction: column; gap: 3px; min-width: 0; min-height: 104px; }
+.calday .num { font-size: 11px; color: #52606D; }
+.calday .race { font-size: 10px; padding: 2px 4px; border-radius: 3px; }
+.calday .chip-t { font-size: 10px; white-space: normal; overflow-wrap: anywhere; line-height: 1.25; max-height: 2.5em; }
+.rightcol { width: 332px; flex-shrink: 0; background: #FFFFFF; border-left: 1px solid #D8DEE4; display: flex; flex-direction: column; }
+.rightcol .top { padding: 12px 14px; border-bottom: 1px solid #D8DEE4; display: flex; flex-direction: column; gap: 6px; }
+.rightcol .top b { font-size: 15px; }
+.rightcol .body { flex: 1 1 auto; min-height: 0; }
+</style>
+</head>
+<body>
+<div id="root" style="display: flex; flex-direction: column; height: 100%"></div>
+<div id="tip" class="tip" role="tooltip" hidden></div>
+<script>
+(function () {
+  var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  var DAY = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  var ZONES = ['R0', 'R1', 'R2', 'R3', 'R3+', 'R4', 'R5', 'R6', 'R7'];
+  var Z = {
+    'R0': { bg: '#D9DDE3', fg: '#16202A' },
+    'R1': { bg: '#BFE0F2', fg: '#16202A' },
+    'R2': { bg: '#7DB8E0', fg: '#16202A' },
+    'R3': { bg: '#2F74B5', fg: '#FFFFFF' },
+    'R3+': { bg: '#1B4B82', fg: '#FFFFFF' },
+    'R4': { bg: '#F0B95B', fg: '#16202A' },
+    'R5': { bg: '#D9722B', fg: '#16202A' },
+    'R6': { bg: '#7B4FA8', fg: '#FFFFFF' },
+    'R7': { bg: '#2A2F36', fg: '#FFFFFF' }
+  };
+  var TYPES = [['I', 'Introductory'], ['C', 'Load'], ['CH', 'Shock'], ['R', 'Recovery'], ['AT', 'Activation'], ['CT', 'Competition']];
+  var LOAD = { I: 60, C: 80, CH: 100, R: 50, AT: 55, CT: 40 };
+  var THR = { 'R1': [3, 2], 'R2': [3, 2], 'R3': [2, 1], 'R3+': [2, 1], 'R4': [2, 1], 'R5': [2, 1], 'R6': [2, 1], 'R7': [2, 1] };
+  var ZINFO = {
+    'R1': {
+      name: 'Aerobic, lipid',
+      what: "The lowest speed that still improves aerobic endurance. Builds paddling economy, teaches the body to burn fat and spare glycogen, and speeds up recovery after hard work.",
+      intensity: "60–70 strokes/min (kayak) · 65–75% VO2max · 70–80% HRmax",
+      how: ["Continuous or split paddling, up to 120'", "Combined with other zones, it usually goes at the end of the session", "A good zone for technique work", "Negligible risk of overtraining"],
+      week: "Develop: 4–6 sessions. Maintain: 3. Recovery after a session: 24 h.",
+      build: "Slowly. Aerobic work needs at least 8 weeks to show an effect.",
+      decay: "Slowly. Aerobic endurance holds for about 30 ± 5 days without training.",
+      ages: "All categories."
+    },
+    'R2': {
+      name: 'Aerobic–anaerobic transition',
+      what: "The highest steady speed that does not accumulate lactate. The base of aerobic work.",
+      intensity: "70–80 strokes/min · 75–85% VO2max · 80–90% HRmax",
+      how: ["Continuous and interval methods", "About 60' of work per session (after 45', about 60% of glycogen is used)", "With anaerobic work in the same session, it usually goes at the end", "For sprinters: no excessive volume, split work, add high-intensity sets"],
+      week: "Develop: 3–4 sessions. Maintain: 2. Recovery: 24 h.",
+      build: "Slowly. Aerobic work needs at least 8 weeks to show an effect.",
+      decay: "Slowly. About 30 ± 5 days.",
+      ages: "From Infantil in the course's long-term table."
+    },
+    'R3': {
+      name: 'Aerobic capacity',
+      what: "A pace close to VO2max. Trains how long VO2max can be held.",
+      intensity: "80–90 strokes/min · 90–95% VO2max · 95–98% HRmax",
+      how: ["Reps of 2'–6' (around 1500 m for interval work)", "About 30' of work per session", "Active recovery, work to rest about 1:1", "Warm up well: full VO2max is only available after 30'–50' of activity", "Develop it fully before starting anaerobic work"],
+      week: "Develop: 2–3 sessions. Maintain: 1. Recovery: 48–72 h.",
+      build: "At least 8 weeks. In well-trained athletes VO2max can improve 10–20% in 2 months.",
+      decay: "Slowly. About 30 ± 5 days (the course gives one figure for all aerobic endurance).",
+      ages: "From Infantil in the course's long-term table."
+    },
+    'R3+': {
+      name: 'Aerobic power (VO2max)',
+      what: "Work at VO2max. 100% of VO2max can only be held for a few minutes (4'–7').",
+      intensity: "90–100 strokes/min · 100% VO2max · 100% HRmax",
+      how: ["Reps of 2'–3' (around 800 m)", "About 15' of work per session", "Active recovery, work to rest 1:1, up to 1:3 for shorter reps", "Intermittent option: 30'' at 95–105% of max aerobic speed, 10''–20'' easy", "The shorter the rep, the closer it gets to R4"],
+      week: "Develop: 2–3 sessions. Maintain: 1. Recovery: 48–72 h.",
+      build: "At least 8 weeks. In well-trained athletes VO2max can improve 10–20% in 2 months.",
+      decay: "Slowly. About 30 ± 5 days (the course gives one figure for all aerobic endurance).",
+      ages: "From Cadete in the course's long-term table."
+    },
+    'R4': {
+      name: 'Lactic capacity (tolerance)',
+      what: "Working with high lactate for as long as possible. Trains tolerance of discomfort and holding technique under fatigue.",
+      intensity: "110–120 strokes/min · 105–120% VO2max",
+      how: ["Efforts of about 75''–80''", "Repetitions of 100–400 m, rest 1:3 or more", "Or series of 300–600 m with 10''–30'' rest and 3'–8' between sets", "Active recovery", "Watch glycogen stores; these sessions cause a lot of fatigue"],
+      week: "Develop: 2–4 sessions. Maintain: 1. Recovery: 48–72 h.",
+      build: "Fast. 4–6 weeks at 3 sessions a week.",
+      decay: "Faster than aerobic. About 18 ± 4 days.",
+      ages: "Seniors only in the course's long-term table."
+    },
+    'R5': {
+      name: 'Lactic power',
+      what: "The highest rate of energy from anaerobic glycolysis. Trains holding technique at very high intensity.",
+      intensity: "Maximal stroke rate · 120–140% VO2max",
+      how: ["Efforts of about 45''", "Repetitions of 100–200 m, or split series of 50–100 m", "3'–6' recovery, active, long enough to restore the fuel", "About 1000 m of work per session", "Do it fresh, with minimal fatigue"],
+      week: "Develop: 2–4 sessions. Maintain: 1. Recovery: 48–72 h.",
+      build: "Fast. 4–6 weeks at 3 sessions a week.",
+      decay: "Faster than aerobic. About 18 ± 4 days.",
+      ages: "From Junior in the course's long-term table."
+    },
+    'R6': {
+      name: 'Alactic (speed)',
+      what: "Maximal speed. R6+ is alactic power: acceleration and top speed, 4''–10''. R6 is alactic capacity: resisting the loss of speed, 10''–20''.",
+      intensity: "Maximal · above 160% VO2max. Below 90% of top speed the stimulus is too weak.",
+      how: ["Efforts of 5''–20'' with 3'–4' rest", "1'–3' of total work per session", "Only when fresh; the number of reps is set by quality", "Rest must restore full work capacity, but long passive rests cool the muscles", "Vary the tasks; monotony and too much volume lower the intensity"],
+      week: "Develop: 3–4 sessions. Maintain: 1–2. Recovery: 24 h.",
+      build: "Keep it in all season; that is how the nervous system learns to coordinate. Too much fatigues the nervous system.",
+      decay: "Fast. Maximal speed holds for only about 5 ± 3 days.",
+      ages: "All categories."
+    },
+    'R7': {
+      name: 'Competition pace',
+      what: "Racing efficiently: the pace, tactics and conditions of the event.",
+      intensity: "Race speed for the target distance",
+      how: ["Split series: the race distance in equal parts, 10''–1' rest", "Simulation series: the race distance with different splits", "USRPT: 15'' on, 15'' off at race speed; stop when the pace is lost", "2–6 times the race distance in total, more than 8' between pieces", "Positive split suits athletes with good aerobic capacity; negative split suits those who build lactate fast"],
+      week: "At most 2 sessions per microcycle in preparation, 4 in the competitive period.",
+      build: "Maximum specificity, used as races approach.",
+      decay: "The course gives no figure.",
+      ages: "From Infantil in the course's long-term table."
+    }
+  };
+  var LAYOUTS = [['A', 'A · Three strips'], ['B', 'B · Annual sheet'], ['C', 'C · Outline + block calendar']];
+
+  // ---- dummy data -------------------------------------------------------
+  var PATTERNS = [
+    ['build', 'Build: load, shock, recovery'],
+    ['intro', 'Introduction, then build'],
+    ['restart', 'Recovery, then build'],
+    ['comp', 'Competition: load, activation, race'],
+    ['recovery', 'Recovery only']
+  ];
+  // week type for position k of n in a mesocycle with this pattern
+  function patType(pat, k, n) {
+    if (pat === 'recovery') return 'R';
+    if (pat === 'comp') return k === n - 1 ? 'CT' : (k === n - 2 ? 'AT' : 'C');
+    if (pat === 'restart') return k === 0 ? 'R' : (k === n - 1 && n > 2 ? 'CH' : 'C');
+    if (pat === 'intro') return k === 0 ? 'I' : patType('build', k - 1, n - 1);
+    if (n === 1) return 'C';
+    return k === n - 1 ? 'R' : (k === n - 2 && n > 2 ? 'CH' : 'C');
+  }
+  // What the coach edits: an ordered list of mesocycles, each with a length in weeks and a macrocycle.
+  var plan = (function () {
+    var macros = [{ name: 'Macrocycle I' }, { name: 'Macrocycle II' }, { name: 'Macrocycle III' }];
+    function m(macro, name, zones, len, pat) { return { macro: macros[macro], name: name, zones: zones.split(' '), len: len, pat: pat }; }
+    return { mesos: [
+      m(0, 'General I', 'R1 R2', 5, 'intro'), m(0, 'General II', 'R2', 4, 'build'), m(0, 'General III', 'R2', 4, 'build'),
+      m(0, 'Specific I', 'R3', 4, 'build'), m(0, 'Specific II', 'R3 R3+', 4, 'build'), m(0, 'Competitive', 'R7', 3, 'comp'),
+      m(1, 'General', 'R2', 4, 'restart'), m(1, 'Specific', 'R3 R3+', 5, 'build'), m(1, 'Competitive', 'R7', 4, 'comp'),
+      m(2, 'Specific', 'R3+', 4, 'restart'), m(2, 'Competitive', 'R7', 2, 'comp'), m(2, 'Transition', 'R1', 1, 'recovery')
+    ] };
+  })();
+  var MACROS = [], MESOS = [];   // positions, worked out from the plan by rebuild()
+  var RTYPE = {
+    sprint: { label: 'Sprint', letter: 'S' },
+    fundo: { label: 'Fundo', letter: 'F' },
+    maratona: { label: 'Maratona', letter: 'M' }
+  };
+  var BOATS = { solo: 'Solo', crew: 'Tripulações', mixed: 'Mixed' };
+  var RACES = [
+    { name: 'Campeonato Regional de Fundo Norte', short: 'Reg. Fundo', week: 22, day: 5, type: 'fundo', boats: 'solo', pri: 2, confirmed: true },
+    { name: 'Taça de Portugal de Tripulações', short: 'Tripulações', week: 23, day: 5, type: 'fundo', boats: 'crew', pri: 3, confirmed: true },
+    { name: 'Campeonato Nacional de Fundo', short: 'Nac. Fundo', week: 24, day: 5, type: 'fundo', boats: 'mixed', pri: 1, confirmed: true },
+    { name: 'Taça de Portugal de Regatas em Linha', short: 'Taça Linha', week: 28, day: 5, type: 'sprint', boats: 'mixed', pri: 2, confirmed: false },
+    { name: 'Campeonato Regional de Maratona Norte', short: 'Reg. Maratona', week: 32, day: 5, type: 'maratona', boats: 'solo', pri: 3, confirmed: false },
+    { name: 'Campeonato Nacional de Maratona', short: 'Nac. Maratona', week: 33, day: 5, type: 'maratona', boats: 'mixed', pri: 2, confirmed: false },
+    { name: 'Campeonato Nacional de Regatas em Linha', short: 'Nac. Linha', week: 37, day: 5, type: 'sprint', boats: 'mixed', pri: 1, confirmed: false },
+    { name: 'Campeonato Regional de Regatas em Linha Norte', short: 'Reg. Linha', week: 40, day: 5, type: 'sprint', boats: 'solo', pri: 3, confirmed: false },
+    { name: 'Taça de Portugal de Maratona', short: 'Taça Maratona', week: 43, day: 5, type: 'maratona', boats: 'crew', pri: 2, confirmed: false }
+  ];
+  var BANK = {
+    'R1': [
+      "2km R1 + 2x(300m unilateral + 300m SSF) + 2km R1",
+      "10' R1 + 4x 200m R1 com bola em pares + 10' R1",
+      "6km R1",
+      "1km R1 + 8x(100m R1 técnica/100m R0) + 1km R1"
+    ],
+    'R2': [
+      "1km R1 + 8x 4' R2/1' R0 + 1km R1",
+      "1km R1 + 3x 2000m R2/3' + 1km R1",
+      "8km R1 + 3x 10'' R6/2'",
+      "1km R1 + 2x(6x 2'30'' R2/30'')/5' + 1km R1"
+    ],
+    'R3': [
+      "2km R1 + 4x(3x 2' R3/30'')/6' + 1km R1",
+      "2km R1 + 6x 3' R3/3' R1 + 1km R1",
+      "1km R1 + 3x(4'-6'-4' R2/1')/3' + 1km R1",
+      "8km R1 + 2x 300m SSF"
+    ],
+    'R3+': [
+      "2km R1 + 4x(6x 30'' R3+/30'')/8' + 1km R1",
+      "1km R1 + 8x 4' R2/1' R0 + 1km R1",
+      "6km R1 + 2x 300m unilateral",
+      "2km R1 + 4x(500m-300m R3+/200m)/12' + 1km R1"
+    ],
+    'R7': [
+      "2km R1 + 2x 1000m R7/10' + 1km R1",
+      "6km R1 + 4x(15'' R7 + 15'' R0)",
+      "20' R1 + 4x 10'' R6/2' + 10' R1",
+      "2km R1 + 1x 2000m R7 + 2km R1"
+    ],
+    'G': [
+      "20' R0 caça à baleia + 4x 200m R1 com bola em pares",
+      "800m R1 + remada unilateral 2x 300m + 800m R1",
+      "15' R0 pagaia debaixo do barco + estafetas 6x 50m R6",
+      "800m R1 + 2x 300m SSF + 800m R1"
+    ]
+  };
+  var GROUPS = [
+    { id: 'jun', name: 'Juniors', games: false, slots: [[1, 'PM'], [3, 'PM'], [5, 'AM'], [6, 'AM']] },
+    { id: 'cad', name: 'Cadetes', games: false, slots: [[2, 'PM'], [5, 'AM'], [6, 'AM']] },
+    { id: 'ini', name: 'Iniciados', games: true, slots: [[5, 'AM'], [6, 'AM']] },
+    { id: 'men', name: 'Menores', games: true, slots: [[5, 'AM']] }
+  ];
+  var WEEKS = [];
+  (function () {
+    for (var n = 1; n <= 44; n++) {
+      var race = null;
+      for (var i = 0; i < RACES.length; i++) { if (RACES[i].week === n) race = RACES[i]; }
+      WEEKS.push({ n: n, d: new Date(2026, 9, 5 + (n - 1) * 7), meso: 0, macro: 0, type0: 'C', race: race });
+    }
+  })();
+  function rebuild() {
+    var n = 1;
+    MACROS = [];
+    MESOS = plan.mesos.map(function (pm, i) {
+      var last = MACROS[MACROS.length - 1];
+      if (!last || last.ref !== pm.macro) { last = { ref: pm.macro, name: pm.macro.name, from: n, to: n }; MACROS.push(last); }
+      // zone = the most intense content (used for the block colour); label = all contents, as in the course sheets
+      var out = { ref: pm, macro: MACROS.length - 1, name: pm.name, zones: pm.zones, zone: pm.zones.length ? pm.zones[pm.zones.length - 1] : null, label: pm.zones.length ? pm.zones.join('-') : '–', pat: pm.pat, from: n, to: n + pm.len - 1 };
+      for (var k = 0; k < pm.len; k++) { var w = WEEKS[n - 1 + k]; w.meso = i; w.macro = out.macro; w.type0 = patType(pm.pat, k, pm.len); }
+      n += pm.len;
+      last.to = n - 1;
+      return out;
+    });
+  }
+  rebuild();
+  // Dummy sessions are generated once from the starting plan and then stay on their dates.
+  var INITW = WEEKS.map(function (w) { return { zone: w.meso === 0 ? 'R1' : MESOS[w.meso].zone, type: w.type0 }; });
+
+  // ---- infer: main zone from the plan text --------------------------------
+  // Reference volume of one full session in each zone, in minutes (R4, R7 and R0 are assumptions).
+  var REF = { 'R0': 60, 'R1': 120, 'R2': 60, 'R3': 30, 'R3+': 15, 'R4': 10, 'R5': 4.5, 'R6': 2, 'R7': 10 };
+  // Dummy speeds in km/h, used only to turn distances into minutes.
+  var SPEED = { 'R0': 7, 'R1': 9.5, 'R2': 11, 'R3': 12, 'R3+': 12.8, 'R4': 13.5, 'R5': 14.5, 'R6': 16, 'R7': 13, '?': 10 };
+
+  function parsePlan(text) {
+    var s = String(text || '').replace(/[’′´`]/g, "'").replace(/[”″"]/g, "''");
+    var pos = 0;
+    function peek(re) { return re.exec(s.slice(pos)); }
+    function ws() { var m = peek(/^\s+/); if (m) pos += m[0].length; }
+    function add(tot, z, a, k) { if (!tot[z]) tot[z] = { sec: 0, m: 0 }; tot[z].sec += a.sec * k; tot[z].m += a.m * k; }
+    function merge(into, from, k) { for (var z in from) add(into, z, from[z], k); }
+    function zone() {
+      var m = peek(/^R([0-7])(\+)?F?(?![A-Za-z0-9])/i);
+      if (!m) return null;
+      pos += m[0].length;
+      return 'R' + m[1] + (m[2] && m[1] === '3' ? '+' : '');
+    }
+    function amount() {
+      var m;
+      if ((m = peek(/^(\d+)\s*'(?!')\s*(?:(\d+)\s*'')?/))) { pos += m[0].length; return { sec: +m[1] * 60 + (m[2] ? +m[2] : 0), m: 0 }; }
+      if ((m = peek(/^(\d+)\s*''/))) { pos += m[0].length; return { sec: +m[1], m: 0 }; }
+      if ((m = peek(/^(\d+(?:[.,]\d+)?)\s*km(?![a-z])/i))) { pos += m[0].length; return { sec: 0, m: parseFloat(m[1].replace(',', '.')) * 1000 }; }
+      if ((m = peek(/^(\d+)\s*m(?![a-z])/i))) { pos += m[0].length; return { sec: 0, m: +m[1] }; }
+      if ((m = peek(/^(\d+)(?![\d.,])/))) { pos += m[0].length; return { sec: 0, m: +m[1] }; }
+      return null;
+    }
+    function effort(isRest) {
+      var a = { sec: 0, m: 0 }, k = 1, z = null, got = false, m;
+      while (pos < s.length) {
+        ws();
+        var ch = s.charAt(pos);
+        if (ch === '' || ch === '+' || ch === '/' || ch === ')' || ch === '(') break;
+        var zz = zone();
+        if (zz) { if (!z) z = zz; continue; }
+        if ((m = peek(/^(\d+)\s*x(?![a-z])\s*/i))) { pos += m[0].length; k *= +m[1]; continue; }
+        var am = amount();
+        if (am) { a.sec += am.sec; a.m += am.m; got = true; ws(); if (s.charAt(pos) === '-') pos++; continue; }
+        m = peek(/^[^\s+\/()]+/);
+        pos += m ? m[0].length : 1;
+      }
+      var tot = {};
+      if (got) add(tot, z || (isRest ? 'rest' : '?'), a, k);
+      return tot;
+    }
+    function block() {
+      var count = 1, m, inner, tot = {};
+      ws();
+      if ((m = peek(/^\(\s*(\d+)\s*-\s*(\d+)\s*\)\s*x\s*/i))) { pos += m[0].length; count = (+m[1] + +m[2]) / 2; }
+      else if ((m = peek(/^(\d+)\s*x(?![a-z])\s*/i))) { pos += m[0].length; count = +m[1]; }
+      ws();
+      if (s.charAt(pos) === '(') { pos++; inner = sequence(true); if (s.charAt(pos) === ')') pos++; }
+      else inner = effort(false);
+      ws();
+      if (s.charAt(pos) === '/') { pos++; merge(inner, effort(true), 1); }
+      merge(tot, inner, count);
+      return tot;
+    }
+    function sequence(inParen) {
+      var tot = {};
+      while (pos < s.length) {
+        ws();
+        var ch = s.charAt(pos);
+        if (ch === '') break;
+        if (ch === ')') { if (inParen) break; pos++; continue; }
+        if (ch === '+' || ch === '/') { pos++; continue; }
+        var before = pos;
+        merge(tot, block(), 1);
+        if (pos === before) pos++;
+      }
+      return tot;
+    }
+    return sequence(false);
+  }
+
+  function infer(text) {
+    var tot = parsePlan(text), parts = [], main = null, best = 0, other = 0;
+    ZONES.forEach(function (z) {
+      if (!tot[z]) return;
+      var min = tot[z].sec / 60 + tot[z].m / 1000 / SPEED[z] * 60;
+      if (min <= 0) return;
+      parts.push({ z: z, min: min, dose: min / REF[z] });
+    });
+    parts.forEach(function (p) { if (p.z !== 'R0' && p.dose > best) { best = p.dose; main = p.z; } });
+    if (!main && parts.length) main = 'R0';
+    if (tot['?']) other = tot['?'].sec / 60 + tot['?'].m / 1000 / SPEED['?'] * 60;
+    // km: distances as written, times at the zone's pace; R0 is left out of the totals, as in the course's yearly table
+    var km = {}, totalKm = 0;
+    ZONES.forEach(function (z) {
+      if (!tot[z] || z === 'R0') return;
+      km[z] = tot[z].m / 1000 + tot[z].sec / 3600 * SPEED[z];
+      totalKm += km[z];
+    });
+    if (tot['?']) totalKm += tot['?'].m / 1000 + tot['?'].sec / 3600 * SPEED['?'];
+    return { main: main, parts: parts, other: other, km: km, totalKm: totalKm };
+  }
+  // ---- end infer ---------------------------------------------------------
+
+  // Yearly water km per group: the course's long-term table for the group's category.
+  var YEAR_KM = { jun: 2220, cad: 1605, ini: 274, men: null };
+  // Content factor: the km of a typical hard session with that content, compared with a hard R2 session.
+  // HARDKM is the work only; WARM is added to every session for warm-up and cool-down.
+  // R7 is race pace, so its distance depends on the race the block is aimed at.
+  var HARDKM = { 'R1': 12, 'R2': 12, 'R3': 6, 'R3+': 3.2, 'R4': 2.2, 'R5': 1, 'R6': 0.5 };
+  var R7KM = { sprint: 1.4, fundo: 6, maratona: 13.5 };
+  var WARM = 2;
+  // the race a block is aimed at: the most important race inside it, else the next one after it
+  function raceFor(m) {
+    var inside = RACES.filter(function (r) { return r.week >= m.from && r.week <= m.to; }).sort(function (a, b) { return a.pri - b.pri; });
+    if (inside.length) return inside[0];
+    var after = RACES.filter(function (r) { return r.week > m.to; });
+    return after.length ? after[0] : RACES[RACES.length - 1];
+  }
+  function contentFactor(m) {
+    if (!m.zones.length) return 1;
+    var sum = 0;
+    m.zones.forEach(function (z) { sum += ((z === 'R7' ? R7KM[raceFor(m).type] : HARDKM[z]) + WARM) / (HARDKM['R2'] + WARM); });
+    return sum / m.zones.length;
+  }
+  // Km estimate per microcycle: coefficient = load % x content factor; the yearly km are shared out in proportion.
+  function estimates() {
+    var year = YEAR_KM[state.group];
+    if (!year) return null;
+    var coef = WEEKS.map(function (w) { return LOAD[typeOf(w.n)] / 100 * contentFactor(MESOS[w.meso]); }), sum = 0;
+    coef.forEach(function (c) { sum += c; });
+    return { year: year, coef: coef, week: coef.map(function (c) { return year * c / sum; }) };
+  }
+  function fmtKm(v) { return v >= 9.95 ? String(Math.round(v)) : (v >= 0.95 ? v.toFixed(1) : (v >= 0.05 ? v.toFixed(1).replace(/^0/, '') : '·')); }
+
+  var NOZ = { bg: '#E6EAEE', fg: '#16202A' };
+  function zc(z) { return z ? Z[z] : NOZ; }
+  function mins(x) { return x >= 1 ? Math.round(x) + "'" : Math.round(x * 60) + "''"; }
+
+  // ---- state ------------------------------------------------------------
+  var state = { layout: 'A', group: 'jun', week: 7, sel: null, types: {}, edits: {}, added: {}, removed: {}, notes: {}, edit: null, grid: 'sessions' };
+  var selKey = null;
+  var hash = decodeURIComponent((window.location.hash || '').replace('#', '')).toUpperCase().split(':');
+  if (hash[0] === 'A' || hash[0] === 'B' || hash[0] === 'C') state.layout = hash[0];
+  if (hash[4] === 'KM') state.grid = 'km';
+  if (/^M\d+$/.test(hash[3] || '')) state.edit = { kind: 'meso', i: +hash[3].slice(1) };
+  if (/^\d+$/.test(hash[2] || '') && +hash[2] >= 1 && +hash[2] <= 44) state.week = +hash[2];
+
+  function fmt(d) { return d.getDate() + ' ' + MON[d.getMonth()]; }
+  function addDays(d, k) { return new Date(d.getFullYear(), d.getMonth(), d.getDate() + k); }
+  function esc(t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  function typeOf(n) { return state.types[n] || WEEKS[n - 1].type0; }
+  function group() { for (var i = 0; i < GROUPS.length; i++) { if (GROUPS[i].id === state.group) return GROUPS[i]; } return GROUPS[0]; }
+  function range(n) { var w = WEEKS[n - 1]; return fmt(w.d) + ' – ' + fmt(addDays(w.d, 6)); }
+
+  function slotFor(n, di, slot) {
+    var g = group(), w = WEEKS[n - 1];
+    var key = g.id + '-' + n + '-' + di + '-' + slot;
+    var base = null;
+    if (!state.removed[key]) {
+      for (var j = 0; j < g.slots.length; j++) {
+        if (g.slots[j][0] === di && g.slots[j][1] === slot) {
+          var zk = g.games ? 'G' : (INITW[n - 1].type === 'R' ? 'R1' : INITW[n - 1].zone);
+          base = BANK[zk][(n + j) % BANK[zk].length];
+        }
+      }
+    }
+    if (!base && !state.added[key]) return { key: key, week: n, slot: slot, filled: false };
+    var text = state.edits[key] !== undefined ? state.edits[key] : (base || '');
+    var inf = infer(text);
+    return {
+      key: key, week: n, slot: slot, filled: true, zone: inf.main, inf: inf, text: text, notes: state.notes[key] || '',
+      when: DAY[di] + ' ' + fmt(addDays(w.d, di)) + ' · ' + slot
+    };
+  }
+
+  function daysFor(n) {
+    var w = WEEKS[n - 1], out = [];
+    for (var di = 0; di < 7; di++) {
+      var date = addDays(w.d, di);
+      var hasRace = !!w.race && w.race.day === di;
+      out.push({ label: DAY[di], dnum: date.getDate(), dateLabel: fmt(date), race: hasRace ? w.race : null, slots: [slotFor(n, di, 'AM'), slotFor(n, di, 'PM')] });
+    }
+    return out;
+  }
+
+  function current() {
+    var days = daysFor(state.week), first = null, sess = null;
+    days.forEach(function (d) {
+      d.slots.forEach(function (sl) {
+        if (!sl.filled) return;
+        if (!first) first = sl;
+        if (sl.key === state.sel) sess = sl;
+      });
+    });
+    if (!sess) sess = first;
+    selKey = sess ? sess.key : null;
+    return { days: days, sess: sess };
+  }
+
+  // ---- races -------------------------------------------------------------
+  // Drawn like the other cells of the sheet: a short code, one neutral colour.
+  // Code = type letter + boats mark. Shade = importance. Dashed ring = date not confirmed.
+  var BOATMARK = { solo: '1', crew: 'T', mixed: '+' };
+  function raceTitle(r) {
+    return esc(r.name) + ' · ' + RTYPE[r.type].label + ' · ' + BOATS[r.boats] + ' · importance ' + r.pri + ' of 3 · ' + (r.confirmed ? 'date confirmed' : 'date not confirmed');
+  }
+  function raceBadge(r) {
+    return '<span class="rc mono i' + r.pri + (r.confirmed ? '' : ' tbc') + '" title="' + raceTitle(r) + '">' + RTYPE[r.type].letter + BOATMARK[r.boats] + '</span>';
+  }
+  function raceBanner(r) {
+    return '<div class="race i' + r.pri + (r.confirmed ? '' : ' tbc') + '" title="' + raceTitle(r) + '">' + esc(r.short) + '<small>' + RTYPE[r.type].label + ' · ' + BOATS[r.boats] + (r.confirmed ? '' : ' · date not confirmed') + '</small></div>';
+  }
+
+  // ---- shared pieces ----------------------------------------------------
+  function monthsRow(cw) {
+    var months = [];
+    WEEKS.forEach(function (w) {
+      var label = MON[w.d.getMonth()], last = months[months.length - 1];
+      if (last && last.label === label) last.count++; else months.push({ label: label, count: 1 });
+    });
+    return months.map(function (m) { return '<div class="month" style="width:' + (m.count * cw) + 'px">' + m.label + '</div>'; }).join('');
+  }
+  function racesRow(cw) {
+    return WEEKS.map(function (w) {
+      return '<div class="racecell" style="width:' + cw + 'px">' + (w.race ? raceBadge(w.race) : '') + '</div>';
+    }).join('');
+  }
+  function macrosRow(cw) {
+    var cur = WEEKS[state.week - 1].macro;
+    return MACROS.map(function (m, i) {
+      return '<button class="macro' + (i === cur ? ' on' : '') + '" data-act="week" data-v="' + (i === cur ? state.week : m.from) + '" style="width:' + ((m.to - m.from + 1) * cw) + 'px">' + esc(m.name) + '</button>';
+    }).join('');
+  }
+  function mesosRow(cw) {
+    var cur = WEEKS[state.week - 1].meso;
+    return MESOS.map(function (m, i) {
+      return '<button class="meso" data-act="week" data-v="' + (i === cur ? state.week : m.from) + '" title="' + esc(m.name) + ' · ' + m.label + ' · weeks ' + m.from + '–' + m.to + '" style="width:' + ((m.to - m.from + 1) * cw) + 'px;background:' + zc(m.zone).bg + ';color:' + zc(m.zone).fg + '">' + esc(m.name) + '</button>';
+    }).join('');
+  }
+  function typeSelect() {
+    var t = typeOf(state.week);
+    return '<label class="inline"><span>Type</span><select data-change="type">' + TYPES.map(function (x) {
+      return '<option value="' + x[0] + '"' + (x[0] === t ? ' selected' : '') + '>' + x[0] + ' · ' + x[1] + '</option>';
+    }).join('') + '</select></label>';
+  }
+  function chip(sl, extra) {
+    return '<button class="chip' + (extra || '') + (sl.key === selKey ? ' on' : '') + '" data-act="pick" data-week="' + sl.week + '" data-key="' + sl.key + '" style="background:' + zc(sl.zone).bg + ';color:' + zc(sl.zone).fg + '">' +
+      '<span class="chip-h">' + sl.slot + ' · ' + (sl.zone || 'no zone') + '</span><span class="chip-t mono">' + esc(sl.text || 'Empty session') + '</span></button>';
+  }
+  function addBtn(sl, label, extra) {
+    return '<button class="add' + (extra || '') + '" data-act="add" data-week="' + sl.week + '" data-key="' + sl.key + '" aria-label="Add session">' + label + '</button>';
+  }
+  function dayCards(days, tall) {
+    return days.map(function (d) {
+      return '<div class="day"><div class="day-h"><b>' + d.label + '</b><span class="muted">' + d.dateLabel + '</span></div>' +
+        (d.race ? raceBanner(d.race) : '') +
+        d.slots.map(function (sl) { return sl.filled ? chip(sl, tall ? ' tall' : '') : addBtn(sl, '+ ' + sl.slot); }).join('') + '</div>';
+    }).join('');
+  }
+  function editor(sess, dir, emptyText) {
+    if (!sess) return '<div class="empty">' + emptyText + '</div>';
+    var inf = sess.inf, detail;
+    if (inf.main) {
+      detail = inf.parts.slice().reverse().map(function (p) { return p.z + ' ≈ ' + mins(p.min); }).join(' · ') + (inf.other >= 0.5 ? ' · no zone ≈ ' + mins(inf.other) : '') + ' · ≈ ' + inf.totalKm.toFixed(1) + ' km';
+    } else {
+      detail = sess.text ? 'No zone found in the plan. Write the zone next to the work, e.g. 6km R1.' : 'Write the plan and the zone is worked out from it.';
+    }
+    var zone = '<div class="fld"><span>Main zone, from the plan</span><div class="inf"><b class="zpill" style="background:' + zc(inf.main).bg + ';color:' + zc(inf.main).fg + '">' + (inf.main || '–') + '</b><small>' + esc(detail) + '</small></div></div>';
+    var plan = '<label class="fld f-plan"><span>Plan</span><textarea class="mono plan" data-input="edits" placeholder="e.g. 1km R1 + 8x 4\' R2/1\' R0 + 1km R1">' + esc(sess.text) + '</textarea></label>';
+    var notes = '<label class="fld f-notes"><span>Notes</span><textarea data-input="notes" placeholder="Drills, boats, what to watch for">' + esc(sess.notes) + '</textarea></label>';
+    var del = '<button class="del" data-act="del">Delete session</button>';
+    var head = '<div class="eyebrow">Session</div><div class="when">' + esc(sess.when) + '</div>';
+    if (dir === 'row') return '<div class="ed-row"><div class="meta">' + head + zone + del + '</div>' + plan + notes + '</div>';
+    return '<div class="ed-col">' + head + zone + plan + notes + del + '</div>';
+  }
+
+  // ---- layout A: three strips -------------------------------------------
+  function viewA(c) {
+    var CW = 27, CW2 = 56;
+    var sel = WEEKS[state.week - 1], macro = MACROS[sel.macro], meso = MESOS[sel.meso], t = typeOf(state.week);
+    var year =
+      '<div class="sec"><div class="sec-h"><span class="eyebrow">Year</span><span class="muted">44 weeks, 5 Oct 2026 to 8 Aug 2027.</span></div>' +
+      '<div class="panel sx" data-scroll="year"><div class="stack" style="width:' + (44 * CW + 16) + 'px">' +
+      '<div class="row">' + monthsRow(CW) + '</div>' +
+      '<div class="row">' + racesRow(CW) + '</div>' +
+      '<div class="row">' + macrosRow(CW) + '</div>' +
+      '<div class="row">' + mesosRow(CW) + '</div>' +
+      '<div class="row">' + WEEKS.map(function (w) {
+        return '<button class="wk mono' + (w.n === state.week ? ' on' : '') + '" data-act="week" data-v="' + w.n + '" aria-label="Week ' + w.n + '" style="width:' + CW + 'px">' + w.n + '</button>';
+      }).join('') + '</div></div></div></div>';
+
+    var mw = WEEKS.filter(function (w) { return w.macro === sel.macro; });
+    var mm = MESOS.filter(function (m) { return m.macro === sel.macro; });
+    var macroStrip =
+      '<div class="sec"><div class="sec-h"><span class="eyebrow">Macrocycle</span><b>' + macro.name + '</b><span class="muted">Weeks ' + macro.from + '–' + macro.to + ' · ' + fmt(WEEKS[macro.from - 1].d) + ' to ' + fmt(addDays(WEEKS[macro.to - 1].d, 6)) + '</span></div>' +
+      '<div class="panel sx" data-scroll="macro' + sel.macro + '"><div class="stack" style="width:' + (mw.length * CW2 + 16) + 'px">' +
+      '<div class="row">' + mm.map(function (m) {
+        return '<div class="mesohead" style="width:' + ((m.to - m.from + 1) * CW2) + 'px;background:' + zc(m.zone).bg + ';color:' + zc(m.zone).fg + '">' + m.name + ' · ' + m.label + '</div>';
+      }).join('') + '</div>' +
+      '<div class="row">' + mw.map(function (w) { return '<div class="racelab"' + (w.race ? ' title="' + raceTitle(w.race) + '"' : '') + '>' + (w.race ? esc(w.race.short) : '') + '</div>'; }).join('') + '</div>' +
+      '<div class="row">' + mw.map(function (w) {
+        var ty = typeOf(w.n);
+        return '<button class="mwk' + (w.n === state.week ? ' on' : '') + '" data-act="week" data-v="' + w.n + '">' +
+          '<span class="barbox"><span class="bar" style="height:' + Math.round(LOAD[ty] * 0.46) + 'px"></span></span>' +
+          '<span class="t mono">' + ty + '</span><span class="n">W' + w.n + '</span><span class="d">' + fmt(w.d) + '</span></button>';
+      }).join('') + '</div></div></div></div>';
+
+    var micro =
+      '<div class="sec"><div class="sec-h"><span class="eyebrow">Microcycle</span><b>Week ' + state.week + '</b><span class="muted">' + range(state.week) + ' · ' + meso.name + ' · ' + meso.label + '</span>' +
+      '<span class="push"></span>' + typeSelect() + '<span class="mono">Load ' + LOAD[t] + '%</span></div>' +
+      '<div class="sx"><div class="days">' + dayCards(c.days, false) + '</div></div></div>';
+
+    var session = '<div class="panel" style="flex:1 1 auto;min-height:200px;margin:10px 16px 16px">' + editor(c.sess, 'row', 'No session this week yet. Add one in a slot above.') + '</div>';
+    return year + macroStrip + micro + session;
+  }
+
+  // ---- layout B: annual sheet -------------------------------------------
+  function viewB(c) {
+    var CW = 26;
+    var sel = WEEKS[state.week - 1], meso = MESOS[sel.meso], t = typeOf(state.week);
+    function lab(text, h) { return '<div class="lab" style="height:' + h + 'px">' + text + '</div>'; }
+    function per(fn) { return WEEKS.map(fn).join(''); }
+    var ed = state.edit;
+    function handle(i, week) { return '<span class="hdl" data-drag="' + i + '" style="left:' + (104 + week * CW - 4) + 'px"></span>'; }
+    var counts = {}, kmz = {}, kmw = {};
+    WEEKS.forEach(function (w) {
+      (w.n === state.week ? c.days : daysFor(w.n)).forEach(function (d) {
+        d.slots.forEach(function (sl) {
+          if (!sl.filled) return;
+          if (!counts[sl.zone]) counts[sl.zone] = {};
+          counts[sl.zone][w.n] = (counts[sl.zone][w.n] || 0) + 1;
+          for (var z in sl.inf.km) { if (!kmz[z]) kmz[z] = {}; kmz[z][w.n] = (kmz[z][w.n] || 0) + sl.inf.km[z]; }
+          kmw[w.n] = (kmw[w.n] || 0) + sl.inf.totalKm;
+        });
+      });
+    });
+    var mode = state.grid, tg = estimates(), ZR = ['R1', 'R2', 'R3', 'R3+', 'R4', 'R5', 'R6', 'R7'];
+    function zlabel(z, extra) { return '<button class="lab zlab" data-tip="' + z + '" style="height:20px"><i class="sw" style="background:' + Z[z].bg + '"></i><u>' + z + '</u>' + (extra || '') + '</button>'; }
+    // one km cell: the number is the target, the fill is how much of it the sessions cover
+    function kmCell(w, name, target, planned) {
+      var pct = target > 0 ? Math.min(1, planned / target) : 0, cls = 'cap mono', style = '', text, tip;
+      if (target > 0) {
+        text = String(Math.round(target));
+        tip = 'estimate ' + target.toFixed(1) + ' km (load ' + LOAD[typeOf(w.n)] + '% × content ' + contentFactor(MESOS[w.meso]).toFixed(2) + '), sessions ' + planned.toFixed(1) + ' km (' + Math.round(planned / target * 100) + '%)';
+        if (pct >= 0.95) cls += ' dev';
+        else { if (target >= 0.95 || pct > 0) cls += ' tg'; if (pct > 0) style = ' style="background:linear-gradient(to top, #BCD9E6 ' + Math.round(pct * 100) + '%, transparent ' + Math.round(pct * 100) + '%)"'; }
+      } else {
+        text = planned >= 0.5 ? String(Math.round(planned)) : (planned >= 0.05 ? '<1' : '·');
+        tip = 'sessions ' + planned.toFixed(1) + ' km';
+        if (planned >= 0.5) cls += ' tg';
+      }
+      return '<button class="' + cls + (w.n === state.week ? ' cur' : '') + '" data-act="week" data-v="' + w.n + '"' + style + ' title="Week ' + w.n + ' · ' + name + ': ' + tip + '">' + text + '</button>';
+    }
+    function kmRow(label, name, tgOf, plOf) {
+      var tSum = 0, pSum = 0;
+      var cells = WEEKS.map(function (w, j) { var t = tgOf(j), p = plOf(w.n); tSum += t; pSum += p; return kmCell(w, name, t, p); }).join('');
+      return '<div class="row">' + label + cells + '<div class="capsum mono">' + Math.round(pSum) + (tSum > 0 ? ' / ' + Math.round(tSum) : '') + '</div></div>';
+    }
+    var kmEstRow = kmRow(lab('Km', 20), 'total', function (j) { return tg ? tg.week[j] : 0; }, function (n) { return kmw[n] || 0; });
+    var capRows = ZR.filter(function (z) { return counts[z] || kmz[z]; }).map(function (z) {
+      if (mode === 'km') return kmRow(zlabel(z), z, function () { return 0; }, function (n) { return kmz[z] ? (kmz[z][n] || 0) : 0; });
+      var total = 0;
+      var cells = per(function (w) {
+        var k = counts[z] ? (counts[z][w.n] || 0) : 0;
+        total += k;
+        var st = k === 0 ? '' : (k >= THR[z][0] ? ' dev' : (k >= THR[z][1] ? ' mnt' : ' low'));
+        var word = k === 0 ? 'absent' : (st === ' dev' ? 'developing' : (st === ' mnt' ? 'maintaining' : 'below maintenance'));
+        return '<button class="cap mono' + st + (w.n === state.week ? ' cur' : '') + '" data-act="week" data-v="' + w.n + '" title="Week ' + w.n + ': ' + k + ' sessions of ' + z + ', ' + word + '">' + (k || '·') + '</button>';
+      });
+      return '<div class="row">' + zlabel(z) + cells + '<div class="capsum mono">' + total + '</div></div>';
+    }).join('');
+    var capGrid = '<div class="row" style="margin-top:8px"><div class="lab" style="height:20px"><span class="seg"><button class="segb' + (mode === 'km' ? '' : ' on') + '" data-act="grid" data-v="sessions">Sessions</button><button class="segb' + (mode === 'km' ? ' on' : '') + '" data-act="grid" data-v="km">Km</button></span></div>' +
+      '<div class="legend"><span style="margin-left:auto">Season</span></div></div>' + capRows;
+    var wkKm = kmw[state.week] || 0, wkTg = tg ? tg.week[state.week - 1] : 0;
+    var sheet =
+      '<div class="panel sx" data-scroll="sheet" style="margin:12px 16px 0;flex-shrink:0"><div class="sheet" style="width:' + (104 + 44 * CW + 96) + 'px">' +
+      '<div class="row">' + lab('Month', 18) + monthsRow(CW) + '</div>' +
+      '<div class="row">' + lab('Monday', 18) + per(function (w) { return '<div class="cell mono">' + w.d.getDate() + '</div>'; }) + '</div>' +
+      '<div class="row">' + lab('Races', 24) + racesRow(CW) + '</div>' +
+      '<div class="row rel">' + lab('Macrocycle', 22) + MACROS.map(function (m, i) {
+        return '<button class="macro' + (ed && ed.kind === 'macro' && ed.i === i ? ' editing' : '') + '" data-act="edit-macro" data-v="' + i + '" data-anchor-id="macro' + i + '" style="width:' + ((m.to - m.from + 1) * CW) + 'px">' + esc(m.name) + '</button>';
+      }).join('') + MACROS.slice(0, -1).map(function (m) { return handle(WEEKS[m.to - 1].meso, m.to); }).join('') + '</div>' +
+      '<div class="row rel">' + lab('Mesocycle', 22) + MESOS.map(function (m, i) {
+        return '<button class="meso' + (ed && ed.kind === 'meso' && ed.i === i ? ' editing' : '') + '" data-act="edit-meso" data-v="' + i + '" data-anchor-id="meso' + i + '" style="width:' + ((m.to - m.from + 1) * CW) + 'px;background:' + zc(m.zone).bg + ';color:' + zc(m.zone).fg + '">' + esc(m.name) + '</button>';
+      }).join('') + MESOS.slice(0, -1).map(function (m, i) { return handle(i, m.to); }).join('') + '</div>' +
+      '<div class="row rel" id="content-row">' + lab('Content', 20) + MESOS.map(function (m, i) {
+        return '<button class="content mono" data-act="edit-meso" data-v="' + i + '" style="width:' + ((m.to - m.from + 1) * CW) + 'px">' + m.label + '</button>';
+      }).join('') + MESOS.slice(0, -1).map(function (m, i) { return handle(i, m.to); }).join('') + '</div>' +
+      '<div class="row">' + lab('Microcycle', 26) + per(function (w) { return '<button class="swk mono' + (w.n === state.week ? ' on' : '') + '" data-act="week" data-v="' + w.n + '" aria-label="Week ' + w.n + '">' + w.n + '</button>'; }) + '</div>' +
+      '<div class="row">' + lab('Type', 22) + per(function (w) { return '<button class="sty mono' + (w.n === state.week ? ' on' : '') + '" data-act="week" data-v="' + w.n + '" aria-label="Week ' + w.n + ' type">' + typeOf(w.n) + '</button>'; }) + '</div>' +
+      '<div class="row">' + lab('Load %', 60) + per(function (w) { return '<button class="sld' + (w.n === state.week ? ' on' : '') + '" data-act="week" data-v="' + w.n + '" aria-label="Week ' + w.n + ' load ' + LOAD[typeOf(w.n)] + ' percent"><span style="height:' + Math.round(LOAD[typeOf(w.n)] * 0.56) + 'px"></span></button>'; }) + '</div>' +
+      kmEstRow +
+      capGrid +
+      '</div></div>';
+
+    var lower =
+      '<div class="lower"><div class="left">' +
+      '<div class="sec-h" style="margin:0"><button class="nav" data-act="prev" aria-label="Previous week">‹</button><button class="nav" data-act="next" aria-label="Next week">›</button>' +
+      '<b style="font-size:16px">Week ' + state.week + '</b><span class="muted">' + range(state.week) + ' · ' + meso.name + ' · ' + meso.label + '</span>' +
+      '<span class="push"></span>' + typeSelect() + '<span class="mono">Load ' + LOAD[t] + '% · ' + Math.round(wkKm) + (wkTg ? ' of ' + Math.round(wkTg) : '') + ' km</span></div>' +
+      '<div class="sx" style="flex:1 1 auto;display:flex"><div class="days">' + dayCards(c.days, true) + '</div></div></div>' +
+      '<div class="panel right">' + editor(c.sess, 'col', 'No session this week yet. Add one in a slot on the left.') + '</div></div>';
+    return sheet + lower;
+  }
+
+  function popover() {
+    var ed = state.edit, h = '';
+    if (!ed) return '';
+    if (ed.kind === 'meso') {
+      var m = MESOS[ed.i];
+      if (!m) return '';
+      var n = m.to - m.from + 1, firstOfMacro = ed.i === 0 || MESOS[ed.i - 1].macro !== m.macro;
+      var def = state.week > m.from && state.week <= m.to ? state.week : m.from + Math.ceil(n / 2);
+      var wopt = '';
+      for (var w = m.from + 1; w <= m.to; w++) wopt += '<option value="' + w + '"' + (w === def ? ' selected' : '') + '>week ' + w + '</option>';
+      h = '<div class="pop-h"><span class="eyebrow">Mesocycle</span><span class="muted">weeks ' + m.from + '–' + m.to + '</span><button class="x" data-act="pop-close" aria-label="Close">×</button></div>' +
+        '<label class="fld"><span>Name</span><input type="text" data-plan="name" data-fid="pop-name" value="' + esc(m.name) + '"></label>' +
+        '<div class="fld"><span>Content</span><div class="ztogs">' + ZONES.slice(1).map(function (z) {
+          var on = m.zones.indexOf(z) >= 0;
+          return '<button class="ztog mono" data-act="m-zone" data-v="' + z + '" aria-pressed="' + on + '"' + (on ? ' style="background:' + Z[z].bg + ';color:' + Z[z].fg + ';border-color:' + Z[z].bg + '"' : '') + '>' + z + '</button>';
+        }).join('') + '</div></div>' +
+        '<label class="fld"><span>Load pattern</span><select data-plan="pat">' + PATTERNS.map(function (x) { return '<option value="' + x[0] + '"' + (x[0] === m.pat ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select></label>' +
+        '<div class="pop-r"><button class="b" data-act="m-left"' + (ed.i === 0 ? ' disabled' : '') + '>◀ Move earlier</button><button class="b" data-act="m-right"' + (ed.i === MESOS.length - 1 ? ' disabled' : '') + '>Move later ▶</button></div>' +
+        (n > 1 ? '<div class="pop-r"><button class="b" data-act="m-split">Split</button><label class="inline"><span>new block from</span><select id="splitw">' + wopt + '</select></label></div>' : '') +
+        '<div class="pop-r"><button class="b" data-act="m-newmacro"' + (firstOfMacro ? ' disabled' : '') + '>Start new macrocycle here</button><button class="b danger" data-act="m-del"' + (MESOS.length < 2 ? ' disabled' : '') + '>Delete</button></div>';
+      return '<div class="pop" id="pop" data-anchor="meso' + ed.i + '">' + h + '</div>';
+    }
+    var mc = MACROS[ed.i];
+    if (!mc) return '';
+    h = '<div class="pop-h"><span class="eyebrow">Macrocycle</span><span class="muted">weeks ' + mc.from + '–' + mc.to + '</span><button class="x" data-act="pop-close" aria-label="Close">×</button></div>' +
+      '<label class="fld"><span>Name</span><input type="text" data-plan="mname" data-fid="pop-name" value="' + esc(mc.name) + '"></label>' +
+      '<div class="pop-r"><button class="b danger" data-act="mac-merge"' + (ed.i === 0 ? ' disabled' : '') + '>Merge into previous</button></div>';
+    return '<div class="pop" id="pop" data-anchor="macro' + ed.i + '">' + h + '</div>';
+  }
+
+  function planAct(act, v) {
+    var ed = state.edit, ms = plan.mesos;
+    if (!ed) return;
+    var i = ed.i;
+    function swap(a, b) { var x = ms[a], y = ms[b], mx = x.macro, my = y.macro; ms[a] = y; ms[b] = x; y.macro = mx; x.macro = my; }
+    if (ed.kind === 'meso') {
+      var m = ms[i];
+      if (act === 'm-zone') {
+        var at = m.zones.indexOf(v);
+        if (at >= 0) m.zones.splice(at, 1); else m.zones.push(v);
+        m.zones.sort(function (a, b) { return ZONES.indexOf(a) - ZONES.indexOf(b); });
+      }
+      else if (act === 'm-left' && i > 0) { swap(i - 1, i); ed.i = i - 1; }
+      else if (act === 'm-right' && i < ms.length - 1) { swap(i, i + 1); ed.i = i + 1; }
+      else if (act === 'm-split') {
+        var sel = document.getElementById('splitw'), first = (sel ? +sel.value : 0) - MESOS[i].from;
+        if (first >= 1 && first < m.len) { ms.splice(i + 1, 0, { macro: m.macro, name: 'New block', zones: m.zones.slice(), len: m.len - first, pat: 'build' }); m.len = first; ed.i = i + 1; }
+      }
+      else if (act === 'm-del' && ms.length > 1) { (i > 0 ? ms[i - 1] : ms[i + 1]).len += m.len; ms.splice(i, 1); state.edit = null; }
+      else if (act === 'm-newmacro') { var old = m.macro, nm = { name: 'New macrocycle' }; for (var j = i; j < ms.length && ms[j].macro === old; j++) ms[j].macro = nm; }
+    } else if (act === 'mac-merge' && i > 0) {
+      var gone = MACROS[i].ref, prev = MACROS[i - 1].ref;
+      ms.forEach(function (x) { if (x.macro === gone) x.macro = prev; });
+      ed.i = i - 1;
+    }
+    rebuild();
+  }
+
+  // ---- layout C: outline + block calendar -------------------------------
+  function viewC(c) {
+    var sel = WEEKS[state.week - 1], meso = MESOS[sel.meso], macro = MACROS[sel.macro];
+    var side = '<div class="side"><div class="eyebrow">Season outline</div>' + MACROS.map(function (m, i) {
+      return '<h3>' + m.name + '<span>W' + m.from + '–' + m.to + '</span></h3>' + MESOS.map(function (ms, j) {
+        if (ms.macro !== i) return '';
+        return '<button class="item' + (j === sel.meso ? ' on' : '') + '" data-act="week" data-v="' + (j === sel.meso ? state.week : ms.from) + '"><i style="background:' + zc(ms.zone).bg + '"></i><span><b>' + ms.name + '</b><small>W' + ms.from + (ms.to > ms.from ? '–' + ms.to : '') + ' · ' + ms.label + '</small></span></button>';
+      }).join('');
+    }).join('') +
+      '<div class="eyebrow" style="margin-top:18px">Races</div>' + RACES.map(function (r) {
+        return '<button class="item" data-act="week" data-v="' + r.week + '"><span class="rbbox">' + raceBadge(r) + '</span><span><b>' + esc(r.name) + '</b><small>' + fmt(addDays(WEEKS[r.week - 1].d, r.day)) + (r.confirmed ? '' : ' · not confirmed') + '</small></span></button>';
+      }).join('') + '</div>';
+
+    var rows = '';
+    for (var n = meso.from; n <= meso.to; n++) {
+      var ty = typeOf(n), days = n === state.week ? c.days : daysFor(n);
+      rows += '<div class="calrow' + (n === state.week ? ' on' : '') + '">' +
+        '<button class="cw" data-act="week" data-v="' + n + '"><span class="n">W' + n + '</span><span class="d">' + range(n) + '</span><span class="t mono">' + ty + ' · ' + LOAD[ty] + '%</span><span class="track"><span style="width:' + LOAD[ty] + '%"></span></span></button>' +
+        days.map(function (d) {
+          var empty = d.slots.filter(function (sl) { return !sl.filled; })[0];
+          return '<div class="calday"><div class="num">' + d.dnum + '</div>' +
+            (d.race ? raceBanner(d.race) : '') +
+            d.slots.map(function (sl) { return sl.filled ? chip(sl) : ''; }).join('') +
+            (empty ? addBtn(empty, '+', ' small') : '') + '</div>';
+        }).join('') + '</div>';
+    }
+    var mid = '<div class="mid"><div class="sec-h" style="margin-bottom:8px"><span class="eyebrow">Mesocycle</span><b style="font-size:17px">' + meso.name + '</b><span class="muted">' + macro.name + ' · content ' + meso.label + '</span></div>' +
+      '<div class="calhead"><div>Microcycle</div>' + DAY.map(function (d) { return '<div>' + d + '</div>'; }).join('') + '</div>' + rows + '</div>';
+
+    var right = '<div class="rightcol"><div class="top"><div class="eyebrow">Microcycle</div><b>Week ' + state.week + ' · ' + range(state.week) + '</b>' + typeSelect() + '</div>' +
+      '<div class="body">' + editor(c.sess, 'col', 'No session in this week yet. Use + on a day to add one.') + '</div></div>';
+    return '<div class="cols">' + side + mid + right + '</div>';
+  }
+
+  // ---- render and events ------------------------------------------------
+  var tipEl = document.getElementById('tip');
+  function hideTip() { tipEl.hidden = true; }
+  function showTip(el) {
+    var z = el.getAttribute('data-tip'), info = ZINFO[z];
+    if (!info) return;
+    tipEl.innerHTML = '<h4><i style="background:' + Z[z].bg + '"></i>' + z + ' · ' + esc(info.name) + '</h4><p>' + esc(info.what) + '</p><dl>' +
+      '<dt>Intensity</dt><dd>' + esc(info.intensity) + '</dd>' +
+      '<dt>How to train</dt><dd><ul>' + info.how.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul></dd>' +
+      '<dt>Per week</dt><dd>' + esc(info.week) + '</dd>' +
+      '<dt>Builds</dt><dd>' + esc(info.build) + '</dd>' +
+      '<dt>Decays</dt><dd>' + esc(info.decay) + '</dd>' +
+      '<dt>Ages</dt><dd>' + esc(info.ages) + '</dd></dl>' +
+      '<div class="src">From the Grau II course slides. The per-week counts assume near-daily training.</div>';
+    tipEl.hidden = false;
+    var r = el.getBoundingClientRect();
+    tipEl.style.left = (r.right + 8) + 'px';
+    tipEl.style.top = Math.max(8, Math.min(r.top - 12, window.innerHeight - tipEl.offsetHeight - 8)) + 'px';
+  }
+  function tipTarget(e) { return e.target.closest ? e.target.closest('[data-tip]') : null; }
+  document.addEventListener('mouseover', function (e) { var t = tipTarget(e); if (t) showTip(t); });
+  document.addEventListener('mouseout', function (e) { var t = tipTarget(e); if (t && !(e.relatedTarget && t.contains(e.relatedTarget))) hideTip(); });
+  document.addEventListener('focusin', function (e) { var t = tipTarget(e); if (t) showTip(t); });
+  document.addEventListener('focusout', function (e) { if (tipTarget(e)) hideTip(); });
+
+  function render() {
+    hideTip();
+    var root = document.getElementById('root');
+    var scroll = {};
+    Array.prototype.forEach.call(root.querySelectorAll('[data-scroll]'), function (el) { scroll[el.getAttribute('data-scroll')] = el.scrollLeft; });
+    var c = current();
+    var header = '<header><div class="brand">Kayplan</div><div class="muted">Season 2026–27 · dummy data, nothing is saved</div>' +
+      '<div class="tabs">' + LAYOUTS.map(function (l) { return '<button class="tab' + (l[0] === state.layout ? ' on' : '') + '" data-act="layout" data-v="' + l[0] + '">' + l[1] + '</button>'; }).join('') + '</div>' +
+      '<div class="pills">' + GROUPS.map(function (g) { return '<button class="pill' + (g.id === state.group ? ' on' : '') + '" data-act="group" data-v="' + g.id + '">' + g.name + '</button>'; }).join('') + '</div></header>';
+    var body = state.layout === 'A' ? viewA(c) : (state.layout === 'B' ? viewB(c) : viewC(c));
+    root.innerHTML = header + '<div id="app">' + body + '</div>' + (state.layout === 'B' ? popover() : '');
+    var pop = document.getElementById('pop');
+    if (pop) {
+      var anchor = root.querySelector('[data-anchor-id="' + pop.getAttribute('data-anchor') + '"]'), under = document.getElementById('content-row');
+      if (anchor && under) {
+        pop.style.left = Math.max(8, Math.min(anchor.getBoundingClientRect().left, window.innerWidth - pop.offsetWidth - 8)) + 'px';
+        pop.style.top = (under.getBoundingClientRect().bottom + 6) + 'px';
+      }
+    }
+    Array.prototype.forEach.call(root.querySelectorAll('[data-scroll]'), function (el) {
+      var k = el.getAttribute('data-scroll');
+      if (scroll[k] !== undefined) el.scrollLeft = scroll[k];
+      var on = el.querySelector('.mwk.on, .swk.on, .wk.on');
+      if (on) {
+        var left = on.offsetLeft - el.offsetLeft, right = left + on.offsetWidth;
+        if (left < el.scrollLeft + 110) el.scrollLeft = Math.max(0, left - 110);
+        else if (right > el.scrollLeft + el.clientWidth) el.scrollLeft = right - el.clientWidth + 8;
+      }
+    });
+  }
+
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest ? e.target.closest('[data-act]') : null;
+    var inPop = e.target.closest ? e.target.closest('.pop') : null;
+    if (state.edit && !inPop && !(t && /^edit-/.test(t.getAttribute('data-act')))) { state.edit = null; if (!t) { render(); return; } }
+    if (!t) return;
+    var act = t.getAttribute('data-act'), v = t.getAttribute('data-v'), key = t.getAttribute('data-key');
+    if (act === 'edit-meso') state.edit = { kind: 'meso', i: +v };
+    else if (act === 'edit-macro') state.edit = { kind: 'macro', i: +v };
+    else if (act === 'pop-close') state.edit = null;
+    else if (/^m-|^mac-/.test(act)) planAct(act, v);
+    if (act === 'layout') { state.layout = v; state.edit = null; }
+    else if (act === 'grid') state.grid = v;
+    else if (act === 'group') { state.group = v; state.sel = null; }
+    else if (act === 'week') { var n = parseInt(v, 10); if (n !== state.week) { state.week = n; state.sel = null; } }
+    else if (act === 'prev') { if (state.week > 1) { state.week--; state.sel = null; } }
+    else if (act === 'next') { if (state.week < 44) { state.week++; state.sel = null; } }
+    else if (act === 'pick') { state.week = parseInt(t.getAttribute('data-week'), 10); state.sel = key; }
+    else if (act === 'add') {
+      state.week = parseInt(t.getAttribute('data-week'), 10);
+      state.added[key] = true; state.removed[key] = true; state.edits[key] = ''; delete state.notes[key];
+      state.sel = key;
+    }
+    else if (act === 'del') { if (selKey) { state.removed[selKey] = true; state.added[selKey] = false; state.sel = null; } }
+    render();
+    if (act === 'add') { var ta = document.querySelector('textarea[data-input="edits"]'); if (ta) ta.focus(); }
+  });
+
+  document.addEventListener('change', function (e) {
+    var pf = e.target.getAttribute ? e.target.getAttribute('data-plan') : null;
+    if (pf === 'pat' && state.edit && state.edit.kind === 'meso') { plan.mesos[state.edit.i][pf] = e.target.value; rebuild(); render(); return; }
+    var c = e.target.getAttribute ? e.target.getAttribute('data-change') : null;
+    if (!c) return;
+    if (c === 'type') state.types[state.week] = e.target.value;
+    render();
+  });
+
+  document.addEventListener('input', function (e) {
+    var pf = e.target.getAttribute ? e.target.getAttribute('data-plan') : null;
+    if ((pf === 'name' || pf === 'mname') && state.edit) {
+      var val = e.target.value.replace(/[<>&"]/g, ''), s0 = e.target.selectionStart, s1 = e.target.selectionEnd;
+      if (pf === 'name') plan.mesos[state.edit.i].name = val; else MACROS[state.edit.i].ref.name = val;
+      rebuild();
+      render();
+      var inp = document.querySelector('[data-fid="pop-name"]');
+      if (inp) { inp.focus(); inp.setSelectionRange(s0, s1); }
+      return;
+    }
+    var f = e.target.getAttribute ? e.target.getAttribute('data-input') : null;
+    if (!f || !selKey) return;
+    state[f][selKey] = e.target.value;
+    if (f !== 'edits') return;
+    // redraw so the inferred zone, the chips and the grid follow the text, then put the cursor back
+    var a = e.target.selectionStart, b = e.target.selectionEnd, top = e.target.scrollTop;
+    render();
+    var ta = document.querySelector('textarea[data-input="edits"]');
+    if (ta) { ta.focus(); ta.setSelectionRange(a, b); ta.scrollTop = top; }
+  });
+
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && state.edit) { state.edit = null; render(); } });
+
+  // drag a boundary between two blocks: one grows, the other shrinks, in whole weeks
+  var drag = null;
+  document.addEventListener('pointerdown', function (e) {
+    var h = e.target.closest ? e.target.closest('[data-drag]') : null;
+    if (!h) return;
+    e.preventDefault();
+    var i = +h.getAttribute('data-drag');
+    drag = { i: i, x: e.clientX, a: plan.mesos[i].len, b: plan.mesos[i + 1].len };
+    state.edit = null;
+    document.body.classList.add('dragging');
+  });
+  document.addEventListener('pointermove', function (e) {
+    if (!drag) return;
+    var d = Math.round((e.clientX - drag.x) / 26);
+    d = Math.max(1 - drag.a, Math.min(drag.b - 1, d));
+    if (plan.mesos[drag.i].len === drag.a + d) return;
+    plan.mesos[drag.i].len = drag.a + d;
+    plan.mesos[drag.i + 1].len = drag.b - d;
+    rebuild();
+    render();
+  });
+  document.addEventListener('pointerup', function () { if (drag) { drag = null; document.body.classList.remove('dragging'); render(); } });
+
+  render();
+  if (hash[1]) { var first = document.querySelector('[data-tip="' + hash[1] + '"]'); if (first) showTip(first); }
+})();
+</script>
+</body>
+</html>
