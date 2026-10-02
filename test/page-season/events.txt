@@ -1,0 +1,109 @@
+2027-03-06 Campeonato Regional de Fundo Norte
+  confirmed: no
+  place: Marco de Canaveses
+  kind: race
+  type: fundo
+  boats: mixed
+  plans: juniors 2, cadetes 2, iniciados 2
+
+2027-03-13 Taça de Portugal de Tripulações
+  until: 2027-03-14
+  confirmed: no
+  place: Melres-Gondomar
+  kind: race
+  type: fundo
+  boats: crew
+  plans: juniors 2, cadetes 2, iniciados 2
+
+2027-03-20 Campeonato Nacional de Fundo
+  until: 2027-03-21
+  confirmed: no
+  place: Mirandela
+  kind: race
+  type: fundo
+  boats: mixed
+  plans: juniors 2, cadetes 2, iniciados 2
+
+2027-04-16 Taça de Portugal de Regatas em Linha
+  until: 2027-04-18
+  confirmed: no
+  place: Montemor-o-Velho
+  kind: race
+  type: sprint
+  boats: mixed
+  plans: juniors 2, cadetes 2
+
+2027-05-08 Taça de Portugal de Esperanças
+  confirmed: no
+  place: Vila Nova da Barquinha
+  kind: race
+  type: fundo
+  boats: mixed
+  plans: cadetes 2, iniciados 2
+
+2027-05-15 Campeonato Regional de Esperanças Norte
+  confirmed: no
+  place: Alpendorada
+  kind: race
+  type: fundo
+  boats: mixed
+  plans: cadetes 2, iniciados 2
+
+2027-05-15 Campeonato Regional de Maratona Norte
+  confirmed: no
+  place: Alpendorada
+  kind: race
+  type: maratona
+  boats: mixed
+  plans: juniors 2
+
+2027-05-21 Campeonato Nacional de Maratona
+  until: 2027-05-23
+  confirmed: no
+  place: Prado
+  kind: race
+  type: maratona
+  boats: mixed
+  plans: juniors 2
+
+2027-06-06 Campeonato Nacional de Esperanças
+  confirmed: no
+  place: Gemeses
+  kind: race
+  type: fundo
+  boats: mixed
+  plans: cadetes 2, iniciados 2
+
+2027-06-19 Campeonato Nacional de Regatas em Linha Seniores Juniores Masters
+  until: 2027-06-20
+  confirmed: no
+  place: Montemor-o-Velho
+  kind: race
+  type: sprint
+  boats: mixed
+  plans: juniors 2
+
+2027-07-10 Campeonato Regional de Regatas em Linha Norte
+  confirmed: no
+  place: Montemor-o-Velho
+  kind: race
+  type: sprint
+  boats: mixed
+  plans: juniors 2, cadetes 2
+
+2027-07-24 Campeonato Nacional de Regatas em Linha Iniciados Infantis Cadetes
+  until: 2027-07-25
+  confirmed: no
+  place: Montemor-o-Velho
+  kind: race
+  type: sprint
+  boats: mixed
+  plans: cadetes 2, iniciados 2
+
+2027-07-31 Taça de Portugal de Maratona
+  until: 2027-08-01
+  confirmed: no
+  kind: race
+  type: maratona
+  boats: mixed
+  plans: juniors 2

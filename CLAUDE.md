@@ -10,23 +10,23 @@ Kayplan is a tool for one kayak coach to plan a club's training season. [DESIGN.
 4. **One engine.** Everything worked out from the plan is computed in `src/` and used by both the page and the command line. Nothing is computed only in the page's code.
 5. **As few dependencies as possible.** There are none so far: plain JavaScript modules, Node's built-in test runner.
 6. **Ask before making commits.**
-7. **Check before saying something works.** Run the tests. For the page, render it with headless Firefox and look at the screenshot (there is no Chrome on the coach's machine):
-   `firefox --headless --no-remote --profile <temp dir> --screenshot <file> <url>`
-   Say plainly what was tested and what was not.
+7. **Check before saying something works.** Run `npm test`. For the page, run `npm run page-check` and look at the screenshots it leaves (headless Firefox; there is no Chrome on the coach's machine). Say plainly what was tested and what was not.
 
 ## State
 
-Built (level 1, first step):
+Built (level 1):
 
-- The engine: file format, session notation and main zone, cycle positions, week types and loads, cycle edits, events, today, `check`.
+- The engine: file format, session notation and main zone, cycle positions, week types and loads, edits, events, today, `check`.
 - The command line, `kayplan.js`.
-- Tests for all of the above (`npm test`).
+- The page, served by `serve.js` from the files on this computer: the annual sheet, cycle editing, the selected week and session, the races and events table, live reload.
+- Tests for the engine, the command line and the server (`npm test`), and a check of the page in headless Firefox (`npm run page-check`).
 - The real 2026–27 season in `season/`: 45 weeks from Monday 28 Sep 2026, three plans, last season's races moved to the matching 2027 weekends as unconfirmed guesses.
 
-Not built yet:
+Not built:
 
-- The page: `index.html`, `src/page.js`, `src/page.css`, the local server `serve.js`, and `src/store-http.js`. See "Next step" below.
-- The GitHub store (after the page works on disk).
+- Anything from level 2 or 3.
+- The GitHub store, for use from two computers and a phone (DESIGN.md 6.5). It is the next step once the coach is happy with level 1 on this computer. It implements the store interface described in `src/store-disk.js`, and the page then needs a sign-in and a layout for the phone.
+- A commit per save. On this computer a save only writes the file; commits are made by hand (ask first).
 
 ## Layout
 
@@ -34,15 +34,21 @@ Not built yet:
 DESIGN.md            the design
 CLAUDE.md            this file
 kayplan.js           command line
+serve.js             local server for the page
+index.html           the page
 src/dates.js         date arithmetic on YYYY-MM-DD strings
 src/notation.js      reading session text; main zone
 src/cycles.js        week types from patterns, cycle positions, cycle edits
+src/edits.js         edits to weeks, sessions and events
 src/format.js        the plan's text files <-> data
-src/engine.js        load, sheet, weekView, eventsFor, check
+src/engine.js        load, sheet, weekView, eventsFor, check, fileText
 src/report.js        the command line's text output
 src/store-disk.js    file access on disk; describes the store interface
-test/                node --test
+src/store-http.js    the same interface for the page, through serve.js
+src/page.js, page.css  the page: draws what the engine works out, turns clicks into edits
+test/                node --test; test/page-season is the season the page check runs on
 tools/check-names.sh the names check
+tools/page-check.mjs the page check; tools/firefox.mjs drives headless Firefox for it
 season/              the plan: only what was typed
 mockups/             the layout mockup with dummy data (reference for look and behaviour)
 ```
@@ -50,16 +56,18 @@ mockups/             the layout mockup with dummy data (reference for look and b
 ## Commands
 
 ```
+node serve.js                                          the page, at http://127.0.0.1:8137/
 node kayplan.js show season [--plan <id>]              the annual sheet as a table
 node kayplan.js show week [n] [--plan <id>] [--band <name>]   a week's sessions with the zone working
 node kayplan.js show events                            the races and events table
 node kayplan.js check                                  errors and warnings; exit code 1 on errors
-npm test
+npm test                                               engine, command line and server
+npm run page-check                                     the page, in headless Firefox (about two minutes)
 ```
 
 - Without `--plan`, every plan is shown. `show week` without a number is the current week.
-- `--as-of <YYYY-MM-DD>` runs any command as if today were that date. Today is never stored.
-- `--dir <folder>` reads another season folder (the tests use this).
+- `--as-of <YYYY-MM-DD>` runs any command as if today were that date. Today is never stored. The page takes `?asof=YYYY-MM-DD` in its address for the same purpose.
+- `--dir <folder>` reads another season folder; `serve.js` takes `--dir` and `--port` too. Use these to try things on a copy and never experiment in `season/`.
 - In `show season`, `>` marks the current week and `*` a week type set by hand.
 
 ## Working on the plan
@@ -191,7 +199,7 @@ Only weeks whose type was set by hand: the week's Monday, the type, and a load %
 ## Decisions made while building, not yet in DESIGN.md
 
 - The pattern `none` for unplanned time (DESIGN.md 6.4 lists five patterns).
-- Splitting a block copies its pattern to the new block (the mockup always gave the new block `build`).
+- Splitting a block copies its pattern to the new block (the mockup always gave the new block `build`). Splitting unplanned time (`none`) leaves both parts with its name.
 - `check` reports invalid files and plan-level warnings (a race outside the season, a race in no plan, a past race whose date was never confirmed). A session with no zone is shown in `show week` and is not a `check` warning, so that off-water sessions (yoga, pool) do not flood it.
 - Events that are not races have a one-letter code: `t` test, `c` camp, `h` holiday, `x` no water.
 - Saving checks the revision that was read (`store.write(path, text, rev)`), so a stale copy never overwrites newer text. GitHub's file API works the same way.
@@ -205,16 +213,12 @@ Only weeks whose type was set by hand: the week's Monday, the type, and a load %
 - No landmarks yet (the coach chose to start without them).
 - Changing a block's length or pattern can change the type of weeks that have already ended, because types follow the pattern. The design does not say whether past week types should be frozen.
 
-## Next step: the page
+## The page
 
-Layout B of the mockup, on the engine, for level 1 only:
+`src/page.js` holds no rules. It asks the engine for what to draw (`sheet`, `weekView`, `eventView`, `check`), and every change goes through an edit function in `src/cycles.js` or `src/edits.js`, then `fileText` and the store. To change behaviour, change the engine and its tests; to change the look, change `page.js` and `page.css`.
 
-- `serve.js`: a local server with Node built-ins only. It serves the page and reads and writes the files in `season/` through the disk store. Listen on 127.0.0.1 only and refuse requests from other origins.
-- `src/store-http.js`: the same four store functions for the page, through that server.
-- The annual sheet with these rows: month, Monday, races, macrocycle, mesocycle, content, microcycle, type, load. Not the Km row, the zone grid or the zone hover cards (level 2).
-- Cycle editing as in the mockup (drag a boundary, the edit panel), calling the edits in `src/cycles.js`, with the past locked.
-- The selected week and the selected session under the sheet; type and load set by hand; the "not done" mark.
-- The races and events table as a separate view.
-- A selector for plan and age band; the current week marked, and a "Today" control.
-- Live reload: redraw when a file changes on disk.
-- The page must not save a file that has errors.
+- **Saving.** An edit is applied in memory, drawn, and its file written: at once for clicks, after a short pause for typing. A write carries the revision that was read; if the file changed on disk meanwhile, the write is refused, the page reloads from disk and says so. A file with a line that cannot be read is never saved from the page.
+- **Live reload.** The page asks the server every two seconds whether any file changed and reloads the plan when one did. Edit the files while the page is open and the change appears.
+- **Where you are** (plan, band, week, view) is kept in the address after `#`, so a reload stays put.
+- **On the sheet:** a week type set by hand is bold; the current week has its Monday underlined; a boundary that cannot move has no handle. Events that are not races show as one plain letter in the Races row.
+- **Checking it.** `npm run page-check` clicks, types and drags through the page in headless Firefox on a copy of `test/page-season`, and checks the files that were saved. It leaves screenshots in a temporary folder and prints the path: look at them after changing the page. Add a step there for each new behaviour. The one-shot `firefox --screenshot` is of little use here, because it captures the page before the plan has loaded.

@@ -46,6 +46,16 @@ export async function load(store) {
   return data;
 }
 
+// The text of one of the files the plan's edits change, written from the data.
+export function fileText(data, path) {
+  if (path === 'events.txt') return format.serializeEvents(data.events);
+  const m = /^plans\/([^/]+)\/(cycles|weeks|sessions)\.txt$/.exec(path), plan = m && planOf(data, m[1]);
+  if (!plan) throw new Error('not a file the plan writes: ' + path);
+  if (m[2] === 'cycles') return format.serializeCycles(plan.macros);
+  if (m[2] === 'weeks') return format.serializeWeeks(plan.hand);
+  return format.serializeSessions(plan.sessions, plan.bands);
+}
+
 // false when the season itself cannot be read; nothing can be worked out then
 export function usable(data) {
   return !!(data.season && data.season.start && data.season.weeks);

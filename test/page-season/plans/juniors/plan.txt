@@ -1,0 +1,2 @@
+name: Juniors
+bands: junior, senior

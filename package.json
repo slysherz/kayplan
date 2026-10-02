@@ -3,6 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test test/*.test.js"
+    "start": "node serve.js",
+    "test": "node --test test/*.test.js",
+    "page-check": "node tools/page-check.mjs"
   }
 }

@@ -1,0 +1,7 @@
+Macrocycle I
+  5 intro  R1-R2  General I
+  4 build  R2     General II
+  4 build  R3     Specific I
+  12 build  R3-R3+  Specific II
+Macrocycle II
+  20 none  -  Unplanned

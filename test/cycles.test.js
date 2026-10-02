@@ -97,9 +97,9 @@ test('splitting a block', () => {
   const p = c.splitMeso(plan(), 1, 6, 0);
   assert.equal(shape(p), 'First macro: General one 3, General two 2, New block 2 | Second macro: Specific 3, Racing 2');
   assert.deepEqual(p.macros[0].mesos[2], { len: 2, pat: 'build', zones: ['R2'], name: 'New block' });
-  // the new block copies the pattern, so carving from unplanned time leaves it unplanned
+  // carving from unplanned time leaves both parts unplanned, with the same name
   const u = c.splitMeso({ macros: [{ name: 'M', mesos: [{ len: 12, pat: 'none', zones: [], name: 'Unplanned' }] }], hand: [], sessions: [] }, 0, 5, 0);
-  assert.deepEqual(u.macros[0].mesos, [{ len: 4, pat: 'none', zones: [], name: 'Unplanned' }, { len: 8, pat: 'none', zones: [], name: 'New block' }]);
+  assert.deepEqual(u.macros[0].mesos, [{ len: 4, pat: 'none', zones: [], name: 'Unplanned' }, { len: 8, pat: 'none', zones: [], name: 'Unplanned' }]);
   assert.throws(() => c.splitMeso(plan(), 1, 4, 0), /inside the block/);
   assert.throws(() => c.splitMeso(plan(), 1, 8, 0), /inside the block/);
   assert.equal(c.splitMeso(plan(), 1, 6, 5).macros[0].mesos.length, 3);

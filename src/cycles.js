@@ -109,11 +109,12 @@ export function moveBoundary(plan, i, delta, ended) {
 }
 
 // Split mesocycle i: a new block starts at this week. The new block copies the contents and pattern.
+// Splitting time that is not planned yet leaves both parts with its name.
 export function splitMeso(plan, i, week, ended) {
   const f = open(plan), m = mesoAt(f, i), from = fromOf(f, i), first = week - from;
   if (!Number.isInteger(week) || first < 1 || first >= m.len) fail('the new block must start inside the block');
   if (week - 1 < ended) fail(LOCKED);
-  f.mesos.splice(i + 1, 0, { name: 'New block', zones: m.zones.slice(), len: m.len - first, pat: m.pat });
+  f.mesos.splice(i + 1, 0, { name: m.pat === 'none' ? m.name : 'New block', zones: m.zones.slice(), len: m.len - first, pat: m.pat });
   m.len = first;
   f.runs[runOf(f, i)].count++;
   return close(plan, f);

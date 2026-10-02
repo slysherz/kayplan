@@ -1,6 +1,6 @@
 # Kayplan — design
 
-Status: design agreed for level 1 and the first parts of level 2, 2026-10-02. Level 1 is being built: the engine and the command line exist, the page does not yet. [CLAUDE.md](CLAUDE.md) says what is built, describes the file format and lists the decisions made while building. What is still undecided is listed in [Open questions](#10-open-questions).
+Status: design agreed for level 1 and the first parts of level 2, 2026-10-02. Level 1 is built and runs on one computer, with the plan in text files in `season/`: the engine, the command line and the page. The GitHub step (section 6.5) is not built. [CLAUDE.md](CLAUDE.md) says what is built, describes the file format and lists the decisions made while building. What is still undecided is listed in [Open questions](#10-open-questions).
 
 Kayplan is a planning tool for one kayak coach at a small club who trains children and teenagers of all ages, often several age groups in the same session. It shows the whole season at a glance and zooms into weeks and single sessions.
 
