@@ -548,7 +548,7 @@ function suggested() {
   if (!g) return '';
   const rows = g.list.map((x, i) => {
     const c = zc(x.main);
-    return '<button class="sug-r" data-act="sug" data-v="' + i + '"' + (x.notes ? ' title="' + esc(x.notes) + '"' : '') + '><b style="background:' + c.bg + ';color:' + c.fg + '">' + (x.main || placeName(x.place)) + '</b>' +
+    return '<button class="sug-r" data-act="sug" data-v="' + i + '" title="' + esc(x.text + (x.notes ? '\n' + x.notes : '')) + '"><b style="background:' + c.bg + ';color:' + c.fg + '">' + (x.main || placeName(x.place)) + '</b>' +
       '<span class="mono">' + esc(x.text) + '</span><small>' + (x.min > 0 ? minutesText(x.min) : '') + '</small></button>';
   }).join('');
   const zones = g.typed ? '' : '<div class="sug-z">' + g.zones.map(z => '<button class="segb' + (z.missing ? ' need' : '') + (state.zone === z.zone ? ' on' : '') + '" data-act="sug-zone" data-v="' + z.zone + '">' + z.zone + '</button>').join('') + '</div>';
