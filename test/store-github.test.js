@@ -128,3 +128,25 @@ test('a refused token, a repository that is not there, a folder that is not ther
   const other = fakeGithub({ repo: REPO, branch: 'plan', files: { 'club/2027/season.txt': 'start: 2026-01-05\nweeks: 12\n' } });
   assert.deepEqual(await open(other, { dir: 'club/2027/', branch: 'plan' }).list(), ['season.txt']);
 });
+
+test('a setup link carries the repository and a token after the #, and is read back', async () => {
+  const { setupLink, readSetup } = await import('../src/store-github.js');
+  const link = setupLink('https://someone.example/kayplan/#plan=a', { repo: REPO, dir: 'season', token: 'github_pat_Açb/+=', readonly: true, plan: 'group-a' });
+  assert.match(link, /^https:\/\/someone\.example\/kayplan\/#setup=[A-Za-z0-9_-]+$/);
+  assert.ok(!link.includes('github_pat'));
+  assert.deepEqual(readSetup(new URL(link).hash), { repo: REPO, dir: 'season', token: 'github_pat_Açb/+=', readonly: true, plan: 'group-a' });
+  // a link for someone who edits: every plan, not read only; the folder defaults to season
+  assert.deepEqual(readSetup(new URL(setupLink('https://x.example/', { repo: REPO, token: 't' })).hash), { repo: REPO, dir: 'season', token: 't', readonly: false, plan: null });
+  // no link, a broken one, one with no token
+  assert.equal(readSetup('#plan=a&week=3'), null);
+  assert.equal(readSetup('#setup=not-json'), null);
+  assert.equal(readSetup('#setup=' + Buffer.from(JSON.stringify({ repo: REPO })).toString('base64url')), null);
+});
+
+test('a token that only reads: the plan loads, and a write is refused as a token problem', async () => {
+  const gh = github(), store = open(gh, { token: 'reader' });
+  assert.deepEqual((await load(store)).errors, []);
+  const f = await store.read('season.txt');
+  assert.equal(await code(store.write('season.txt', 'start: 2026-01-05\nweeks: 13\n', f.rev)), 'auth');
+  assert.equal(gh.commits.length, 1);
+});

@@ -1,5 +1,5 @@
 // A GitHub in memory, for the tests: the few calls store-github.js makes, answered the way GitHub does.
-// fakeGithub({ repo, token, files }) returns { fetch, files(), commits, hold }.
+// fakeGithub({ repo, token, reader, files }) (reader is a token that may only read) returns { fetch, files(), commits, hold }.
 //   files()   the repository's files now: { path: text }
 //   commits   every commit: [{ sha, message }]
 //   lag       set to a number to make the next that many "last commit" answers stale, as GitHub can be
@@ -9,7 +9,7 @@ import crypto from 'node:crypto';
 const sha1 = s => crypto.createHash('sha1').update(s, 'utf8').digest('hex');
 const blobId = text => sha1('blob ' + Buffer.byteLength(text, 'utf8') + '\0' + text);
 
-export function fakeGithub({ repo = 'someone/plan', token = 'secret', branch = 'main', files = {} } = {}) {
+export function fakeGithub({ repo = 'someone/plan', token = 'secret', reader = 'reader', branch = 'main', files = {} } = {}) {
   let held = { ...files };
   const trees = {}, commits = [];
   const state = { lag: 0, calls: [] };
@@ -26,7 +26,10 @@ export function fakeGithub({ repo = 'someone/plan', token = 'secret', branch = '
     const u = new URL(url, 'http://fake'), method = options.method || 'GET', h = new Headers(options.headers || {});
     const at = u.pathname.replace(/^.*?\/repos\//, '/repos/');
     state.calls.push(method + ' ' + at);
-    if (h.get('authorization') !== 'Bearer ' + token) return answer(401, { message: 'Bad credentials' });
+    // a second token that may only read
+    const reads = h.get('authorization') === 'Bearer ' + reader;
+    if (!reads && h.get('authorization') !== 'Bearer ' + token) return answer(401, { message: 'Bad credentials' });
+    if (reads && method !== 'GET') return answer(403, { message: 'Resource not accessible by personal access token' });
     if (!at.startsWith('/repos/' + repo)) return answer(404, { message: 'Not Found' });
     const rest = at.slice(('/repos/' + repo).length);
     if (rest === '' && method === 'GET') return answer(200, { default_branch: branch });

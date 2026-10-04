@@ -1,3 +1,5 @@
 node_modules/
 *.tmp
 site/
+.token
+*.zip

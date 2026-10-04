@@ -200,6 +200,67 @@ try {
   await shot('05-phone-full');
   ok('a phone: the full page on request, the days one under the other and the session under them');
 
+  // ---- links for other people ----
+  await ff.resize(1440, 900);
+  await open('plan=juniors&band=junior&week=1');
+  await ff.wait('return !!document.querySelector(".sheet")');
+  await ff.click('.acct');
+  await ff.wait('return !!document.querySelector("[data-gh=ltoken]")');
+  assert.equal(await value('[data-gh=link]'), '');
+  assert.ok(await ff.js('return document.querySelector("[data-act=gh-copy]").disabled'));
+  await ff.click('[data-gh=ltoken]');
+  await ff.keys('secret');
+  const writer = await value('[data-gh=link]');
+  assert.match(writer, new RegExp('^' + BASE.replace(/[.]/g, '[.]') + '#setup=[A-Za-z0-9_-]+$'));
+  // for the athletes: a token that only reads, one plan
+  await ff.js('document.querySelector("[data-gh=ltoken]").select()');
+  await ff.keys('reader');
+  await ff.js('const s = document.querySelector("[data-gh=lplan]"); s.value = "juniors"; s.dispatchEvent(new Event("change", { bubbles: true }));');
+  await ff.click('[data-gh=lro]');
+  const reading = await value('[data-gh=link]');
+  assert.notEqual(reading, writer);
+  await shot('06-links');
+  ok('the form makes a link for another person from their token, read only and for one plan if wanted');
+
+  // another person's browser: nothing remembered, and only the link
+  const elsewhere = async link => {
+    await ff.js('localStorage.clear(); localStorage.setItem("kayplan-github", JSON.stringify({ api: location.origin + "/gh", every: 1000 }))');
+    await ff.nav('about:blank');
+    await ff.nav(link.replace('#', '?github&asof=2026-10-03#'));
+    await ff.js('window.__errs = []; window.addEventListener("error", e => __errs.push(String(e.message)));');
+  };
+  await elsewhere(reading);
+  await ff.wait('return !!document.querySelector(".ph")');
+  assert.equal(await count('.signin'), 0);
+  assert.ok(!/setup=/.test(await ff.js('return location.href')), 'the token is gone from the address');
+  // the day page on a wide screen, only the plan the link was made for, and no way to the full page
+  assert.deepEqual(await ff.js('return [...document.querySelectorAll(".ph-h div b")].map(b => b.textContent)'), ['Juniors · junior', 'Juniors · senior']);
+  assert.equal(await count('[data-act=full]'), 0);
+  assert.equal(await count('textarea, .acct'), 0);
+  await ff.click('[aria-label="Previous day"]');
+  assert.equal(await count('.ph-s'), 0, 'the cadetes session of 2 Oct is not shown to the juniors');
+  await shot('07-reader');
+  // it is remembered: the plain address opens the same page
+  await ff.nav('about:blank');
+  await ff.nav(BASE + '?github&asof=2026-10-03');
+  await ff.wait('return !!document.querySelector(".ph")');
+  assert.equal(await count('[data-act=full]'), 0);
+  const before = gh.commits.length;
+  ok('a read-only link opens the day page of one plan with nothing to type, and is remembered');
+
+  await elsewhere(writer);
+  await ff.wait('return !!document.querySelector(".sheet")');
+  assert.equal(await count('.signin'), 0);
+  assert.ok(!/setup=/.test(await ff.js('return location.href')));
+  assert.equal(await text('.acct'), REPO);
+  await ff.click('.swk[data-v="7"]');
+  await ff.click('.day:nth-child(7) .add[data-v="am"]');
+  await ff.keys('5km R1');
+  await saved();
+  assert.match(season('plans/cadetes/sessions.txt'), /^2026-11-15 am cadete: 5km R1$/m);
+  assert.ok(gh.commits.length > before);
+  ok('a link with a token that writes opens the full page, and its saves are committed');
+
   assert.deepEqual(await ff.js('return window.__errs || []'), []);
   ok('no script errors on the page');
 } catch (e) {

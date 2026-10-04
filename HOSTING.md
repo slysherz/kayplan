@@ -57,6 +57,26 @@ Open `https://slysherz.github.io/kayplan/`. The page asks once:
 
 The browser keeps them. The repository's name at the top right of the page opens the form again.
 
+## 5. Links for other people
+
+A link carries the repository and a token, so the other person only has to open it once: their browser keeps what it carries, and the token disappears from the address.
+
+1. Make a token for that person on GitHub, as in step 3, with a name that says whose it is:
+   - another trainer: Contents **Read and write**;
+   - the athletes: Contents **Read-only**.
+2. Open the page, click the repository's name at the top right, and under "Link for another person" paste that token. For the athletes tick "Read only" and, if you want, choose their plan. Copy the link and send it.
+
+What each link gives:
+
+| Link | Opens | Can change the plan |
+|---|---|---|
+| a read-and-write token | the whole page | yes; the saves show as yours on GitHub |
+| a read-only token, "Read only" ticked | the day page: the sessions of one day, on any screen | no |
+
+- **A link is a password.** Anyone who gets it can do what its token can. Send it privately. To take access away, delete that token on GitHub; that is why each person or group gets their own.
+- **A read-only token reads the whole private repository**, not only one plan: every plan, past and future sessions, and the course documents in `docs/`. Choosing a plan only limits what the page shows. Do not put in the repository anything the athletes should not be able to read.
+- **Always tick "Read only" for a read-only token.** Without it the page shows the editing page, and every save fails.
+
 ## What to know
 
 - **Every save is a commit** in `kayplan-rioneiva-2027`, so the plan's whole history is on GitHub.
