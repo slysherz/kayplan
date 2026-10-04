@@ -58,6 +58,7 @@ export async function firefox(profile, size = [1440, 900]) {
   const key = c => [{ type: 'keyDown', value: c }, { type: 'keyUp', value: c }];
   const ff = {
     ENTER: '', END: '', ESCAPE: '', DOWN: '\uE015', UP: '\uE013',
+    resize: (width, height) => cmd('WebDriver:SetWindowRect', { width, height }),
     nav: url => cmd('WebDriver:Navigate', { url }),
     // run script in the page; "return x" gives x back; arguments[] holds args
     js: async (script, ...args) => (await cmd('WebDriver:ExecuteScript', { script, args })).value,

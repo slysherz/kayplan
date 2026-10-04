@@ -22,6 +22,7 @@ Built:
 - **Level 2, step 3: checks of sessions and weeks** (the coach asked for these from DESIGN.md section 9 on 2026-10-02). What the course would question about a session (a zone not for that age, the order of contents, repetition length, rest, too much of a zone, R3 before the warm-up is done) and about a week (hard sessions under 48 h apart, quality in the afternoon, too many R7 sessions, a block content with no session, intensity in a recovery week, the days around a race, the taper). They are words on the page and in `show week` and `show checks`; nothing is refused. The season-level checks of section 9 (order of blocks, residual effects before a race, build times) were offered and turned down.
 - **Zone cards from the course reference** (`docs/course-reference.md`): intensity markers, place in the session and the season, kinds of work for R6 and R7, the resisted variants inside each card, km a year per category. A click keeps a card open.
 - **Session suggestions** (DESIGN.md 8.4, asked for by the coach on 2026-10-03): `season/library.txt` holds sessions shared by every plan and band (the coach's old sessions and the course's model sessions). A session with no work written shows a short list in its editor, filtered to the week and ordered by how likely each is to be picked (see "Rules the engine applies"). The reader understands ranges (`2-4x`, `10-20'`).
+- **The plan on GitHub** (DESIGN.md 6.5, asked for by the coach on 2026-10-04): `src/store-github.js` reads and writes the plan's files in a folder of a GitHub repository; the page uses it whenever it is not served from this computer, asks once per browser for the repository and a token, and has a layout for a phone. `npm run site` builds the page as plain files for GitHub Pages. [HOSTING.md](HOSTING.md) has the steps. It has only been run against a GitHub in memory (`test/fake-github.js`), never against the real one: the coach has to create the repositories and the token.
 - Tests for the engine, the command line and the server (`npm test`), and a check of the page in headless Firefox (`npm run page-check`).
 - The real 2026–27 season in `season/`: 45 weeks from Monday 28 Sep 2026, three plans, last season's races moved to the matching 2027 weekends as unconfirmed guesses.
 
@@ -31,8 +32,7 @@ Not built:
 
 - **Frozen estimates.** DESIGN.md 6.7 says estimates of weeks that have ended are frozen. They are not: every estimate follows the plan as it is now, so changing a future block also changes past estimates. Freezing needs the estimate of each ended week to be stored, and the design stores nothing that is worked out. The coach has been told; it waits for a decision.
 - The rest of DESIGN.md section 9 (season-level checks, monitoring, load curves), and anything from level 3.
-- The GitHub store, for use from two computers and a phone (DESIGN.md 6.5). It implements the store interface described in `src/store-disk.js`, and the page then needs a sign-in and a layout for the phone.
-- A commit per save. On this computer a save only writes the file; commits are made by hand (ask first).
+- A commit per save on this computer. Through `serve.js` a save only writes the file; commits are made by hand (ask first). Through GitHub every save is a commit.
 
 ## Layout
 
@@ -57,10 +57,14 @@ src/lang.js          the page's words in English and Portuguese: tr(), dec(), th
 src/report.js        the command line's text output
 src/store-disk.js    file access on disk; describes the store interface
 src/store-http.js    the same interface for the page, through serve.js
+src/store-github.js  the same interface for the page, through GitHub's API: a folder of a repository
 src/page.js, page.css  the page: draws what the engine works out, turns clicks into edits
 test/                node --test; test/page-season is the season the page check runs on
 tools/check-names.sh the names check
 tools/page-check.mjs the page check; tools/firefox.mjs drives headless Firefox for it
+tools/hosted-check.mjs the same for the page as hosted: the built site against a GitHub in memory, and a phone-sized window
+tools/build-site.mjs builds site/ (not in git): index.html and the modules the page loads, for a static host
+HOSTING.md           how the page and the plan are put on GitHub
 season/              the plan: only what was typed
 mockups/             the layout mockup with dummy data (reference for look and behaviour)
 docs/                the course slides as text: course-reference.md by topic, course-slides-1.md in slide order
@@ -80,6 +84,8 @@ node kayplan.js show suggestions <date> <am|pm> [--plan <id>] [--band <name>] [-
 node kayplan.js show zone <zone>                       a zone's card: what it is and how the course trains it
 node kayplan.js show types                             what each week type is for, with its load
 node kayplan.js show events                            the races and events table
+npm run site                                           builds site/ for GitHub Pages (HOSTING.md)
+npm run hosted-check                                   checks the hosted page in headless Firefox against a GitHub in memory
 node kayplan.js check                                  errors and warnings; exit code 1 on errors
 npm test                                               engine, command line and server
 npm run page-check                                     the page, in headless Firefox (about two minutes)
@@ -319,6 +325,8 @@ gym: 4-6 exercises, 2-3x 10-15 reps, tempo 2:2
 - **Checks:** a week where the course would question something has its number in the Microcycle row in dark red and underlined, for the selected band. The selected week lists them in words above its days, and the selected session lists its own under the main zone.
 - **Week types card:** hovering, focusing or clicking the Type row's label shows what each week type is for, with its load from the load table (`typesCard` in `src/zones.js`; `show types` prints it).
 - **Suggestions:** a selected session with no work written (no amount with or without a zone) shows the list under its plan text: the band's zones, the ones the week is missing in bold, then one row per suggestion with its main zone, text and minutes in that zone. A zone button lists that zone's suggestions; words typed in the plan text narrow the list (`r3`, `gym`); a click, or the arrow keys and Enter, puts the text, place and notes into the session, where it is saved and changed like any other. The plan text and the list share one space of a fixed size (the text is short while the list shows, and fills the space otherwise; a long list scrolls inside it), so the notes, the place and everything else in the panel stay where they are (the coach, 2026-10-03). The lower part of the page is at least 600 px high, and a redraw keeps the page scrolled where it was.
+- **Where the plan is.** Served from `127.0.0.1` or `localhost` the page uses `serve.js`; anywhere else (or with `?github` in the address) it uses GitHub. The repository (`owner/name`), the folder (`season`) and the token are asked for in a form and kept in the browser's `localStorage` under `kayplan-github`; a refused token or a missing repository brings the form back with the reason. The repository's name in the header opens the form again. GitHub is asked for changes every 20 seconds (the local server every 2), an unchanged answer costing nothing of GitHub's hourly allowance. A save is one commit, "Kayplan: <file>"; a file changed elsewhere since it was read is refused by GitHub and handled like a file changed on disk. After a write GitHub can name the commit before it for a moment; the store ignores a commit it has itself written over, so the old text never comes back.
+- **A phone** (760 px or narrower): the days of the week one under the other, the session panel under them, and picking or adding a session scrolls to it. The sheet scrolls sideways as it always did. Fields are 16 px so that a phone does not zoom in on them.
 - **Zone cards:** hovering or focusing a zone name shows its card; a click keeps it open and scrollable until Escape or a click elsewhere. A card states one value for each thing, in the same wording across zones, and never says where it comes from (no "the course", no slide, no "on another slide"): the coach asked for this on 2026-10-02. Where slides disagree the card takes the zone summary of slide 145; the sources are in the head of `src/zones.js`. Sessions per week and km a year are read from `tables.txt`, so the card and the grid show the same figures. The course's model sessions are not in the cards (the coach, 2026-10-02): they are in `season/library.txt` as suggestions.
 - **Km row:** the number in a cell is the week's estimate, and the cell fills from the bottom as the week's sessions cover it. With no estimate it shows the km from the sessions. How an estimate was worked out is in the cell's hover text.
 - **Capacity grid:** dark is developing, light is maintaining, an outline is below maintenance. A zone that is not suggested for the band's age has its name dimmed; its sessions are still counted and shaded. The Sessions/Km switch changes what the cells show, not the rows. The counts behind a shade are in the cell's hover text.

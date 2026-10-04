@@ -16,6 +16,7 @@ import { zoneCard, typesCard } from './zones.js';
 import { checksView } from './checks.js';
 import { suggestions } from './suggest.js';
 import { httpStore } from './store-http.js';
+import { githubStore } from './store-github.js';
 import { tr, dec, setLang, getLang, LANGS } from './lang.js';
 
 const CW = 26, LAB = 104;   // width of a week column and of the row labels, in px
@@ -44,8 +45,13 @@ const placeName = x => ({ water: tr('Water'), pool: tr('Pool'), gym: tr('Gym'), 
 const slotName = x => ({ am: tr('AM'), pm: tr('PM') })[x];
 const stateName = x => ({ developing: tr('developing'), maintaining: tr('maintaining'), 'below maintenance': tr('below maintenance'), trained: tr('trained'), absent: tr('absent') })[x];
 
-const store = httpStore();
 const params = new URLSearchParams(location.search);
+// Where the plan is: the files next to the local server when the page comes from it; anywhere else,
+// a folder of a GitHub repository, opened with a token this browser keeps (DESIGN.md 6.5).
+const hosted = !/^(127\.0\.0\.1|localhost|\[::1\])$/.test(location.hostname) || params.has('github');
+let account = null;     // { repo, dir, token }: the repository this browser opens
+let signin = null;      // { message } while the form that asks for the repository is shown
+let store = hosted ? null : httpStore();
 
 let data = null;        // the plan as loaded, with the edits made here
 let known = null;       // the files' stamp when data was loaded
@@ -53,6 +59,7 @@ let ctx = null;         // what the last draw worked out
 let edition = 0;        // counts edits made here, so a reload that raced with one is thrown away
 let note = '';          // why the last edit was refused; cleared by the next click
 let fault = '';         // the server cannot be reached; cleared when it answers again
+let toSession = false; // a session was just picked: on a phone, scroll to it on the next draw
 let reveal = true;      // scroll the sheet to the selected week on the next draw
 let uid = 0;
 const state = { plan: null, band: null, week: null, sel: null, view: 'sheet', edit: null, problems: false, event: null, grid: 'sessions', zone: null };
@@ -137,22 +144,59 @@ function tag(before) {
   }
 }
 
+// ---- the repository, when the plan is on GitHub -------------------------------------------
+
+function readAccount() {
+  try { account = JSON.parse(localStorage.getItem('kayplan-github') || 'null'); } catch (e) { account = null; }
+  if (account && account.repo && account.token) store = githubStore(account);
+  else signin = { message: '' };
+}
+
+function drawSignin() {
+  const a = account || {}, f = (name, label, value, type) => '<label class="fld"><span>' + label + '</span><input type="' + (type || 'text') + '" data-gh="' + name + '" value="' + esc(value || '') + '" autocomplete="off" autocapitalize="off" spellcheck="false"></label>';
+  document.getElementById('root').innerHTML = '<div class="signin panel"><div class="pop-h"><div class="brand">Kayplan</div>' + (data ? '<button class="x" data-act="gh-close" aria-label="' + tr('Close') + '">×</button>' : '') + '</div>' +
+    f('repo', tr('Repository'), a.repo).replace('<input ', '<input placeholder="owner/name" ') + f('dir', tr('Folder'), a.dir || 'season') + f('token', tr('Token'), a.token, 'password') +
+    '<div class="pop-r"><button class="b" data-act="gh-open">' + tr('Open') + '</button><span class="msg">' + esc(signin.message || '') + '</span></div></div>';
+}
+
+function openAccount() {
+  const v = name => document.querySelector('[data-gh="' + name + '"]').value.trim();
+  account = { ...(account || {}), repo: v('repo'), dir: v('dir') || 'season', token: v('token') };
+  if (!/^[\w.-]+\/[\w.-]+$/.test(account.repo)) { signin = { message: tr('Write the repository as owner/name') }; drawSignin(); return; }
+  try { localStorage.setItem('kayplan-github', JSON.stringify(account)); } catch (e) { /* no storage: asked again next time */ }
+  store = githubStore(account);
+  signin = { message: '' };
+  data = null;
+  known = null;
+  drawSignin();
+  reload();
+}
+
 // ---- loading and saving -------------------------------------------------------
 
 const dirty = new Set();   // files changed here and not saved yet
 let timer = null, queue = Promise.resolve(), pending = 0, conflict = false, drag = null;
 
+// the store did not answer: say so, and when it is the token or the repository, ask for them again
+function unread(e) {
+  const asked = e.code === 'auth' ? tr('GitHub refused the token') : e.code === 'missing' ? tr('The repository or the folder was not found with this token') : '';
+  fault = hosted ? tr('The plan cannot be read: is there a connection?') : tr('The plan cannot be read: is the server running?');
+  if (asked || signin) { signin = { message: asked || fault }; drawSignin(); }
+  else paintStatus();
+}
+
 async function reload() {
+  if (!store) { drawSignin(); return; }
   const mark = edition;
   let fresh, stamp;
   try {
     stamp = await store.stamp();
     fresh = await load(store);
   } catch (e) {
-    fault = tr('The plan cannot be read: is the server running?');
-    paintStatus();
+    unread(e);
     return;
   }
+  signin = null;
   // something was typed meanwhile: keep what is on screen and try again on the next tick
   if (mark !== edition || dirty.size || pending || drag) return;
   const before = data ? data.events : null;
@@ -165,13 +209,12 @@ async function reload() {
 }
 
 async function poll() {
-  if (document.hidden || drag || pending) return;
+  if (document.hidden || drag || pending || !store || signin) return;
   if (dirty.size) { if (!timer) flush(); return; }
   try {
     if (await store.stamp() !== known) await reload();
   } catch (e) {
-    fault = tr('The plan cannot be read: is the server running?');
-    paintStatus();
+    unread(e);
   }
 }
 
@@ -187,7 +230,7 @@ function flush() {
         if (!conflict) data.revs[path] = await store.write(path, fileText(data, path), data.revs[path]);
       } catch (e) {
         if (e.code === 'conflict') conflict = true;
-        else { dirty.add(path); fault = tr('Not saved yet: is the server running?'); }
+        else { dirty.add(path); fault = hosted ? tr('Not saved yet: is there a connection?') : tr('Not saved yet: is the server running?'); }
       }
       pending--;
       if (!pending) settled();
@@ -302,7 +345,8 @@ function header() {
     '<div class="tabs"><button class="tab' + (state.view === 'sheet' ? ' on' : '') + '" data-act="view" data-v="sheet">' + tr('Plan') + '</button>' +
     '<button class="tab' + (state.view === 'events' ? ' on' : '') + '" data-act="view" data-v="events">' + tr('Events') + '</button></div>' +
     '<button class="b" data-act="today"' + (usable(data) && weekOf(data.season, now()) ? '' : ' disabled') + '>' + tr('Today') + '</button>' +
-    '<div class="pills">' + pills + '</div><div id="status">' + statusHtml() + '</div>' + langs + '</header>';
+    '<div class="pills">' + pills + '</div><div id="status">' + statusHtml() + '</div>' + langs +
+    (hosted && account ? '<button class="b acct" data-act="account">' + esc(account.repo) + '</button>' : '') + '</header>';
 }
 
 function problemsPanel() {
@@ -615,6 +659,7 @@ document.addEventListener('click', e => {
 
 function render() {
   const root = document.getElementById('root');
+  if (signin) { drawSignin(); return; }
   if (!data) return;
   if (!pinned) hideTip();
   // remember what is focused and how far the sheet is scrolled, to put both back
@@ -676,6 +721,9 @@ function render() {
       el.scrollTop = held.top;
     }
   }
+  // on a phone the session is under the week: bring it into view when one is picked
+  if (toSession && window.innerWidth <= 760) { const el = root.querySelector('.lower .right'); if (el) el.scrollIntoView({ block: 'start' }); }
+  toSession = false;
   markPointed();
   // a card that was clicked open stays open across a redraw
   if (pinned) { const el = root.querySelector('[data-tip="' + pinned + '"]'); if (el) showTip(el); else unpin(); }
@@ -715,7 +763,13 @@ function planAct(act, v) {
 }
 
 document.addEventListener('click', e => {
-  if (!data) return;
+  const gh = e.target.closest('[data-act^="gh-"]');
+  if (gh) {
+    if (gh.dataset.act === 'gh-open') openAccount();
+    else { signin = null; render(); }
+    return;
+  }
+  if (!data || signin) return;
   note = '';
   const t = e.target.closest('[data-act]'), inPop = e.target.closest('.pop');
   // a click outside an open panel closes it
@@ -726,7 +780,8 @@ document.addEventListener('click', e => {
   }
   if (!t || t.disabled) { paintStatus(); return; }
   const act = t.dataset.act, v = t.dataset.v;
-  if (act === 'problems') state.problems = !state.problems;
+  if (act === 'account') signin = { message: '' };
+  else if (act === 'problems') state.problems = !state.problems;
   else if (act === 'pop-close') { state.edit = null; state.problems = false; }
   else if (act === 'view') { state.view = v; state.edit = null; state.event = null; reveal = true; }
   else if (act === 'grid') state.grid = v;
@@ -740,7 +795,7 @@ document.addEventListener('click', e => {
     const n = act === 'week' ? +v : state.week + (act === 'prev' ? -1 : 1);
     if (n !== state.week && n >= 1 && n <= data.season.weeks) { state.week = n; state.sel = null; reveal = true; }
   }
-  else if (act === 'pick') { state.sel = v; state.zone = null; }
+  else if (act === 'pick') { state.sel = v; state.zone = null; toSession = true; }
   else if (act === 'sug-zone') state.zone = state.zone === v ? null : v;
   else if (act === 'sug') {
     // the suggestion's text goes into the session, to be changed there like any other
@@ -760,6 +815,7 @@ document.addEventListener('click', e => {
     const s = { date: t.dataset.date, slot: v, band: state.band, place: 'water', text: '', notes: '' };
     state.sel = sessionKey(s);
     state.zone = null;
+    toSession = true;
     if (change([planFiles(ctx.plan.id).sessions], () => setPlan(edits.putSession(ctx.plan, s)))) {
       const ta = document.querySelector('[data-fid="s-text"]');
       if (ta) ta.focus();
@@ -849,6 +905,7 @@ document.addEventListener('input', e => {
 });
 
 document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.dataset && e.target.dataset.gh) { openAccount(); return; }
   if (e.key === 'Escape' && pinned) unpin();
   if (e.key === 'Escape' && (state.edit || state.problems)) { state.edit = null; state.problems = false; render(); }
   // the arrows go from the plan text into the suggestions and along them
@@ -907,5 +964,7 @@ document.addEventListener('pointercancel', () => endDrag(false));
 
 useLang(firstLang(), false);
 readHash();
+if (hosted) readAccount();
 reload();
-setInterval(poll, 2000);
+// GitHub is asked less often than the local server
+setInterval(poll, hosted ? (account && account.every) || 20000 : 2000);
