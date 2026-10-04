@@ -7,7 +7,7 @@ import { sheet, sessionView, weekOf } from './engine.js';
 import { contents } from './grid.js';
 import { tooClose, wrongHalf } from './checks.js';
 import { CONTENT_ZONES } from './cycles.js';
-import { sessionKey } from './format.js';
+import { sessionKey, plain } from './format.js';
 
 // how many are listed when nothing was asked for
 export const SHOWN = 5;
@@ -24,13 +24,14 @@ const same = t => String(t || '').replace(/\s+/g, ' ').trim().toLowerCase();
 // ask: { place, zone, query, limit }
 //   place   the place the session is set to; the water unless given
 //   zone    every suggestion of this main zone, whatever the week is for
-//   query   every suggestion with these words in its text, zone, place or notes, whatever the week and place
+//   query   every suggestion with these words in its name, text, zone, place or notes, whatever the week and place
 //   limit   how many to list; SHOWN when neither zone nor query is given, all of them otherwise
 //
 // Returns { zones, list, total }.
 //   zones  [{ zone, missing }]: the band's zones; missing when it is a content of the block that has
 //          fewer sessions this week than it takes to develop it
-//   list   [{ text, place, notes, main, min, used, clash }], the most likely first
+//   list   [{ text, place, notes, name, main, min, used, clash }], the most likely first
+//          name   the name the library gives it, or ''
 //          min    minutes of work in the main zone
 //          used   the date it was last in the plan before this slot, or null
 //          clash  it would be too close to another session of the week, or in the wrong half of the day
@@ -54,13 +55,13 @@ export function suggestions(data, planId, band, date, slot, today, ask) {
   // every different text once: the band's own sessions, then the library
   const found = new Map();
   for (const s of mine) {
-    const key = same(s.text) + '|' + s.place, c = found.get(key) || { text: s.text, place: s.place, notes: s.notes, used: null, order: Infinity };
+    const key = plain(s.text) + '|' + s.place, c = found.get(key) || { text: s.text, place: s.place, notes: s.notes, name: '', used: null, order: Infinity };
     if (earlier(s) && (!c.used || s.date > c.used)) c.used = s.date;
     found.set(key, c);
   }
   data.library.forEach((s, i) => {
-    const key = same(s.text) + '|' + s.place, c = found.get(key);
-    if (c) c.order = i; else found.set(key, { text: s.text, place: s.place, notes: s.notes, used: null, order: i });
+    const key = plain(s.text) + '|' + s.place, c = found.get(key);
+    if (c) { if (c.order === Infinity) c.order = i; c.name = c.name || s.name; } else found.set(key, { text: s.text, place: s.place, notes: s.notes, name: s.name, used: null, order: i });
   });
 
   // where: a place that was chosen; else off the water on a day with no water; else the water
@@ -75,7 +76,7 @@ export function suggestions(data, planId, band, date, slot, today, ask) {
     if (!v.main && c.place === 'water') continue;
     if (allowed && v.parts.some(p => p.zone !== 'R0' && !allowed.includes(p.zone))) continue;
     if (words.length) {
-      const hay = same([c.text, c.place, v.main || '', c.notes].join(' '));
+      const hay = same([c.name, c.text, c.place, v.main || '', c.notes].join(' '));
       if (!words.every(w => hay.includes(w))) continue;
     } else {
       if (!places.includes(c.place)) continue;
@@ -85,7 +86,7 @@ export function suggestions(data, planId, band, date, slot, today, ask) {
     const as = { ...here, main: v.main, place: c.place };
     const clash = mine.some(o => earlier(o) ? tooClose(o, as, tables) > 0 : tooClose(as, o, tables) > 0) ||
       mine.some(o => o.date === date && o.slot !== slot && (slot === 'am' ? wrongHalf(as, o) : wrongHalf(o, as)));
-    list.push({ text: c.text, place: c.place, notes: c.notes, main: v.main, min: part ? part.min : v.offMin, share: part ? part.share : 0, used: c.used, order: c.order, clash });
+    list.push({ text: c.text, place: c.place, notes: c.notes, name: c.name, main: v.main, min: part ? part.min : v.offMin, share: part ? part.share : 0, used: c.used, order: c.order, clash });
   }
 
   // the zones, the one the week is missing most first
@@ -113,7 +114,7 @@ export function suggestions(data, planId, band, date, slot, today, ask) {
   const groups = new Map();
   for (const z of [...new Set(list.map(x => x.main))].sort(byRank)) {
     const rows = list.filter(x => x.main === z && !x.clash).sort(within);
-    const last = before.find(s => s.main === z), i = last ? rows.findIndex(x => same(x.text) === same(last.text) && x.place === last.place) : -1;
+    const last = before.find(s => s.main === z), i = last ? rows.findIndex(x => plain(x.text) === plain(last.text) && x.place === last.place) : -1;
     if (i > 0) rows.unshift(rows.splice(i, 1)[0]);
     groups.set(z, rows);
   }
@@ -132,7 +133,7 @@ export function suggestions(data, planId, band, date, slot, today, ask) {
   const limit = ask.limit || (ask.zone || words.length ? out.length : SHOWN);
   return {
     zones: ZONES.filter(z => need[z]).map(z => ({ zone: z, missing: need[z].missing })),
-    list: out.slice(0, limit).map(x => ({ text: x.text, place: x.place, notes: x.notes, main: x.main, min: x.min, used: x.used, clash: x.clash })),
+    list: out.slice(0, limit).map(x => ({ text: x.text, place: x.place, notes: x.notes, name: x.name, main: x.main, min: x.min, used: x.used, clash: x.clash })),
     total: out.length
   };
 }

@@ -160,11 +160,12 @@ try {
 
   await ff.click('[data-fid=s-text]');
   await ff.keys(ff.END + ff.ENTER + ' + 4x 10');
-  assert.equal(await value('[data-fid=s-text]'), "1km R1 + 8x 4' R2/1' R0 + 1km R1 + 4x 10");
+  // the text is shown a part a line; Enter starts a line, and a line is a "+" when it is stored
+  assert.equal(await value('[data-fid=s-text]'), "1km R1\n8x 4' R2/1' R0\n1km R1\n + 4x 10");
   await ff.keys("'' R6/2'");
   await saved();
   assert.match(file('plans/juniors/sessions.txt'), /1km R1 \+ 4x 10'' R6\/2'$/m);
-  ok('spaces can be typed at the end of the plan; Enter does nothing there');
+  ok('spaces can be typed at the end of the plan; Enter starts a line, stored as a "+"');
 
   await choose('[data-fid=s-place]', 'pool');
   await saved();
@@ -562,16 +563,28 @@ try {
   await ff.click('.day:nth-child(2) .add[data-v="pm"]');
   // week 7 is in the block R2 and has no session: R2 first, with the session it had last time, then one of each zone
   assert.deepEqual(await rows(), [
-    ['R2', "1km R1 + 8x 4' R2/1'R0 + 1km R1", "32'"], ['R1', '6km R1', "38'"], ['R3', "R3: 4x(3x 2'/30'')/6'", "24'"], ['R6', "R6: 3x(3x 50/3')/6'", "2'"], ['R2', "R2: 3x(4'-6'-6'-4'/1')/3'", "60'"]]);
+    ['R2', "1km R1 + 8x 4' R2/1'R0 + 1km R1", "32'"], ['R1', '6km R1', "38'"], ['R3', "R3: 4x(3x 2'/30'')/6'", "24'"], ['R6', "R6: 3x(3x 50/3')/6'", "2'"], ['R2', 'R2 ladder', "60'"]]);
   assert.deepEqual(await ff.js('return [...document.querySelectorAll(".sug-z .segb")].map(b => b.textContent + (b.classList.contains("need") ? "!" : ""))'), ['R1', 'R2!', 'R3', 'R3+', 'R5', 'R6', 'R7']);
   await ff.js('const a = document.getElementById("app"); a.scrollTop = a.scrollHeight;');
   await shot('09-suggestions');
+  // pointing at a row opens its card: the name, the work, the text a part a line with what each comes to
+  await ff.hover('.sug-r:nth-child(5)');
+  assert.equal(await text('#tip h4'), 'R2 ladder');
+  assert.deepEqual(await ff.js('return [...document.querySelectorAll("#tip .ses-l > *")].map(e => e.textContent)'), ["R2: 3x(4'-6'-6'-4'/1')/3'", "81'", '11.0 km', '', "81'", '11.0 km']);
+  assert.ok(await ff.js('const r = document.getElementById("tip").getBoundingClientRect(); return r.left >= 0 && r.right <= window.innerWidth && r.bottom <= window.innerHeight'), 'the card is on the screen');
+  await ff.hover('.sug-r:nth-child(1)');
+  assert.equal(await text('#tip h4'), 'R2');
+  assert.match(await text('#tip p'), /^R2 ≈ 32' · R1 ≈ 13' · R0 ≈ 8'$/);
+  assert.deepEqual(await ff.js('return [...document.querySelectorAll("#tip .ses-l span")].map(e => e.textContent)'), ['1km R1', "8x 4' R2/1'R0", '1km R1']);
+  await shot('09-session-card');
+  await ff.hover('.tab');
+  assert.equal(await ff.js('return document.getElementById("tip").hidden'), true);
   // the fields under the list stay where they are, with five rows, with one, and with a session written
   const below = () => ff.js('return ["s-notes", "s-place"].map(f => Math.round(document.querySelector("[data-fid=" + f + "]").getBoundingClientRect().top)).concat(Math.round(document.querySelector(".zpill").getBoundingClientRect().top))');
   const at = await below();
   // a zone lists every suggestion of that zone; clicking it again goes back
   await ff.click('.sug-z [data-v="R2"]');
-  assert.deepEqual((await rows()).map(r => r[1]), ["1km R1 + 8x 4' R2/1'R0 + 1km R1", "R2: 3x(4'-6'-6'-4'/1')/3'", "R2: 2x(4x 5'/1')/3'"]);
+  assert.deepEqual((await rows()).map(r => r[1]), ["1km R1 + 8x 4' R2/1'R0 + 1km R1", 'R2 ladder', "R2: 2x(4x 5'/1')/3'"]);
   assert.equal(await count('.sug-z .segb.on'), 1);
   await ff.click('.sug-z [data-v="R3"]');
   assert.deepEqual((await rows()).map(r => r[1]), ["R3: 4x(3x 2'/30'')/6'"]);

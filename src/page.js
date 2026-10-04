@@ -5,7 +5,7 @@
 // files, so a change made outside (by Claude, or in an editor) is drawn within a couple of seconds.
 
 import { clockToday, isDate, shortDate, addDays, weekday, DAYS, MONTHS } from './dates.js';
-import { minutesText, amountText, kmText } from './notation.js';
+import { minutesText, amountText, kmText, infer, outline, sessionLines, linesText, oneLine } from './notation.js';
 import * as cycles from './cycles.js';
 import * as edits from './edits.js';
 import { KINDS, RACE_TYPES, BOATS, PLACES, sessionKey, sortEvents } from './format.js';
@@ -346,8 +346,9 @@ function banner(e) {
 
 function chip(s) {
   const c = zc(s.main);
-  return '<button class="chip' + (sessionKey(s) === sessionKey(ctx.session) ? ' on' : '') + (s.notDone ? ' off' : '') + '" data-act="pick" data-v="' + sessionKey(s) + '" style="background:' + c.bg + ';color:' + c.fg + '">' +
-    '<span class="chip-h">' + slotName(s.slot) + ' · ' + (s.main || tr('no zone')) + (s.place !== 'water' ? ' · ' + placeName(s.place).toLowerCase() : '') + (s.notDone ? ' · ' + tr('not done') : '') + '</span><span class="chip-t mono">' + esc(s.text || tr('Empty session')) + '</span></button>';
+  return '<button class="chip' + (sessionKey(s) === sessionKey(ctx.session) ? ' on' : '') + (s.notDone ? ' off' : '') + '" data-act="pick" data-v="' + sessionKey(s) + '" data-ses="' + sessionKey(s) + '" style="background:' + c.bg + ';color:' + c.fg + '">' +
+    '<span class="chip-h">' + slotName(s.slot) + ' · ' + (s.main || tr('no zone')) + (s.place !== 'water' ? ' · ' + placeName(s.place).toLowerCase() : '') + (s.notDone ? ' · ' + tr('not done') : '') + '</span>' +
+    (s.name ? '<span class="chip-t">' + esc(s.name) + '</span>' : '<span class="chip-t mono">' + esc(s.text || tr('Empty session')) + '</span>') + '</button>';
 }
 
 function statusHtml() {
@@ -518,10 +519,10 @@ function sheetView() {
     // each piece with a zone, and its other unit
     const other = session.pieces.map(x => x.text + ' ≈ ' + x.approx).join(' · ');
     const c = zc(session.main);
-    right = '<div class="ed-col' + (ctx.sug ? ' asking' : '') + '"><div class="eyebrow">' + tr('Session') + '</div><div class="when">' + tr(DAYS[wk.days.findIndex(d => d.date === session.date)]) + ' ' + shortDate(session.date) + ' · ' + slotName(session.slot) + '</div>' +
+    right = '<div class="ed-col' + (ctx.sug ? ' asking' : '') + '"><div class="eyebrow">' + tr('Session') + '</div><div class="when">' + tr(DAYS[wk.days.findIndex(d => d.date === session.date)]) + ' ' + shortDate(session.date) + ' · ' + slotName(session.slot) + (session.name ? ' · ' + esc(session.name) : '') + '</div>' +
       '<div class="fld"><span>' + tr('Main zone') + '</span><div class="inf"><b class="zpill" style="background:' + c.bg + ';color:' + c.fg + '">' + (session.main || '–') + '</b><small>' + esc(work.join(' · ')) + (other ? '<span class="mono other">' + esc(other) + '</span>' : '') + '</small></div></div>' +
       (doubts.length ? '<div class="chks" data-id="s-checks">' + doubts.map(t => '<div>' + esc(t) + '</div>').join('') + '</div>' : '') +
-      '<label class="fld f-plan"><span>' + tr('Plan') + '</span><textarea class="mono plan" data-input="text" data-fid="s-text" spellcheck="false">' + esc(session.text) + '</textarea></label>' +
+      '<label class="fld f-plan"><span>' + tr('Plan') + '</span><textarea class="mono plan" data-input="text" data-fid="s-text" spellcheck="false">' + esc(linesText(session.text, 40)) + '</textarea></label>' +
       suggested() +
       '<label class="fld f-notes"><span>' + tr('Notes') + '</span><textarea data-input="notes" data-fid="s-notes">' + esc(session.notes) + '</textarea></label>' +
       '<div class="pop-r"><label class="inline"><span>' + tr('Place') + '</span><select data-change="place" data-fid="s-place">' + PLACES.map(x => '<option value="' + x + '"' + (x === session.place ? ' selected' : '') + '>' + placeName(x) + '</option>').join('') + '</select></label>' +
@@ -548,8 +549,8 @@ function suggested() {
   if (!g) return '';
   const rows = g.list.map((x, i) => {
     const c = zc(x.main);
-    return '<button class="sug-r" data-act="sug" data-v="' + i + '" title="' + esc(x.text + (x.notes ? '\n' + x.notes : '')) + '"><b style="background:' + c.bg + ';color:' + c.fg + '">' + (x.main || placeName(x.place)) + '</b>' +
-      '<span class="mono">' + esc(x.text) + '</span><small>' + (x.min > 0 ? minutesText(x.min) : '') + '</small></button>';
+    return '<button class="sug-r" data-act="sug" data-v="' + i + '" data-ses="sug ' + i + '"><b style="background:' + c.bg + ';color:' + c.fg + '">' + (x.main || placeName(x.place)) + '</b>' +
+      (x.name ? '<span>' + esc(x.name) + '</span>' : '<span class="mono">' + esc(x.text) + '</span>') + '<small>' + (x.min > 0 ? minutesText(x.min) : '') + '</small></button>';
   }).join('');
   const zones = g.typed ? '' : '<div class="sug-z">' + g.zones.map(z => '<button class="segb' + (z.missing ? ' need' : '') + (state.zone === z.zone ? ' on' : '') + '" data-act="sug-zone" data-v="' + z.zone + '">' + z.zone + '</button>').join('') + '</div>';
   return '<div class="sug" data-id="sug">' + zones + '<div class="sug-l">' + rows + '</div></div>';
@@ -575,7 +576,8 @@ function phoneView() {
     const other = s.pieces.map(x => x.text + ' ≈ ' + x.approx).join(' · ');
     return '<div class="ph-s panel' + (s.notDone ? ' off' : '') + '"><div class="ph-h"><b class="zpill" style="background:' + c.bg + ';color:' + c.fg + '">' + (s.main || '–') + '</b>' +
       '<div><b>' + esc(p.name) + ' · ' + esc(s.band) + '</b><span class="muted">' + slotName(s.slot) + (s.place !== 'water' ? ' · ' + placeName(s.place) : '') + (s.notDone ? ' · ' + tr('not done') : '') + '</span></div></div>' +
-      (s.text ? '<div class="ph-t mono">' + esc(s.text) + '</div>' : '') +
+      (s.name ? '<b class="ph-name">' + esc(s.name) + '</b>' : '') +
+      (s.text ? '<div class="ph-t mono">' + outline(s.text, 26).map(l => '<div style="padding-left:' + l.depth * 14 + 'px">' + esc(l.text) + '</div>').join('') + '</div>' : '') +
       (work.length ? '<div class="ph-w muted">' + esc(work.join(' · ')) + (other ? '<span class="mono">' + esc(other) + '</span>' : '') + '</div>' : '') +
       (s.notes ? '<div class="ph-n">' + esc(s.notes) + '</div>' : '') + '</div>';
   })));
@@ -690,16 +692,42 @@ const tipEl = document.getElementById('tip');
 let pinned = null;   // the card that was clicked open: a zone, or "types"
 function hideTip() { tipEl.hidden = true; }
 function unpin() { pinned = null; tipEl.classList.remove('pinned'); hideTip(); }
+// a session's card: its name, the work per zone, the text laid out with what each part comes to, the notes
+function sessionCard(key) {
+  if (!ctx) return '';
+  const s = /^sug /.test(key) ? ctx.sug && ctx.sug.list[+key.slice(4)] : ctx.wk.days.flatMap(d => d.sessions).find(x => sessionKey(x) === key);
+  if (!s || !s.text) return '';
+  const off = s.place !== 'water', v = infer(s.text, data.tables, state.band, off), l = sessionLines(s.text, data.tables, state.band, off, 36);
+  const work = v.parts.slice().reverse().map(p => p.zone + ' ≈ ' + minutesText(p.min));
+  if (v.unzoned) work.push(tr('no zone') + ' ' + amountText(v.unzoned));
+  const size = x => '<small>' + (x.min > 0 ? minutesText(x.min) : '') + '</small><small>' + (x.km > 0 ? dec(x.km, 1) + ' km' : '') + '</small>';
+  return '<h4>' + (v.main ? '<i style="background:' + Z[v.main].bg + '"></i>' : '') + esc(s.name || v.main || placeName(s.place)) + '</h4>' +
+    (work.length ? '<p>' + esc(work.join(' · ')) + '</p>' : '') +
+    '<div class="ses-l">' + l.lines.map(x => '<span class="mono" style="padding-left:' + x.depth * 14 + 'px">' + esc(x.text) + '</span>' + (x.min === null ? '<small></small><small></small>' : size(x))).join('') +
+    (l.min > 0 ? '<b></b><b>' + minutesText(l.min) + '</b><b>' + (l.km > 0 ? dec(l.km, 1) + ' km' : '') + '</b>' : '') + '</div>' +
+    (s.notes ? '<p class="ses-n">' + esc(s.notes) + '</p>' : '');
+}
+// beside what it is about: to its right, or to its left when there is no room
+function placeTip(el) {
+  tipEl.hidden = false;
+  const r = el.getBoundingClientRect(), w = tipEl.offsetWidth;
+  tipEl.style.left = (r.right + 8 + w <= window.innerWidth ? r.right + 8 : Math.max(8, r.left - w - 8)) + 'px';
+  tipEl.style.top = Math.max(8, Math.min(r.top - 12, window.innerHeight - tipEl.offsetHeight - 8)) + 'px';
+}
 function showTip(el) {
+  if (el.dataset.ses) {
+    const html = data ? sessionCard(el.dataset.ses) : '';
+    if (!html) { hideTip(); return; }
+    tipEl.innerHTML = html;
+    placeTip(el);
+    return;
+  }
   const card = !data ? null : el.dataset.tip === 'types' ? typesCard(data.tables) : zoneCard(el.dataset.tip, data.tables);
   if (!card) return;
   tipEl.innerHTML = (card.zone ? '<h4><i style="background:' + Z[card.zone].bg + '"></i>' + card.zone + ' · ' + esc(card.name) + '</h4><p>' + esc(card.what) + '</p>' : '<h4>' + esc(card.name) + '</h4>') + '<dl>' +
     card.rows.map(([label, v]) => '<dt>' + esc(label) + '</dt><dd>' + (Array.isArray(v) ? '<ul>' + v.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul>' : esc(v)) + '</dd>').join('') +
     '</dl>';
-  tipEl.hidden = false;
-  const r = el.getBoundingClientRect();
-  tipEl.style.left = (r.right + 8) + 'px';
-  tipEl.style.top = Math.max(8, Math.min(r.top - 12, window.innerHeight - tipEl.offsetHeight - 8)) + 'px';
+  placeTip(el);
 }
 // ---- the events view: the entry under the pointer is marked in the rows of races above -----------
 
@@ -714,13 +742,14 @@ document.addEventListener('mouseover', e => {
   if (id !== pointed) { pointed = id; markPointed(); }
 });
 
-const tipTarget = e => e.target.closest ? e.target.closest('[data-tip]') : null;
+const tipTarget = e => e.target.closest ? e.target.closest('[data-tip],[data-ses]') : null;
 document.addEventListener('mouseover', e => { const t = tipTarget(e); if (t && !pinned) showTip(t); });
 document.addEventListener('mouseout', e => { const t = tipTarget(e); if (t && !pinned && !(e.relatedTarget && t.contains(e.relatedTarget))) hideTip(); });
 document.addEventListener('focusin', e => { const t = tipTarget(e); if (t && !pinned) showTip(t); });
 document.addEventListener('focusout', e => { if (tipTarget(e) && !pinned) hideTip(); });
 document.addEventListener('click', e => {
-  const t = tipTarget(e);
+  // a zone's card can be clicked open; a session's is only shown while it is pointed at
+  const t = e.target.closest ? e.target.closest('[data-tip]') : null;
   if (t && t.dataset.tip !== pinned) { pinned = t.dataset.tip; tipEl.classList.add('pinned'); showTip(t); tipEl.scrollTop = 0; }
   else if (pinned && !(e.target.closest && e.target.closest('#tip'))) unpin();
 });
@@ -790,7 +819,9 @@ function render() {
     const el = root.querySelector('[data-fid="' + fid + '"]');
     if (el) {
       // what is being typed is kept as typed while it means the same as what was saved
-      if (typeof held.value === 'string' && el.value !== held.value && squash(el.value) === squash(held.value)) el.value = held.value;
+      // (the plan text is laid out when it is shown: it is kept while it is what was stored)
+      const flat = t => String(t).replace(/\s+/g, ''), kept = fid === 's-text' && ctx && ctx.session ? flat(oneLine(held.value)) === flat(ctx.session.text) : squash(el.value) === squash(held.value);
+      if (typeof held.value === 'string' && el.value !== held.value && kept) el.value = held.value;
       el.focus();
       try { el.setSelectionRange(held.from, held.to); } catch (e) { /* not a text field */ }
       el.scrollTop = held.top;
@@ -974,7 +1005,8 @@ document.addEventListener('input', e => {
     if (!el.value.trim()) return;   // a block keeps its name while the field is empty
     change([f.cycles], () => setPlan(name === 'name' ? cycles.setMeso(ctx.plan, state.edit.i, { name: el.value }) : cycles.setMacroName(ctx.plan, state.edit.i, el.value)), typing);
   } else if ((field === 'text' || field === 'notes') && ctx.session) {
-    change([f.sessions], () => setPlan(edits.putSession(ctx.plan, { ...ctx.session, [field]: el.value })), typing);
+    // the plan text is shown a part a line and stored on one
+    change([f.sessions], () => setPlan(edits.putSession(ctx.plan, { ...ctx.session, [field]: field === 'text' ? oneLine(el.value) : el.value })), typing);
   } else if (field === 'load') {
     const w = ctx.wk, v = +el.value;
     if (!/^\d+$/.test(el.value.trim()) || v > 100 || w.type === null || (!w.hand && v === w.load)) return;
@@ -993,8 +1025,6 @@ document.addEventListener('keydown', e => {
     const to = i < 0 ? document.querySelector('[data-fid="s-text"]') : rows[i];
     if (to && (row || e.key === 'ArrowDown')) { e.preventDefault(); to.focus(); }
   }
-  // the plan text is one line
-  if (e.key === 'Enter' && e.target.dataset && e.target.dataset.input === 'text') e.preventDefault();
 });
 
 // leaving a field saves what was typed without waiting

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parsePlan, readPlan, infer, minutesText, amountText } from '../src/notation.js';
+import { parsePlan, readPlan, infer, minutesText, amountText, outline, sessionLines, linesText, oneLine, ZONES } from '../src/notation.js';
 import { parseTables } from '../src/format.js';
 import { TABLES } from './helpers.js';
 
@@ -180,4 +180,54 @@ test('a range counts as its middle', () => {
   assert.deepEqual(parsePlan("4'-6'-4' R2"), { R2: { sec: 840, m: 0 } });
   assert.deepEqual(parsePlan('500-300m R4'), { R4: { sec: 0, m: 800 } });
   assert.deepEqual(parsePlan('250-300 R4'), { R4: { sec: 0, m: 550 } });
+});
+
+test('outline: a part a line, a long set over several, and the lines put together are the text', () => {
+  const lines = (t, w) => outline(t, w).map(l => '  '.repeat(l.depth) + l.text);
+  assert.deepEqual(lines("10' R1 + 4x(2' R3 + 8' R1) + 5' R1", 40), ["10' R1", "4x(2' R3 + 8' R1)", "5' R1"]);
+  // the "+" of R3+ is the zone's
+  assert.deepEqual(lines("5x(20'' R3+ + 3'40'' R1) + 5' R1", 40), ["5x(20'' R3+ + 3'40'' R1)", "5' R1"]);
+  assert.deepEqual(lines("10' R1 + 3x(8x 20''/40'' R3 + 2' R0 + 2x(4' R2 + 1' R0))/4' R0 + 5' R1", 24),
+    ["10' R1", '3x(', "  8x 20''/40'' R3", "  + 2' R0", "  + 2x(4' R2 + 1' R0)", ")/4' R0", "5' R1"]);
+  // the parts of a set share a line while they fit
+  assert.deepEqual(lines("R3 (4x 30'' + 2' R0 + 3x 1' + 2' R0 + 2x 2' + 2' R0 + 4') + 6' R0", 24), ['R3 (', "  4x 30'' + 2' R0", "  + 3x 1' + 2' R0", "  + 2x 2' + 2' R0 + 4'", ')', "6' R0"]);
+  assert.deepEqual(lines("R2: 3x(4'-6'/1')/3' + 2km", 40), ["R2: 3x(4'-6'/1')/3'", '2km']);
+  assert.deepEqual(lines("60' R1", 10), ["60' R1"]);
+  assert.deepEqual(lines('', 10), []);
+});
+
+test('sessionLines: what each part comes to, and the parts add up to the session', async () => {
+  const fs = await import('node:fs');
+  const { parseTables, parseLibrary } = await import('../src/format.js');
+  const tables = parseTables(fs.readFileSync(new URL('../season/tables.txt', import.meta.url), 'utf8')).value;
+  const l = sessionLines("15' R1 + 6x 500m R3/4' R0 + 10' R1", tables, 'junior', false, 40);
+  assert.deepEqual(l.lines.map(x => [x.text, Math.round(x.min), +x.km.toFixed(2)]), [["15' R1", 15, 2.38], ["6x 500m R3/4' R0", 39, 3], ["10' R1", 10, 1.58]]);
+  assert.equal(Math.round(l.min), 64);
+  // every session of the library, at three widths: the parts add up to the whole, and the lines are the text
+  const flat = t => t.replace(/\s+/g, '');
+  let n = 0;
+  for (const s of parseLibrary(fs.readFileSync(new URL('../season/library.txt', import.meta.url), 'utf8')).value) {
+    const off = s.place !== 'water', v = infer(s.text, tables, 'junior', off);
+    for (const w of [20, 36, 200]) {
+      const x = sessionLines(s.text, tables, 'junior', off, w);
+      assert.equal(flat(oneLine(linesText(s.text, w))), flat(s.text), s.text);
+      assert.ok(Math.abs(x.km - v.totalKm) < 1e-6, s.text);
+      // the minutes of the whole text read at once, the rests counted
+      const tot = readPlan(s.text, tables.places).totals, pace = tables.pace.junior || tables.pace.default;
+      let min = 0;
+      for (const z in tot) min += tot[z].sec / 60 + (!off && ZONES.includes(z) && pace[z] ? tot[z].m / 1000 / pace[z] * 60 : 0);
+      assert.ok(Math.abs(x.min - min) < 1e-6, s.text);
+    }
+    n++;
+  }
+  assert.ok(n > 200);
+});
+
+test('oneLine: the lines typed are one session; a new line is a "+"', () => {
+  assert.equal(oneLine("10' R1\n3x(4'15'' R1 + 45'' R3)\n5' R1"), "10' R1 + 3x(4'15'' R1 + 45'' R3) + 5' R1");
+  assert.equal(oneLine("10' R1\n\n  + 5' R1 +\n2km R1\n"), "10' R1 + 5' R1 + 2km R1");
+  assert.equal(oneLine("3x(\n  8x 20''/40'' R3\n  + 2' R0\n)/4' R0\n5' R1"), "3x(8x 20''/40'' R3 + 2' R0)/4' R0 + 5' R1");
+  assert.equal(oneLine("5' R3+\n2' R1"), "5' R3+ + 2' R1");
+  assert.equal(oneLine("R2:\n3x 4'/1'\n/3'"), "R2: 3x 4'/1' /3'");
+  assert.equal(oneLine("60' R1"), "60' R1");
 });

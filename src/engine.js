@@ -115,10 +115,24 @@ export function eventsFor(data, planId, today) {
 
 // ---- sessions ---------------------------------------------------------------
 
+// The name the library gives a session: that of the first line with the same text and place, or ''.
+// Nothing links the two: a session whose text is changed is no longer that session.
+const NAMES = new WeakMap();
+export function nameOf(data, s) {
+  if (!data.library) return '';
+  let names = NAMES.get(data.library);
+  if (!names) {
+    names = new Map();
+    for (const l of data.library) { const k = format.plain(l.text) + '|' + l.place; if (l.name && !names.has(k)) names.set(k, l.name); }
+    NAMES.set(data.library, names);
+  }
+  return names.get(format.plain(s.text) + '|' + (s.place || 'water')) || '';
+}
+
 // A session with what is worked out from its text, and whether it counts as done.
 // A session whose date has passed counts as done unless it is marked not done.
 export function sessionView(data, s, today) {
-  return { ...s, ...infer(s.text, data.tables, s.band, s.place !== 'water'), status: s.notDone ? 'not done' : (s.date < today ? 'done' : 'planned') };
+  return { ...s, name: nameOf(data, s), ...infer(s.text, data.tables, s.band, s.place !== 'water'), status: s.notDone ? 'not done' : (s.date < today ? 'done' : 'planned') };
 }
 
 // ---- the annual sheet -------------------------------------------------------
@@ -227,7 +241,10 @@ export function check(data, today) {
 
   // a library line on the water that has no zone is never suggested
   if (!out.some(o => o.level === 'error' && (o.file === 'tables.txt' || o.file === 'library.txt'))) {
+    const named = new Map();
     for (const s of data.library) {
+      if (s.name && named.has(s.name.toLowerCase())) add('warning', 'library.txt', s.line, tr('The name "{0}" is also on line {1}', s.name, named.get(s.name.toLowerCase())));
+      else if (s.name) named.set(s.name.toLowerCase(), s.line);
       if (s.place === 'water' && !infer(s.text, data.tables, null, false).main) add('warning', 'library.txt', s.line, tr('"{0}" has no zone and is never suggested', s.text));
     }
   }

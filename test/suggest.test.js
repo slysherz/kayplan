@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { load } from '../src/engine.js';
+import { load, nameOf, check } from '../src/engine.js';
 import { suggestions, SHOWN } from '../src/suggest.js';
 import { parseLibrary, serializeLibrary } from '../src/format.js';
 import { suggestReport } from '../src/report.js';
@@ -150,4 +150,19 @@ test('check: a library line on the water with no zone is a warning', async () =>
   const data = await season(f => { f['library.txt'] += "8x 4'/1'\nyoga\ngym: circuit\n"; });
   assert.deepEqual(check(data, TODAY).filter(p => p.file === 'library.txt').map(p => [p.level, p.line, p.message]),
     [['warning', 9, '"8x 4\'/1\'" has no zone and is never suggested'], ['warning', 10, '"yoga" has no zone and is never suggested']]);
+});
+
+test('library.txt: a line can have a name, and a session with the same text is shown by it', async () => {
+  const lib = "Ladder one = R2: 3x(4'-6'-6'-4'/1')/3'\ngym: Circuit = 4-6 exercises\n60' R1\n";
+  const r = parseLibrary(lib);
+  assert.deepEqual(r.value.map(x => [x.place, x.name, x.text]), [['water', 'Ladder one', "R2: 3x(4'-6'-6'-4'/1')/3'"], ['gym', 'Circuit', '4-6 exercises'], ['water', '', "60' R1"]]);
+  assert.equal(serializeLibrary(r.value), lib);
+  const data = await season(f => { f['library.txt'] = lib + "Ladder one = 50' R1\n"; });
+  // the spaces and the case do not count; another text is another session
+  assert.equal(nameOf(data, { text: "r2: 3x( 4'-6'-6'-4' / 1' )/3'", place: 'water' }), 'Ladder one');
+  assert.equal(nameOf(data, { text: "R2: 3x(4'-6'-6'-4'/1')/2'", place: 'water' }), '');
+  assert.equal(nameOf(data, { text: '4-6 exercises', place: 'water' }), '');
+  const got = suggestions(data, 'group-a', 'older', '2026-02-03', 'pm', TODAY, { query: 'ladder' });
+  assert.deepEqual(got.list.map(x => [x.name, x.text]), [['Ladder one', "R2: 3x(4'-6'-6'-4'/1')/3'"], ['Ladder one', "50' R1"]]);
+  assert.deepEqual(check(data, TODAY).filter(p => p.file === 'library.txt').map(p => [p.level, p.line, p.message]), [['warning', 4, 'The name "Ladder one" is also on line 1']]);
 });

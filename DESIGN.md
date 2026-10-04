@@ -528,6 +528,15 @@ Level 3. A blueprint is a saved session: notation, main zone, place (water, pool
 
 **As built (2026-10-03).** The library is `season/library.txt`: one session a line, shared by every plan and age band, seeded from the coach's old sessions and the course's model sessions. There is no separate "save as blueprint": every session of the band is already a candidate. A session with no work written shows up to five suggestions under its text: the zones the week is missing first, one of each zone in turn, and in each zone the session the band had last time, then the ones it has not had for longest, then the library. A row of zones lists everything of one zone; typing words narrows the list. Nothing is scaled.
 
+### 8.5 Reading a session
+
+Asked for by the coach on 2026-10-04.
+
+- **Laid out.** A session is stored on one line. Where it is read (the card below, the day page on a phone) it is shown one part a line: the text is cut at each `+` outside brackets, and the parts are one under the other with no `+`. A set too long for the width is opened, its own parts under it. The field where the session is typed shows it the same way, and a new line typed there is a `+`.
+- **Card.** Pointing at a session in the week, or at a suggestion, shows its card: the name or the main zone, the time per zone, each part with its minutes and km, the total, and the notes.
+- **Names.** A line of the library can have a name (`R3 pyramid 1 = …`). A session with the same text and place is shown by that name wherever there is little room: the week, the list of suggestions. The session keeps its text; nothing links it to the library, so changing either one drops the name.
+- **Not built:** naming a session from the page (the library is edited as a file).
+
 ## 9. Later, if needed
 
 None of this is in the first cut of any level. Each item is here because it came up during design; it gets built only if the basics of its level prove insufficient. Checks and monitoring belong to level 2; the planning, session and blueprint items belong to level 3.

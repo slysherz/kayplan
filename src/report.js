@@ -81,7 +81,7 @@ export function suggestReport(data, planId, band, date, slot, today, ask) {
   const r = suggestions(data, planId, band, date, slot, today, ask), n = weekOf(data.season, date);
   const type = n ? sheet(data, planId, today).weeks[n - 1].type : null, missing = r.zones.filter(z => z.missing).map(z => z.zone);
   const out = [planId + ' · ' + band + ' · ' + date + ' ' + slot + (n ? ' · week ' + n + (type ? ' (' + type + ')' : '') : '') + (missing.length ? ' · missing ' + missing.join(', ') : '')];
-  const rows = r.list.map(x => ['  ' + (x.main || '-'), x.min > 0 ? minutesText(x.min) : '', (x.place !== 'water' ? x.place + ': ' : '') + x.text, [x.used ? 'last ' + x.used : '', x.clash ? 'clashes' : ''].filter(Boolean).join(' · ')]);
+  const rows = r.list.map(x => ['  ' + (x.main || '-'), x.min > 0 ? minutesText(x.min) : '', (x.place !== 'water' ? x.place + ': ' : '') + (x.name ? x.name + ' = ' : '') + x.text, [x.used ? 'last ' + x.used : '', x.clash ? 'clashes' : ''].filter(Boolean).join(' · ')]);
   if (rows.length) out.push(table(rows, [1]));
   out.push(r.list.length < r.total ? '  ' + r.list.length + ' of ' + r.total : (r.total ? '' : '  nothing'));
   return out.join('\n').trimEnd();
@@ -94,7 +94,7 @@ export function dayReport(data, date, today) {
   for (const p of d.plans) for (const e of p.events) { if (!seen.has(e.name)) { seen.add(e.name); out.push('  ' + eventText(e)); } }
   for (const p of d.plans) {
     for (const s of p.sessions) {
-      out.push(s.slot + ' ' + p.id + ' ' + s.band + (s.place !== 'water' ? ' ' + s.place : '') + (s.notDone ? ' · not done' : '') + ' · ' + (s.main || 'no zone') + ' · ' + (s.text || '(empty)'));
+      out.push(s.slot + ' ' + p.id + ' ' + s.band + (s.place !== 'water' ? ' ' + s.place : '') + (s.notDone ? ' · not done' : '') + ' · ' + (s.main || 'no zone') + ' · ' + (s.name ? s.name + ' = ' : '') + (s.text || '(empty)'));
       for (const line of s.notes ? s.notes.split('\n') : []) out.push(('    ' + line).trimEnd());
     }
   }

@@ -160,8 +160,8 @@ try {
   assert.equal(await text('.ph .b[data-act=day]'), 'Next session · Sat 3 Oct');
   await ff.click('.ph .b[data-act=day]');
   assert.equal(await text('.ph-d b'), 'Sat 3 Oct');
-  assert.deepEqual(await ff.js('return [...document.querySelectorAll(".ph-s")].map(c => [c.querySelector(".zpill").textContent, c.querySelector(".ph-h div b").textContent, c.querySelector(".ph-h div span").textContent, c.querySelector(".ph-t").textContent])'),
-    [['R2', 'Juniors · junior', 'AM', "1km R1 + 8x 4' R2/1'R0 + 1km R1"], ['R2', 'Juniors · senior', 'AM', '3x 2000m R2']]);
+  assert.deepEqual(await ff.js('return [...document.querySelectorAll(".ph-s")].map(c => [c.querySelector(".zpill").textContent, c.querySelector(".ph-h div b").textContent, c.querySelector(".ph-h div span").textContent, [...c.querySelectorAll(".ph-t div")].map(l => l.textContent).join(" | ")])'),
+    [['R2', 'Juniors · junior', 'AM', "1km R1 | 8x 4' R2/1'R0 | 1km R1"], ['R2', 'Juniors · senior', 'AM', '3x 2000m R2']]);
   assert.equal(await text('.ph-n'), 'K2 on the last four reps');
   assert.match(await text('.ph-w'), /R2 ≈ 32' · R1 ≈ 13' · R0 ≈ 8' · ≈ 7\.9 km/);
   assert.ok(await ff.js('return document.documentElement.scrollWidth <= window.innerWidth'), 'the page is no wider than the phone');
