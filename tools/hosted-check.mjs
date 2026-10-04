@@ -145,28 +145,60 @@ try {
   await ff.wait('return !!document.querySelector(".sheet")');
   ok('the repository can be changed from the header');
 
-  // a phone
+  // a phone gets the day page: every plan's sessions of one day, and nothing to edit
   await ff.resize(390, 844);
-  await open('plan=juniors&band=junior&week=7');
-  await ff.wait('return !!document.querySelector(".sheet")');
-  await shot('03-phone-top');
+  await open('');
+  await ff.wait('return !!document.querySelector(".ph")');
+  assert.equal(await count('.sheet'), 0);
+  assert.equal(await count('textarea'), 0);
+  assert.equal(await text('.ph-d b'), 'Fri 2 Oct');
+  assert.equal(await text('.ph-d span'), 'Week 1');
+  assert.equal(await text('.ph-none'), 'No sessions');
+  assert.ok(await ff.js('return document.querySelector("[data-act=day][data-v=\'\']").disabled'));
+  await shot('03-phone-empty');
+  // the next day with a session: the juniors' two groups
+  assert.equal(await text('.ph .b[data-act=day]'), 'Next session · Sat 3 Oct');
+  await ff.click('.ph .b[data-act=day]');
+  assert.equal(await text('.ph-d b'), 'Sat 3 Oct');
+  assert.deepEqual(await ff.js('return [...document.querySelectorAll(".ph-s")].map(c => [c.querySelector(".zpill").textContent, c.querySelector(".ph-h div b").textContent, c.querySelector(".ph-h div span").textContent, c.querySelector(".ph-t").textContent])'),
+    [['R2', 'Juniors · junior', 'AM', "1km R1 + 8x 4' R2/1'R0 + 1km R1"], ['R2', 'Juniors · senior', 'AM', '3x 2000m R2']]);
+  assert.equal(await text('.ph-n'), 'K2 on the last four reps');
+  assert.match(await text('.ph-w'), /R2 ≈ 32' · R1 ≈ 13' · R0 ≈ 8' · ≈ 7\.9 km/);
   assert.ok(await ff.js('return document.documentElement.scrollWidth <= window.innerWidth'), 'the page is no wider than the phone');
+  await shot('04-phone-day');
+  // the arrows go a day at a time; a session marked not done is shown struck out; Today comes back
+  await ff.click('[aria-label="Previous day"]');
+  await ff.click('[aria-label="Previous day"]');
+  assert.equal(await text('.ph-d b'), 'Thu 1 Oct');
+  assert.equal(await count('.ph-s.off'), 1);
+  assert.match(await text('.ph-h div span'), /PM · not done/);
+  await ff.click('[data-act=day][data-v=""]');
+  assert.equal(await text('.ph-d b'), 'Fri 2 Oct');
+  // a change made elsewhere appears here too
+  gh.put('season/plans/cadetes/sessions.txt', "2026-10-02 pm cadete: 8km R1\n  easy\n");
+  await ff.wait('return !!document.querySelector(".ph-s")', 8000);
+  assert.equal(await text('.ph-h div b'), 'Cadetes · cadete');
+  // the day is in the address, so a reload stays on it; Portuguese
+  await ff.click('[aria-label="Next day"]');
+  await ff.click('[data-act=lang][data-v=pt]');
+  assert.equal(await text('.ph-d b'), 'Sáb 3 Out');
+  assert.match(await ff.js('return location.hash'), /day=2026-10-03/);
+  await ff.click('[data-act=lang][data-v=en]');
+  await ff.js('localStorage.removeItem("kayplan-lang")');
+  ok('a phone: the day page, with the next session, the arrows, a change from elsewhere and Portuguese');
+
+  // the full page is one tap away, laid out for the narrow window
+  await ff.click('[data-act=full]');
+  await ff.wait('return !!document.querySelector(".sheet")');
+  assert.ok(await ff.js('return document.documentElement.scrollWidth <= window.innerWidth'), 'the page is no wider than the phone');
+  await ff.click('.swk[data-v="7"]');
+  await ff.js('document.querySelector(".day:nth-child(2)").scrollIntoView()');
   await ff.click('.day:nth-child(2) .chip');
   await ff.sleep(300);
   assert.ok(await ff.js('const r = document.querySelector(".lower .right").getBoundingClientRect(); return r.top >= 0 && r.top < window.innerHeight / 2'), 'the session is in view');
   assert.ok(await ff.js('const d = [...document.querySelectorAll(".day")].map(x => x.getBoundingClientRect()); return d[1].top > d[0].top && Math.abs(d[1].left - d[0].left) < 1'), 'the days are one under the other');
-  await shot('04-phone-session');
-  await ff.js('document.querySelector(".day:nth-child(5)").scrollIntoView()');
-  await ff.click('.day:nth-child(5) .add[data-v="am"]');
-  await ff.sleep(300);
-  assert.equal(await count('.sug-r'), 5);
-  await shot('05-phone-suggestions');
-  await ff.click('.sug-r');
-  await saved();
-  assert.match(season('plans/juniors/sessions.txt'), /^2026-11-13 am junior: /m);
-  await ff.click('[data-act=view][data-v=events]');
-  await shot('06-phone-events');
-  ok('a phone: the days one under the other, the session under them, a suggestion taken');
+  await shot('05-phone-full');
+  ok('a phone: the full page on request, the days one under the other and the session under them');
 
   assert.deepEqual(await ff.js('return window.__errs || []'), []);
   ok('no script errors on the page');

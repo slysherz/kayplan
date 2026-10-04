@@ -2,7 +2,7 @@
 
 import { DAYS, addDays, weekday } from './dates.js';
 import { minutesText, amountText, kmText } from './notation.js';
-import { sheet, weekView, eventView, check, weekOf } from './engine.js';
+import { sheet, weekView, eventView, check, weekOf, dayView } from './engine.js';
 import { suggestions } from './suggest.js';
 import { kmView } from './km.js';
 import { gridView } from './grid.js';
@@ -85,6 +85,21 @@ export function suggestReport(data, planId, band, date, slot, today, ask) {
   if (rows.length) out.push(table(rows, [1]));
   out.push(r.list.length < r.total ? '  ' + r.list.length + ' of ' + r.total : (r.total ? '' : '  nothing'));
   return out.join('\n').trimEnd();
+}
+
+// one day across every plan: what each group does
+export function dayReport(data, date, today) {
+  const d = dayView(data, date, today), out = [DAYS[d.weekday] + ' ' + date + (d.today ? ' · today' : '') + (d.week ? ' · week ' + d.week : ' · outside the season')];
+  const seen = new Set();
+  for (const p of d.plans) for (const e of p.events) { if (!seen.has(e.name)) { seen.add(e.name); out.push('  ' + eventText(e)); } }
+  for (const p of d.plans) {
+    for (const s of p.sessions) {
+      out.push(s.slot + ' ' + p.id + ' ' + s.band + (s.place !== 'water' ? ' ' + s.place : '') + (s.notDone ? ' · not done' : '') + ' · ' + (s.main || 'no zone') + ' · ' + (s.text || '(empty)'));
+      for (const line of s.notes ? s.notes.split('\n') : []) out.push(('    ' + line).trimEnd());
+    }
+  }
+  if (!d.plans.some(p => p.sessions.length)) out.push('no sessions' + (d.next ? ' · next ' + d.next : ''));
+  return out.join('\n');
 }
 
 // one week: its sessions with the zone working and km, its totals, and its events

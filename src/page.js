@@ -4,12 +4,12 @@
 // Every change is applied to the plan in memory, drawn, and saved to its file. The page watches the
 // files, so a change made outside (by Claude, or in an editor) is drawn within a couple of seconds.
 
-import { clockToday, isDate, shortDate, DAYS, MONTHS } from './dates.js';
+import { clockToday, isDate, shortDate, addDays, weekday, DAYS, MONTHS } from './dates.js';
 import { minutesText, amountText, kmText } from './notation.js';
 import * as cycles from './cycles.js';
 import * as edits from './edits.js';
 import { KINDS, RACE_TYPES, BOATS, PLACES, sessionKey, sortEvents } from './format.js';
-import { load, usable, planOf, planFiles, sheet, weekView, eventView, check, fileText, weekOf, endedWeeks } from './engine.js';
+import { load, usable, planOf, planFiles, sheet, weekView, eventView, check, fileText, weekOf, endedWeeks, dayView } from './engine.js';
 import { kmView } from './km.js';
 import { gridView } from './grid.js';
 import { zoneCard, typesCard } from './zones.js';
@@ -62,7 +62,7 @@ let fault = '';         // the server cannot be reached; cleared when it answers
 let toSession = false; // a session was just picked: on a phone, scroll to it on the next draw
 let reveal = true;      // scroll the sheet to the selected week on the next draw
 let uid = 0;
-const state = { plan: null, band: null, week: null, sel: null, view: 'sheet', edit: null, problems: false, event: null, grid: 'sessions', zone: null };
+const state = { plan: null, band: null, week: null, sel: null, view: 'sheet', edit: null, problems: false, event: null, grid: 'sessions', zone: null, day: null, full: false };
 
 // the language: ?lang= in the address, else the one chosen on this device, else the browser's
 function useLang(l, keep) {
@@ -104,10 +104,14 @@ function readHash() {
   const ed = /^(meso|macro):(\d+)$/.exec(h.get('edit') || '');
   state.edit = ed ? { kind: ed[1], i: +ed[2] } : null;
   state.problems = h.get('problems') === '1';
+  state.day = isDate(h.get('day') || '') ? h.get('day') : null;
+  state.full = h.get('full') === '1';
 }
 
 function writeHash() {
   const h = new URLSearchParams();
+  if (state.day) h.set('day', state.day);
+  if (state.full) h.set('full', '1');
   for (const k of ['plan', 'band', 'week']) { if (state[k] !== null) h.set(k, state[k]); }
   if (state.view === 'events') h.set('view', 'events');
   if (state.grid === 'km') h.set('grid', 'km');
@@ -522,6 +526,37 @@ function suggested() {
   return '<div class="sug" data-id="sug">' + zones + '<div class="sug-l">' + rows + '</div></div>';
 }
 
+// ---- the phone: one day, to read before a training session ------------------------------------
+
+// a narrow window gets the day page unless the full page was asked for
+const phone = () => (window.innerWidth <= 760 || params.has('phone')) && !state.full;
+
+// Every plan's sessions of one day, the morning first. Nothing is edited here.
+function phoneView() {
+  const today = now(), d = dayView(data, state.day || today, today);
+  const seen = new Set(), events = d.plans.flatMap(p => p.events).filter(e => !seen.has(e.name) && seen.add(e.name));
+  const cards = ['am', 'pm'].flatMap(slot => d.plans.flatMap(p => p.sessions.filter(s => s.slot === slot).map(s => {
+    const c = zc(s.main);
+    let work = s.parts.slice().reverse().map(x => x.zone + ' ≈ ' + minutesText(x.min));
+    if (s.place === 'water' && s.totalKm > 0) work.push('≈ ' + dec(s.totalKm, 1) + ' km');
+    const other = s.pieces.map(x => x.text + ' ≈ ' + x.approx).join(' · ');
+    return '<div class="ph-s panel' + (s.notDone ? ' off' : '') + '"><div class="ph-h"><b class="zpill" style="background:' + c.bg + ';color:' + c.fg + '">' + (s.main || '–') + '</b>' +
+      '<div><b>' + esc(p.name) + ' · ' + esc(s.band) + '</b><span class="muted">' + slotName(s.slot) + (s.place !== 'water' ? ' · ' + placeName(s.place) : '') + (s.notDone ? ' · ' + tr('not done') : '') + '</span></div></div>' +
+      (s.text ? '<div class="ph-t mono">' + esc(s.text) + '</div>' : '') +
+      (work.length ? '<div class="ph-w muted">' + esc(work.join(' · ')) + (other ? '<span class="mono">' + esc(other) + '</span>' : '') + '</div>' : '') +
+      (s.notes ? '<div class="ph-n">' + esc(s.notes) + '</div>' : '') + '</div>';
+  })));
+  const none = cards.length ? '' : '<div class="ph-none muted">' + tr('No sessions') + '</div>' +
+    (d.next ? '<button class="b" data-act="day" data-v="' + d.next + '">' + tr('Next session') + ' · ' + tr(DAYS[weekday(d.next)]) + ' ' + shortDate(d.next) + '</button>' : '');
+  return '<header class="ph-top"><button class="nav" data-act="day" data-v="' + addDays(d.date, -1) + '" aria-label="' + tr('Previous day') + '">‹</button>' +
+    '<div class="ph-d"><b>' + tr(DAYS[d.weekday]) + ' ' + shortDate(d.date) + '</b><span class="muted">' + (d.week ? tr('Week {0}', d.week) : '') + '</span></div>' +
+    '<button class="nav" data-act="day" data-v="' + addDays(d.date, 1) + '" aria-label="' + tr('Next day') + '">›</button>' +
+    '<button class="b" data-act="day" data-v=""' + (d.today ? ' disabled' : '') + '>' + tr('Today') + '</button><span id="status">' + statusHtml() + '</span></header>' +
+    '<div id="app" class="ph">' + events.map(banner).join('') + cards.join('') + none +
+    '<div class="ph-f"><button class="b" data-act="full">' + tr('Full page') + '</button>' +
+    '<span class="seg">' + LANGS.map(l => '<button class="segb' + (l === getLang() ? ' on' : '') + '" data-act="lang" data-v="' + l + '">' + l.toUpperCase() + '</button>').join('') + '</span></div></div>';
+}
+
 // the edit panel under a block
 // The week offered for a split: the one that was clicked on the cycle, else the selected week, else the middle.
 function splitDefault(ed, from, first, last) {
@@ -669,6 +704,13 @@ function render() {
   for (const el of root.querySelectorAll('[data-scroll]')) scroll[el.dataset.scroll] = el.scrollLeft;
   const was = document.getElementById('app'), down = was ? was.scrollTop : 0;
 
+  if (usable(data) && phone()) {
+    ctx = null;
+    state.problems = false;
+    root.innerHTML = phoneView();
+    writeHash();
+    return;
+  }
   const plan = usable(data) ? planOf(data, state.plan) : null;
   if (!plan || !plan.bands.length) {
     // nothing can be drawn until the files can be read: show only the problems
@@ -787,6 +829,8 @@ document.addEventListener('click', e => {
   else if (act === 'grid') state.grid = v;
   // the words change at once; the files are read again so that their problems are in the new language too
   else if (act === 'lang') { useLang(v, true); render(); reload(); return; }
+  else if (act === 'day') state.day = v || null;
+  else if (act === 'full') { state.full = true; settle(); reveal = true; }
   else if (!ctx) { /* the rest needs a plan on screen */ }
   else if (act === 'today') { state.week = weekOf(data.season, now()); state.view = 'sheet'; state.sel = null; reveal = true; }
   else if (act === 'plan') { state.plan = v; state.band = null; state.sel = null; state.edit = null; settle(); }

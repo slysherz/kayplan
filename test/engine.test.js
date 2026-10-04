@@ -251,3 +251,15 @@ date        until       confirmed  kind            code  week  name            p
 2026-02-16  2026-02-22  yes        holiday         h     7     Carnival break         all
 2026-03-07  2026-03-08  yes        maratona mixed  M+    9     Long race              group-b 3`);
 });
+
+test('a day across every plan: its sessions with something written, and the nearest other days', async () => {
+  const data = await load(), d = e.dayView(data, '2026-01-20', '2026-01-20');
+  assert.deepEqual([d.weekday, d.today, d.week, d.prev, d.next], [1, true, 3, null, '2026-01-22']);
+  assert.deepEqual(d.plans.map(p => [p.id, p.type, p.meso, p.sessions.map(s => s.band + ' ' + s.main)]), [['group-a', 'R', 'General one', ['older R2', 'younger null']], ['group-b', null, 'Unplanned', []]]);
+  // a day with nothing, between two that have sessions; a race is on its day for the plan it belongs to
+  const none = e.dayView(data, '2026-01-23', '2026-01-20');
+  assert.deepEqual([none.today, none.prev, none.next, none.plans.flatMap(p => p.sessions)], [false, '2026-01-22', '2026-01-24', []]);
+  assert.deepEqual(e.dayView(data, '2026-02-14', '2026-01-20').plans.map(p => p.events.map(x => x.name)), [['Spring regatta'], []]);
+  // outside the season
+  assert.deepEqual([e.dayView(data, '2025-12-01', '2026-01-20').week, e.dayView(data, '2025-12-01', '2026-01-20').next], [null, '2026-01-20']);
+});

@@ -5,12 +5,13 @@ import { fileURLToPath } from 'node:url';
 import { diskStore } from './src/store-disk.js';
 import { clockToday, isDate } from './src/dates.js';
 import { load, usable, planOf, weekOf } from './src/engine.js';
-import { seasonReport, weekReport, eventsReport, checkReport, gridReport, zoneReport, checksReport, typesReport, suggestReport } from './src/report.js';
+import { seasonReport, weekReport, eventsReport, checkReport, gridReport, zoneReport, checksReport, typesReport, suggestReport, dayReport } from './src/report.js';
 
 const USAGE = `usage: node kayplan.js <command> [options]
 
   show season            the annual sheet as a table: cycles, week types, loads, races
   show week [n]          a week's sessions with the zone working; without n, the current week
+  show day [date]        what every plan does on one day; without a date, today
   show grid              the capacity grid: sessions a week per zone with their state, and km
   show checks            what the course would question about the sessions and weeks that are written
   show suggestions <date> <am|pm>   the sessions suggested for a slot, the most likely first
@@ -42,7 +43,7 @@ for (let i = 0; i < args.length; i++) {
 }
 
 const command = words[0] === 'show' ? 'show ' + words[1] : words[0];
-if (!['show season', 'show week', 'show grid', 'show checks', 'show suggestions', 'show zone', 'show types', 'show events', 'check'].includes(command)) fail(USAGE);
+if (!['show season', 'show week', 'show day', 'show grid', 'show checks', 'show suggestions', 'show zone', 'show types', 'show events', 'check'].includes(command)) fail(USAGE);
 if (opts['as-of'] !== undefined && !isDate(opts['as-of'])) fail('--as-of needs a date like 2026-10-12');
 
 const today = opts['as-of'] || clockToday();
@@ -60,6 +61,9 @@ const plans = opts.plan !== undefined ? [opts.plan] : data.plans.map(p => p.id);
 
 if (command === 'show events') {
   console.log(eventsReport(data, today));
+} else if (command === 'show day') {
+  if (words[2] !== undefined && !isDate(words[2])) fail('show day needs a date like 2026-10-12');
+  console.log(dayReport(data, words[2] || today, today));
 } else if (command === 'show types') {
   console.log(typesReport(data.tables));
 } else if (command === 'show zone') {
