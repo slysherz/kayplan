@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as e from '../src/engine.js';
 import { gridView, contents, stateOf } from '../src/grid.js';
-import { zoneCard, ZINFO } from '../src/zones.js';
-import { gridReport, zoneReport } from '../src/report.js';
+import { zoneCard, ZINFO, typesCard } from '../src/zones.js';
+import { gridReport, zoneReport, typesReport } from '../src/report.js';
 import { parseTables, serializeTables } from '../src/format.js';
 import { memoryStore, fixture, TABLES } from './helpers.js';
 
@@ -128,6 +128,16 @@ D developing, M maintaining, b below maintenance, by the course's sessions a wee
    11  2026-03-16  R7       ·    ·     ·    ·    ·    ·    ·      ·
    12  2026-03-23  R7       ·    ·     ·    ·    ·    ·    ·      ·
        season               0 7  1 6   0 0  0 0  0 0  0 0  1 <1   0 0`);
+});
+
+test('the card of the week types: each type of the load table, with its load', () => {
+  const c = typesCard(tables);
+  assert.equal(c.name, 'Microcycle types');
+  assert.deepEqual(c.rows.map(r => r[0]), ['I · 60%', 'C · 80%', 'CH · 100%', 'R · 50%', 'AT · 55%', 'CT · 40%']);
+  assert.equal(c.rows[3][1], 'Recovery. Regeneration: low volume and intensity.');
+  // a type the coach adds to the load table is listed with its load
+  assert.deepEqual(typesCard(parseTables(TABLES.replace('CT 40', 'CT 40  X 70')).value).rows.pop(), ['X · 70%', '']);
+  assert.match(typesReport(tables), /^Microcycle types\nI · 60%: Introductory\. Prepares for the next level/);
 });
 
 test('zone cards: km a year, and nothing about where the text comes from', () => {

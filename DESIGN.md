@@ -526,6 +526,8 @@ Level 3. A blueprint is a saved session: notation, main zone, place (water, pool
 - **Suggesting:** from an empty slot, "from blueprint" lists blueprints and past sessions, filtered by zone and place, least recently used first. The week's dominant content preselects the zone filter.
 - **Using one** copies its notation into the slot, where it is scaled and edited like any other session.
 
+**As built (2026-10-03).** The library is `season/library.txt`: one session a line, shared by every plan and age band, seeded from the coach's old sessions and the course's model sessions. There is no separate "save as blueprint": every session of the band is already a candidate. A session with no work written shows up to five suggestions under its text: the zones the week is missing first, one of each zone in turn, and in each zone the session the band had last time, then the ones it has not had for longest, then the library. A row of zones lists everything of one zone; typing words narrows the list. Nothing is scaled.
+
 ## 9. Later, if needed
 
 None of this is in the first cut of any level. Each item is here because it came up during design; it gets built only if the basics of its level prove insufficient. Checks and monitoring belong to level 2; the planning, session and blueprint items belong to level 3.

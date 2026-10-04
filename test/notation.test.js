@@ -167,3 +167,17 @@ test('amounts as text', () => {
   assert.equal(amountText({ sec: 600, m: 800 }), "800 m + 10'");
   assert.equal(amountText({ sec: 0, m: 1500 }), '1.5 km');
 });
+
+test('a range counts as its middle', () => {
+  assert.deepEqual(parsePlan("2-4x 2' R3/1'"), { R3: { sec: 360, m: 0 }, rest: { sec: 180, m: 0 } });
+  assert.deepEqual(parsePlan("10-20' R1"), { R1: { sec: 900, m: 0 } });
+  assert.deepEqual(parsePlan("15-20'' R6"), { R6: { sec: 17.5, m: 0 } });
+  assert.deepEqual(parsePlan('4-6km R1'), { R1: { sec: 0, m: 5000 } });
+  assert.deepEqual(parsePlan('200-400m R4'), { R4: { sec: 0, m: 300 } });
+  assert.deepEqual(parsePlan("2-3x(4x 30''/30'') R3+/4-6'"), { 'R3+': { sec: 300, m: 0 }, rest: { sec: 1050, m: 0 } });
+  assert.deepEqual(parsePlan("R2: 3-4x(8' + 30'' R5)/1'30''"), { R2: { sec: 1680, m: 0 }, R5: { sec: 105, m: 0 }, rest: { sec: 315, m: 0 } });
+  // a ladder is not a range: each amount has its unit, or the numbers go down, or none has a unit
+  assert.deepEqual(parsePlan("4'-6'-4' R2"), { R2: { sec: 840, m: 0 } });
+  assert.deepEqual(parsePlan('500-300m R4'), { R4: { sec: 0, m: 800 } });
+  assert.deepEqual(parsePlan('250-300 R4'), { R4: { sec: 0, m: 550 } });
+});

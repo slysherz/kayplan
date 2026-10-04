@@ -45,11 +45,22 @@ Second macro
   2 comp   R7     Racing
 `;
 
+export const LIBRARY = `60' R1
+10km R1
+R2: 3x(4'-6'-6'-4'/1')/3'
+R2: 2x(4x 5'/1')/3'
+R3: 4x(3x 2'/30'')/6'
+R6: 3x(3x 50/3')/6'
+gym: 4-6 exercises, 2-3x 10-15 reps
+  tempo 2:2
+`;
+
 // 12 weeks from Monday 5 Jan 2026
 export function fixture() {
   return {
     'season.txt': 'start: 2026-01-05\nweeks: 12\n',
     'tables.txt': TABLES,
+    'library.txt': LIBRARY,
     'events.txt': `2026-02-14 Spring regatta
   confirmed: no
   place: Lake

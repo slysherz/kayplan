@@ -12,8 +12,9 @@ import { KINDS, RACE_TYPES, BOATS, PLACES, sessionKey, sortEvents } from './form
 import { load, usable, planOf, planFiles, sheet, weekView, eventView, check, fileText, weekOf, endedWeeks } from './engine.js';
 import { kmView } from './km.js';
 import { gridView } from './grid.js';
-import { zoneCard } from './zones.js';
+import { zoneCard, typesCard } from './zones.js';
 import { checksView } from './checks.js';
+import { suggestions } from './suggest.js';
 import { httpStore } from './store-http.js';
 import { tr, dec, setLang, getLang, LANGS } from './lang.js';
 
@@ -54,7 +55,7 @@ let note = '';          // why the last edit was refused; cleared by the next cl
 let fault = '';         // the server cannot be reached; cleared when it answers again
 let reveal = true;      // scroll the sheet to the selected week on the next draw
 let uid = 0;
-const state = { plan: null, band: null, week: null, sel: null, view: 'sheet', edit: null, problems: false, event: null, grid: 'sessions' };
+const state = { plan: null, band: null, week: null, sel: null, view: 'sheet', edit: null, problems: false, event: null, grid: 'sessions', zone: null };
 
 // the language: ?lang= in the address, else the one chosen on this device, else the browser's
 function useLang(l, keep) {
@@ -405,7 +406,8 @@ function sheetView() {
     '<div class="row rel" id="content-row">' + lab(tr('Content'), 20) + sh.mesos.map((m, i) =>
       '<button class="content mono" data-act="edit-meso" data-v="' + i + '" style="' + width(m) + '">' + (m.zones.length ? m.label : '–') + '</button>').join('') + mesoHandles + '</div>' +
     '<div class="row">' + lab(tr('Microcycle'), 26) + per(w => '<button class="swk mono' + on(w) + flagged(w) + '" data-act="week" data-v="' + w.n + '" aria-label="' + tr('Week {0}', w.n) + '">' + w.n + '</button>') + '</div>' +
-    '<div class="row">' + lab(tr('Type'), 22) + per(w => '<button class="sty mono' + on(w) + (w.hand ? ' hand' : '') + '" data-act="week" data-v="' + w.n + '" aria-label="' + tr('Week {0} type', w.n) + '"' + (w.hand ? ' title="' + tr('Set by hand') + '"' : '') + '>' + (w.type || '') + '</button>') + '</div>' +
+    // the Type label opens the card of the week types, as a zone name opens its card
+    '<div class="row"><button class="lab zlab" data-tip="types" style="height:22px"><u>' + tr('Type') + '</u></button>' + per(w => '<button class="sty mono' + on(w) + (w.hand ? ' hand' : '') + '" data-act="week" data-v="' + w.n + '" aria-label="' + tr('Week {0} type', w.n) + '"' + (w.hand ? ' title="' + tr('Set by hand') + '"' : '') + '>' + (w.type || '') + '</button>') + '</div>' +
     '<div class="row">' + lab(tr('Load %'), 60) + per(w => '<button class="sld' + on(w) + '" data-act="week" data-v="' + w.n + '" aria-label="' + (w.load === null ? tr('Week {0} load not set', w.n) : tr('Week {0} load {1} percent', w.n, w.load)) + '"' + (w.load === null ? '' : ' title="' + w.load + '%"') + '><span style="height:' + Math.round((w.load || 0) * 0.56) + 'px"></span></button>') + '</div>' +
     '<div class="row">' + lab(tr('Km'), 20) + per(w => kmCell(w, km.weeks[w.n - 1])) +
     '<div class="capsum mono" title="' + seasonTip + '">' + Math.round(se.done + se.planned) + (se.yearly === null ? '' : ' / ' + se.yearly) + '</div></div>' +
@@ -439,10 +441,11 @@ function sheetView() {
     // each piece with a zone, and its other unit
     const other = session.pieces.map(x => x.text + ' ≈ ' + x.approx).join(' · ');
     const c = zc(session.main);
-    right = '<div class="ed-col"><div class="eyebrow">' + tr('Session') + '</div><div class="when">' + tr(DAYS[wk.days.findIndex(d => d.date === session.date)]) + ' ' + shortDate(session.date) + ' · ' + slotName(session.slot) + '</div>' +
+    right = '<div class="ed-col' + (ctx.sug ? ' asking' : '') + '"><div class="eyebrow">' + tr('Session') + '</div><div class="when">' + tr(DAYS[wk.days.findIndex(d => d.date === session.date)]) + ' ' + shortDate(session.date) + ' · ' + slotName(session.slot) + '</div>' +
       '<div class="fld"><span>' + tr('Main zone') + '</span><div class="inf"><b class="zpill" style="background:' + c.bg + ';color:' + c.fg + '">' + (session.main || '–') + '</b><small>' + esc(work.join(' · ')) + (other ? '<span class="mono other">' + esc(other) + '</span>' : '') + '</small></div></div>' +
       (doubts.length ? '<div class="chks" data-id="s-checks">' + doubts.map(t => '<div>' + esc(t) + '</div>').join('') + '</div>' : '') +
       '<label class="fld f-plan"><span>' + tr('Plan') + '</span><textarea class="mono plan" data-input="text" data-fid="s-text" spellcheck="false">' + esc(session.text) + '</textarea></label>' +
+      suggested() +
       '<label class="fld f-notes"><span>' + tr('Notes') + '</span><textarea data-input="notes" data-fid="s-notes">' + esc(session.notes) + '</textarea></label>' +
       '<div class="pop-r"><label class="inline"><span>' + tr('Place') + '</span><select data-change="place" data-fid="s-place">' + PLACES.map(x => '<option value="' + x + '"' + (x === session.place ? ' selected' : '') + '>' + placeName(x) + '</option>').join('') + '</select></label>' +
       '<label class="inline"><input type="checkbox" data-change="notdone" data-fid="s-notdone"' + (session.notDone ? ' checked' : '') + '><span>' + tr('Not done') + '</span></label>' +
@@ -459,6 +462,20 @@ function sheetView() {
     '<div class="sx" style="flex:1 1 auto;display:flex"><div class="days">' + days + '</div></div></div>' +
     '<div class="panel right">' + right + '</div></div>';
   return top + lower;
+}
+
+// the sessions suggested for the selected session while it has no work written: the band's zones, the
+// ones the week is missing in bold, then one row each; a zone lists every suggestion of that zone
+function suggested() {
+  const g = ctx.sug;
+  if (!g) return '';
+  const rows = g.list.map((x, i) => {
+    const c = zc(x.main);
+    return '<button class="sug-r" data-act="sug" data-v="' + i + '"' + (x.notes ? ' title="' + esc(x.notes) + '"' : '') + '><b style="background:' + c.bg + ';color:' + c.fg + '">' + (x.main || placeName(x.place)) + '</b>' +
+      '<span class="mono">' + esc(x.text) + '</span><small>' + (x.min > 0 ? minutesText(x.min) : '') + '</small></button>';
+  }).join('');
+  const zones = g.typed ? '' : '<div class="sug-z">' + g.zones.map(z => '<button class="segb' + (z.missing ? ' need' : '') + (state.zone === z.zone ? ' on' : '') + '" data-act="sug-zone" data-v="' + z.zone + '">' + z.zone + '</button>').join('') + '</div>';
+  return '<div class="sug" data-id="sug">' + zones + '<div class="sug-l">' + rows + '</div></div>';
 }
 
 // the edit panel under a block
@@ -558,13 +575,13 @@ function eventsView() {
 // open, so that it can be scrolled and read, until a click elsewhere or Escape -----------
 
 const tipEl = document.getElementById('tip');
-let pinned = null;   // the zone whose card was clicked open
+let pinned = null;   // the card that was clicked open: a zone, or "types"
 function hideTip() { tipEl.hidden = true; }
 function unpin() { pinned = null; tipEl.classList.remove('pinned'); hideTip(); }
 function showTip(el) {
-  const card = data ? zoneCard(el.dataset.tip, data.tables) : null;
+  const card = !data ? null : el.dataset.tip === 'types' ? typesCard(data.tables) : zoneCard(el.dataset.tip, data.tables);
   if (!card) return;
-  tipEl.innerHTML = '<h4><i style="background:' + Z[card.zone].bg + '"></i>' + card.zone + ' · ' + esc(card.name) + '</h4><p>' + esc(card.what) + '</p><dl>' +
+  tipEl.innerHTML = (card.zone ? '<h4><i style="background:' + Z[card.zone].bg + '"></i>' + card.zone + ' · ' + esc(card.name) + '</h4><p>' + esc(card.what) + '</p>' : '<h4>' + esc(card.name) + '</h4>') + '<dl>' +
     card.rows.map(([label, v]) => '<dt>' + esc(label) + '</dt><dd>' + (Array.isArray(v) ? '<ul>' + v.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul>' : esc(v)) + '</dd>').join('') +
     '</dl>';
   tipEl.hidden = false;
@@ -605,6 +622,7 @@ function render() {
   const held = fid ? { value: a.value, from: a.selectionStart, to: a.selectionEnd, top: a.scrollTop } : null;
   const scroll = {};
   for (const el of root.querySelectorAll('[data-scroll]')) scroll[el.dataset.scroll] = el.scrollLeft;
+  const was = document.getElementById('app'), down = was ? was.scrollTop : 0;
 
   const plan = usable(data) ? planOf(data, state.plan) : null;
   if (!plan || !plan.bands.length) {
@@ -617,7 +635,18 @@ function render() {
   const today = now(), sh = sheet(data, plan.id, today), wk = weekView(data, plan.id, state.week, today);
   const mine = wk.days.flatMap(d => d.sessions).filter(s => s.band === state.band);
   ctx = { today, plan, sh, wk, session: mine.find(s => sessionKey(s) === state.sel) || mine[0] || null, km: kmView(data, plan.id, state.band, today), grid: gridView(data, plan.id, state.band, today), checks: checksView(data, plan.id, state.band, today) };
+  // a session with no work written yet is offered suggestions; words typed in it narrow them
+  const sn = ctx.session;
+  ctx.sug = null;
+  if (sn && !sn.main && !sn.unzoned) {
+    const r = suggestions(data, plan.id, state.band, sn.date, sn.slot, today, { place: sn.place, query: sn.text, zone: sn.text.trim() ? null : state.zone });
+    if (r.list.length || !sn.text.trim()) ctx.sug = { ...r, typed: !!sn.text.trim() };
+  }
   root.innerHTML = header() + '<div id="app">' + (state.view === 'events' ? eventsView() : sheetView()) + '</div>' + popover() + problemsPanel();
+
+  // the page stays scrolled where it was
+  const app = document.getElementById('app');
+  if (app && down) app.scrollTop = down;
 
   const pop = document.getElementById('pop');
   if (pop) {
@@ -711,13 +740,26 @@ document.addEventListener('click', e => {
     const n = act === 'week' ? +v : state.week + (act === 'prev' ? -1 : 1);
     if (n !== state.week && n >= 1 && n <= data.season.weeks) { state.week = n; state.sel = null; reveal = true; }
   }
-  else if (act === 'pick') state.sel = v;
+  else if (act === 'pick') { state.sel = v; state.zone = null; }
+  else if (act === 'sug-zone') state.zone = state.zone === v ? null : v;
+  else if (act === 'sug') {
+    // the suggestion's text goes into the session, to be changed there like any other
+    const x = ctx.sug && ctx.sug.list[+v], sn = ctx.session;
+    if (x && sn) {
+      state.zone = null;
+      change([planFiles(ctx.plan.id).sessions], () => setPlan(edits.putSession(ctx.plan, { ...sn, text: x.text, place: x.place, notes: sn.notes || x.notes })));
+      const ta = document.querySelector('[data-fid="s-text"]');
+      if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+    }
+    return;
+  }
   else if (act === 'edit-meso') { state.edit = { kind: 'meso', i: +v, week: weekAt(e, t, ctx.sh.mesos[+v]) }; state.problems = false; }
   else if (act === 'edit-macro') { state.edit = { kind: 'macro', i: +v, week: weekAt(e, t, ctx.sh.macros[+v]) }; state.problems = false; }
   else if (/^m-|^mac-/.test(act)) { planAct(act, v); return; }
   else if (act === 'add') {
     const s = { date: t.dataset.date, slot: v, band: state.band, place: 'water', text: '', notes: '' };
     state.sel = sessionKey(s);
+    state.zone = null;
     if (change([planFiles(ctx.plan.id).sessions], () => setPlan(edits.putSession(ctx.plan, s)))) {
       const ta = document.querySelector('[data-fid="s-text"]');
       if (ta) ta.focus();
@@ -809,6 +851,13 @@ document.addEventListener('input', e => {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && pinned) unpin();
   if (e.key === 'Escape' && (state.edit || state.problems)) { state.edit = null; state.problems = false; render(); }
+  // the arrows go from the plan text into the suggestions and along them
+  const row = e.target.closest ? e.target.closest('.sug-r') : null, inText = e.target.dataset && e.target.dataset.input === 'text';
+  if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && (row || (inText && ctx && ctx.sug))) {
+    const rows = [...document.querySelectorAll('.sug-r')], i = rows.indexOf(row) + (e.key === 'ArrowDown' ? 1 : -1);
+    const to = i < 0 ? document.querySelector('[data-fid="s-text"]') : rows[i];
+    if (to && (row || e.key === 'ArrowDown')) { e.preventDefault(); to.focus(); }
+  }
   // the plan text is one line
   if (e.key === 'Enter' && e.target.dataset && e.target.dataset.input === 'text') e.preventDefault();
 });

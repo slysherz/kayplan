@@ -12,7 +12,7 @@ test('the fixture loads without problems', async () => {
   assert.deepEqual(data.errors, []);
   assert.deepEqual(data.plans.map(p => [p.id, p.name, p.bands]), [['group-a', 'Group A', ['older', 'younger']], ['group-b', 'Group B', ['masters']]]);
   assert.deepEqual(e.check(data, '2026-01-21'), []);
-  assert.equal(Object.keys(data.revs).length, 11);
+  assert.equal(Object.keys(data.revs).length, 12);
 });
 
 test('plans come in the order season.txt lists them, the rest after by id', async () => {

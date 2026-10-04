@@ -134,7 +134,7 @@ body.dragging { cursor: col-resize; user-select: none; }
 .pop-acts .b:disabled { background: transparent; }
 
 /* the selected week */
-.lower { flex: 1 1 auto; min-height: 380px; display: flex; gap: 12px; padding: 12px 16px 16px; }
+.lower { flex: 1 0 auto; min-height: 600px; display: flex; gap: 12px; padding: 12px 16px 16px; }
 .lower .left { flex: 3 1 0; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 .lower .right { flex: 2 1 0; min-width: 320px; }
 .nav { width: 40px; height: 40px; border: 1px solid #C5CDD5; border-radius: 4px; background: #FFFFFF; font-size: 16px; line-height: 1; }
@@ -169,9 +169,27 @@ select { height: 40px; border: 1px solid #C5CDD5; border-radius: 4px; background
 .zpill { flex-shrink: 0; min-width: 48px; text-align: center; padding: 6px 10px; border-radius: 4px; font-size: 15px; font-weight: 600; }
 .del { height: 44px; padding: 0 16px; border: 1px solid #C5CDD5; border-radius: 4px; background: #FFFFFF; color: #8E1B21; font-weight: 500; }
 .ed-col { display: flex; flex-direction: column; gap: 10px; padding: 14px; height: 100%; }
-.ed-col .f-plan { flex: 2 1 0; }
-.ed-col .f-notes { flex: 1 1 0; }
+/* the plan text and the suggestions share one space of a fixed size, so nothing under them moves */
+.ed-col .f-plan { flex: 1 1 0; min-height: 0; }
+.ed-col .f-plan textarea { min-height: 44px; }
+.ed-col .f-notes { flex: 0 0 auto; }
+.ed-col .f-notes textarea { flex: 0 0 auto; height: 64px; min-height: 64px; }
 .ed-col .pop-r { justify-content: space-between; }
+.ed-col.asking .f-plan { flex: 0 0 auto; }
+.ed-col.asking .f-plan textarea { flex: 0 0 auto; height: 44px; }
+.sug { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
+.sug-l { flex: 0 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; border: 1px solid #D8DEE4; border-radius: 4px; }
+.sug-l:empty { display: none; }
+.sug-r { display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 4px 8px; border: 0; border-bottom: 1px solid #D8DEE4; background: #FFFFFF; text-align: left; color: #16202A; flex-shrink: 0; }
+.sug-r:last-child { border-bottom: 0; }
+.sug-r:hover, .sug-r:focus { background: #F3F5F7; outline: 0; }
+.sug-r b { flex-shrink: 0; width: 38px; text-align: center; padding: 2px 0; border-radius: 3px; font-size: 11px; font-weight: 600; }
+.sug-r span { flex: 1 1 auto; min-width: 0; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sug-r small { flex-shrink: 0; font-size: 11px; color: #52606D; }
+.sug-z { display: flex; gap: 0; align-self: flex-start; border: 1px solid #C5CDD5; border-radius: 4px; overflow: hidden; flex-shrink: 0; }
+.sug-z .segb { color: #52606D; }
+.sug-z .segb.need { color: #16202A; font-weight: 700; }
+.sug-z .segb.on { color: #FFFFFF; }
 .ed-col .pop-r .del { margin-left: auto; }
 
 /* the races and events table */

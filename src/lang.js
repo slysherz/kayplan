@@ -88,6 +88,13 @@ export const PT = {
   "Competition: load, activation, race": "Competição: carga, ativação, prova",
   "Recovery only": "Só recuperação",
   "Not planned": "Por planear",
+  "Microcycle types": "Tipos de microciclo",
+  "Prepares for the next level of load or the next mesocycle, with reduced load.": "Prepara para o nível de carga seguinte ou para o mesociclo seguinte, com carga reduzida.",
+  "Enough volume to improve, without exhausting the athlete.": "Volume suficiente para melhorar, sem esgotar o atleta.",
+  "The highest stimulus: development sessions without full recovery between them.": "O estímulo máximo: sessões de desenvolvimento sem recuperação completa entre elas.",
+  "Regeneration: low volume and intensity.": "Regeneração: volume e intensidade baixos.",
+  "Before an important race: full recovery, low volume, high intensity, modelling the race.": "Antes de uma prova importante: recuperação completa, volume baixo, intensidade alta, simulação da prova.",
+  "The race week: the race, supplementary sessions and recovery.": "A semana da prova: a prova, sessões complementares e recuperação.",
   // the cycle panels
   "Name": "Nome",
   "Load pattern": "Padrão de carga",

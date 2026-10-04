@@ -470,6 +470,33 @@ export function parseSessions(source) {
   return { value, errors };
 }
 
+// ---- library.txt ------------------------------------------------------------
+// R2: 3x(4'-6'-6'-4'/1')/3'
+//   a note
+// gym: 4-6 exercises, 2-3x 10-15 reps
+//
+// The sessions that are suggested for an empty slot, shared by every plan and band. A line is the
+// plan text as in a session; "pool:", "gym:" or "land:" in front when it is not on the water.
+// Indented lines are notes. The order of the lines is the order they are suggested in.
+
+export function parseLibrary(source) {
+  const { blocks, errors } = readBlocks(source);
+  const value = blocks.map(b => {
+    const m = /^(pool|gym|land):\s*(.*)$/.exec(b.head);
+    return { place: m ? m[1] : 'water', text: (m ? m[2] : b.head).replace(/\s+/g, ' ').trim(), notes: b.sub.map(s => s.text).join('\n'), line: b.line };
+  });
+  return { value, errors };
+}
+
+export function serializeLibrary(library) {
+  const lines = [];
+  for (const s of library) {
+    lines.push((s.place && s.place !== 'water' ? s.place + ': ' : '') + s.text);
+    for (const n of String(s.notes || '').split(/\r?\n/)) { if (n.trim()) lines.push('  ' + n.trim()); }
+  }
+  return text(lines);
+}
+
 export function sessionKey(s) {
   return s.date + ' ' + s.slot + ' ' + s.band;
 }

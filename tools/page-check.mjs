@@ -76,7 +76,7 @@ try {
   ok('opens on the current week; today is marked; types follow the patterns, the hand-set one is marked; km row');
 
   // the capacity grid: always a row for each zone
-  assert.deepEqual(await ff.js('return [...document.querySelectorAll(".zlab")].map(b => b.dataset.tip)'), ['R1', 'R2', 'R3', 'R3+', 'R4', 'R5', 'R6', 'R7']);
+  assert.deepEqual(await ff.js('return [...document.querySelectorAll(".zlab:not([data-tip=types])")].map(b => b.dataset.tip)'), ['R1', 'R2', 'R3', 'R3+', 'R4', 'R5', 'R6', 'R7']);
   assert.deepEqual(await ff.js('return [...document.querySelectorAll(".zlab.off")].map(b => b.dataset.tip)'), ['R4']);   // juniors: every zone but R4
   const cell = (zone, week) => '.zlab[data-tip="' + zone + '"] ~ .cap[data-v="' + week + '"]';
   assert.equal(await text(cell('R1', 1)), '1');
@@ -108,6 +108,12 @@ try {
   assert.equal(await ff.js('const t = document.getElementById("tip"); return !t.hidden && t.classList.contains("pinned") && t.getBoundingClientRect().bottom <= window.innerHeight'), true);
   await shot('01-zone-card-open');
   await ff.keys(ff.ESCAPE);
+  assert.equal(await ff.js('return document.getElementById("tip").hidden'), true);
+  // the Type label opens the card of the week types
+  await ff.hover('.zlab[data-tip="types"]');
+  assert.match(await text('#tip'), /^Microcycle typesI · 60%Introductory\. Prepares[^]*CH · 100%Shock\. The highest stimulus[^]*CT · 40%Competition\. The race week/);
+  await shot('01-types-card');
+  await ff.hover('.tab');
   assert.equal(await ff.js('return document.getElementById("tip").hidden'), true);
   await ff.click('.zlab[data-tip="R7"]');
   assert.match(await text('#tip'), /R7 · Competition pace[^]*Kinds of work[^]*Simulation series/);
@@ -433,7 +439,7 @@ try {
   assert.equal(await status(), '');
   assert.equal(await ff.js('return document.querySelector("[data-fid=w-load]").disabled'), true);
   // the grid is there before anything is planned
-  assert.equal(await count('.zlab'), 8);
+  assert.equal(await count(".zlab:not([data-tip=types])"), 8);
   assert.equal(await count('.lab .segb'), 2);
   await shot('09-unplanned');
   await ff.click('.meso[data-v="0"]');
@@ -548,12 +554,73 @@ try {
   assert.equal(await count('.chks'), 0);
   ok('checks: a session and a week say what the course would question; the course notation is read');
 
+  // ================= suggestions =================
+  fresh();
+  await open('plan=juniors&band=junior&week=7');
+  const rows = () => ff.js('return [...document.querySelectorAll(".sug-r")].map(r => [r.querySelector("b").textContent, r.querySelector("span").textContent, r.querySelector("small").textContent])');
+  assert.equal(await count('.sug'), 0);
+  await ff.click('.day:nth-child(2) .add[data-v="pm"]');
+  // week 7 is in the block R2 and has no session: R2 first, with the session it had last time, then one of each zone
+  assert.deepEqual(await rows(), [
+    ['R2', "1km R1 + 8x 4' R2/1'R0 + 1km R1", "32'"], ['R1', '6km R1', "38'"], ['R3', "R3: 4x(3x 2'/30'')/6'", "24'"], ['R6', "R6: 3x(3x 50/3')/6'", "2'"], ['R2', "R2: 3x(4'-6'-6'-4'/1')/3'", "60'"]]);
+  assert.deepEqual(await ff.js('return [...document.querySelectorAll(".sug-z .segb")].map(b => b.textContent + (b.classList.contains("need") ? "!" : ""))'), ['R1', 'R2!', 'R3', 'R3+', 'R5', 'R6', 'R7']);
+  await ff.js('const a = document.getElementById("app"); a.scrollTop = a.scrollHeight;');
+  await shot('09-suggestions');
+  // the fields under the list stay where they are, with five rows, with one, and with a session written
+  const below = () => ff.js('return ["s-notes", "s-place"].map(f => Math.round(document.querySelector("[data-fid=" + f + "]").getBoundingClientRect().top)).concat(Math.round(document.querySelector(".zpill").getBoundingClientRect().top))');
+  const at = await below();
+  // a zone lists every suggestion of that zone; clicking it again goes back
+  await ff.click('.sug-z [data-v="R2"]');
+  assert.deepEqual((await rows()).map(r => r[1]), ["1km R1 + 8x 4' R2/1'R0 + 1km R1", "R2: 3x(4'-6'-6'-4'/1')/3'", "R2: 2x(4x 5'/1')/3'"]);
+  assert.equal(await count('.sug-z .segb.on'), 1);
+  await ff.click('.sug-z [data-v="R3"]');
+  assert.deepEqual((await rows()).map(r => r[1]), ["R3: 4x(3x 2'/30'')/6'"]);
+  assert.deepEqual(await below(), at);
+  await shot('09-suggestions-one');
+  // using one writes its text into the session, where it is changed like any other
+  await ff.click('.sug-r');
+  assert.equal(await value('[data-fid=s-text]'), "R3: 4x(3x 2'/30'')/6'");
+  assert.equal(await ff.js('return document.activeElement.dataset.fid'), 's-text');
+  assert.equal(await text('.zpill'), 'R3');
+  assert.equal(await count('.sug'), 0);
+  assert.deepEqual(await below(), at);
+  await shot('09-suggestions-used');
+  await ff.keys(' + 2km R1');
+  await saved();
+  assert.match(file('plans/juniors/sessions.txt'), /^2026-11-10 pm junior: R3: 4x\(3x 2'\/30''\)\/6' \+ 2km R1$/m);
+  // the next morning an R3 session would be too close: it is not among the first
+  await ff.click('.day:nth-child(3) .add[data-v="am"]');
+  assert.ok(!(await rows()).some(r => r[0] === 'R3'));
+  // words narrow the list, in any place; the place and the notes come with the session
+  await ff.keys('gym');
+  assert.deepEqual(await rows(), [['Gym', '4-6 exercises, 2-3x 10-15 reps', '']]);
+  assert.equal(await count('.sug-z'), 0);
+  await ff.click('.sug-r');
+  await saved();
+  assert.equal(await value('[data-fid=s-place]'), 'gym');
+  assert.equal(await value('[data-fid=s-notes]'), 'tempo 2:2');
+  assert.match(file('plans/juniors/sessions.txt'), /^2026-11-11 am junior gym: 4-6 exercises, 2-3x 10-15 reps\n  tempo 2:2$/m);
+  // the arrows go from the text into the list, and Enter takes the row
+  await ff.click('.day:nth-child(5) .add[data-v="pm"]');
+  await ff.keys(ff.DOWN + ff.DOWN);
+  assert.equal(await ff.js('return [...document.querySelectorAll(".sug-r")].indexOf(document.activeElement)'), 1);
+  const second = (await rows())[1][1];
+  await ff.keys(ff.ENTER);
+  await saved();
+  assert.equal(await value('[data-fid=s-text]'), second);
+  assert.equal(await count('.sug'), 0);
+  // a session with its work written offers nothing; emptied, it offers again
+  await selectAll('[data-fid=s-text]');
+  await ff.keys('r1');
+  assert.ok((await rows()).every(r => /R1/.test(r[1])));
+  ok('suggestions: the week\'s missing zone first, a zone on request, words narrow them, one click fills the session');
+
   // ================= in Portuguese =================
   fresh();
   await open('plan=juniors&week=6', '2026-11-18', 'pt');
   assert.equal(await ff.js('return document.documentElement.lang'), 'pt-PT');
   assert.deepEqual(await ff.js('return [...document.querySelectorAll(".tab, header > .b")].map(b => b.textContent)'), ['Plano', 'Eventos', 'Hoje']);
-  assert.deepEqual(await ff.js('return [...document.querySelectorAll(".sheet .row > div.lab")].map(l => l.textContent).slice(0, 10)'), ['Mês', 'Segunda', 'Provas', 'Macrociclo', 'Mesociclo', 'Conteúdo', 'Microciclo', 'Tipo', 'Carga %', 'Km']);
+  assert.deepEqual(await ff.js('return [...document.querySelectorAll(".sheet .row > .lab")].map(l => l.textContent).slice(0, 10)'), ['Mês', 'Segunda', 'Provas', 'Macrociclo', 'Mesociclo', 'Conteúdo', 'Microciclo', 'Tipo', 'Carga %', 'Km']);
   assert.equal(await text('.month'), 'Set');
   assert.match(await text('.lower .sec-h b'), /Semana 6/);
   assert.match(await text('.lower .sec-h .muted'), /2 Nov – 8 Nov/);

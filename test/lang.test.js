@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { tr, dec, setLang, getLang, PT } from '../src/lang.js';
-import { ZINFO, zoneCard } from '../src/zones.js';
+import { ZINFO, TYPEINFO, zoneCard, typesCard } from '../src/zones.js';
 import { MONTHS, DAYS, shortDate } from '../src/dates.js';
 import { distanceText } from '../src/notation.js';
 import * as cycles from '../src/cycles.js';
@@ -18,6 +18,7 @@ function texts() {
     for (const m of src.matchAll(/\btr\(\s*('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")/g)) found.add(new Function('return ' + m[1])());
   }
   for (const z of Object.values(ZINFO)) for (const [k, v] of Object.entries(z)) { if (k !== 'recovery') for (const x of [].concat(v)) found.add(x); }
+  for (const t of Object.values(TYPEINFO)) { found.add(t.name); found.add(t.what); }
   for (const x of [...MONTHS, ...DAYS]) found.add(x);
   return found;
 }
@@ -60,6 +61,7 @@ test('the language in use decides the words and the decimal mark', () => {
     assert.equal(row('Por semana'), 'Desenvolver: 2–4 sessões. Manter: 1. Contado em conjunto com R5. Recuperação depois de uma sessão: 48–72 h.');
     assert.equal(row('Escalões'), 'Só Seniores.');
     assert.equal(row('Perde-se'), 'Cerca de 18 ± 4 dias sem treino.');
+    assert.deepEqual(typesCard(parseTables(TABLES).value).rows[2], ['CH · 100%', 'Choque. O estímulo máximo: sessões de desenvolvimento sem recuperação completa entre elas.']);
     assert.equal(zoneCard('R4', parseTables(TABLES + 'zone-km older  R4 35.2\n').value).rows.pop()[1], 'older 35,2');
     setLang('xx');
     assert.equal(getLang(), 'en');

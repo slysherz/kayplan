@@ -22,7 +22,7 @@ export function planFiles(id) {
 // Read every file. Problems in the files are collected in errors, not thrown.
 // revs holds each file's revision as read, for saving it back.
 export async function load(store) {
-  const data = { season: null, tables: null, events: [], plans: [], errors: [], revs: {} };
+  const data = { season: null, tables: null, events: [], library: [], plans: [], errors: [], revs: {} };
   async function file(path, parse) {
     const f = await store.read(path);
     data.revs[path] = f ? f.rev : null;
@@ -33,8 +33,8 @@ export async function load(store) {
   }
   const paths = await store.list();
   const ids = [...new Set(paths.map(p => /^plans\/([^/]+)\//.exec(p)).filter(Boolean).map(m => m[1]))].sort();
-  [data.season, data.tables, data.events] = await Promise.all([
-    file('season.txt', format.parseSeason), file('tables.txt', format.parseTables), file('events.txt', format.parseEvents)
+  [data.season, data.tables, data.events, data.library] = await Promise.all([
+    file('season.txt', format.parseSeason), file('tables.txt', format.parseTables), file('events.txt', format.parseEvents), file('library.txt', format.parseLibrary)
   ]);
   // plans in the order season.txt lists them; any it does not list come after, by id
   const order = data.season ? data.season.plans : [];

@@ -27,6 +27,23 @@ function short(sec) {
 // a session that needs two days before the next one like it (48 h or more)
 const hard = (tables, s) => hoursOf(tables, s.main) >= 48;
 
+// the content a zone is counted in (R3 and R3+ together, R4 and R5 together)
+const contentOf = (tables, z) => Object.keys(tables.develop).find(key => key.split('-').includes(z)) || z;
+
+// The hours two sessions should be apart and are not, a before b (the recovery table): 48 after a
+// session that needs 48 h or more, 24 for the same content twice in a day. 0 when they are far enough.
+export function tooClose(a, b, tables) {
+  const days = daysBetween(a.date, b.date);
+  if (hard(tables, a) && hard(tables, b) && days < 2) return 48;
+  if (days === 0 && a.main && contentOf(tables, a.main) === contentOf(tables, b.main) && hoursOf(tables, a.main) >= 24) return 24;
+  return 0;
+}
+
+// volume in the morning and quality in the afternoon of the same day (slide 196)
+export function wrongHalf(am, pm) {
+  return ORDER[am.main] === 2 && ORDER[pm.main] < 2;
+}
+
 // "Tue AM (R3)"
 function named(s) {
   return tr(DAYS[weekday(s.date)]) + ' ' + (s.slot === 'am' ? tr('AM') : tr('PM')) + ' (' + s.main + ')';
@@ -112,7 +129,7 @@ export function checksView(data, planId, band, today) {
   const all = sortSessions(plan.sessions.filter(s => s.band === band && !s.notDone), plan.bands).map(s => sessionView(data, s, today));
   const races = eventsFor(data, planId, today).filter(e => e.kind === 'race' && e.importance <= 2);
   const allowed = tables.zones[band];
-  const contentOf = z => Object.keys(tables.develop).find(key => key.split('-').includes(z)) || z;
+  const content = z => contentOf(tables, z);
 
   return sh.weeks.map(wk => {
     const list = all.filter(s => weekOf(data.season, s.date) === wk.n);
@@ -124,16 +141,15 @@ export function checksView(data, planId, band, today) {
     for (const b of list) {
       for (const a of all) {
         if (a === b || a.date > b.date || (a.date === b.date && a.slot >= b.slot)) continue;
-        const days = daysBetween(a.date, b.date);
-        if (hard(tables, a) && hard(tables, b) && days < 2) week.push(tr('{0} and {1} are less than {2} h apart', named(a), named(b), 48));
-        else if (days === 0 && a.main && contentOf(a.main) === contentOf(b.main) && hoursOf(tables, a.main) >= 24) week.push(tr('{0} and {1} are less than {2} h apart', named(a), named(b), 24));
+        const hours = tooClose(a, b, tables);
+        if (hours) week.push(tr('{0} and {1} are less than {2} h apart', named(a), named(b), hours));
       }
     }
 
     // quality in the morning, volume in the afternoon (slide 196)
     for (const pm of list.filter(s => s.slot === 'pm')) {
       const am = list.find(s => s.date === pm.date && s.slot === 'am');
-      if (am && ORDER[am.main] === 2 && ORDER[pm.main] < 2) week.push(tr('{0} before {1}: the quality session is recommended in the morning', named(am), named(pm)));
+      if (am && wrongHalf(am, pm)) week.push(tr('{0} before {1}: the quality session is recommended in the morning', named(am), named(pm)));
     }
 
     // race-pace sessions in the week (the race-pace table)
@@ -147,9 +163,9 @@ export function checksView(data, planId, band, today) {
 
     // a content of the block that has no session in a week with sessions
     if (meso && list.length && wk.type !== 'R') {
-      const keys = [...new Set(meso.zones.filter(z => !allowed || allowed.includes(z)).map(contentOf))];
+      const keys = [...new Set(meso.zones.filter(z => !allowed || allowed.includes(z)).map(content))];
       for (const key of keys) {
-        if (!list.some(s => s.main && contentOf(s.main) === key)) week.push(tr("{0} is the block's content and has no session this week", key));
+        if (!list.some(s => s.main && content(s.main) === key)) week.push(tr("{0} is the block's content and has no session this week", key));
       }
     }
 

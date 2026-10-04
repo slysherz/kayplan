@@ -5,7 +5,7 @@ Kayplan is a tool for one kayak coach to plan a club's training season. [DESIGN.
 ## Rules
 
 1. **No athlete names, ever.** No name, first name or initials of an athlete goes into any file in this folder, into test data, or into a commit message. The athletes are children and this folder becomes a GitHub repository. The plan is written for plans and age bands, never for individuals. The roster is in the coach's notes at `../provas.md`, outside this folder: read it if needed, copy nothing personal from it. Before every commit run `bash tools/check-names.sh`, which searches this folder and the commit messages for the roster's first names.
-2. **Levels.** The tool is built in three levels (DESIGN.md 2.1), and a level is only started when the coach says the one above works. Level 1 is accepted. Level 2 is being built in steps the coach tries one at a time (see State). Do not add anything from level 3 (scaling, blueprints, generated plans) or from DESIGN.md section 9. Prefer a small thing that is right.
+2. **Levels.** The tool is built in three levels (DESIGN.md 2.1), and a level is only started when the coach says the one above works. Level 1 is accepted. Level 2 is being built in steps the coach tries one at a time (see State). Session suggestions (DESIGN.md 8.4) were asked for by the coach on 2026-10-03 and are built. Do not add anything else from level 3 (scaling, generated plans) or from DESIGN.md section 9 unless the coach asks. Prefer a small thing that is right.
 3. **The screen stays calm.** The neutral palette and plain text cells of layout B in [mockups/level1-layouts.html](mockups/level1-layouts.html). No explanatory text on the page, no new colours, no icons.
 4. **One engine.** Everything worked out from the plan is computed in `src/` and used by both the page and the command line. Nothing is computed only in the page's code.
 5. **As few dependencies as possible.** There are none so far: plain JavaScript modules, Node's built-in test runner.
@@ -21,6 +21,7 @@ Built:
 - **Level 2, step 2: the capacity grid** (DESIGN.md 7.1). Under the Km row, one row per zone and one cell per week, showing sessions or km with a switch. A sessions cell is shaded developing, maintaining or below maintenance by the course's sessions a week. Hovering or focusing a zone name opens its card.
 - **Level 2, step 3: checks of sessions and weeks** (the coach asked for these from DESIGN.md section 9 on 2026-10-02). What the course would question about a session (a zone not for that age, the order of contents, repetition length, rest, too much of a zone, R3 before the warm-up is done) and about a week (hard sessions under 48 h apart, quality in the afternoon, too many R7 sessions, a block content with no session, intensity in a recovery week, the days around a race, the taper). They are words on the page and in `show week` and `show checks`; nothing is refused. The season-level checks of section 9 (order of blocks, residual effects before a race, build times) were offered and turned down.
 - **Zone cards from the course reference** (`docs/course-reference.md`): intensity markers, place in the session and the season, kinds of work for R6 and R7, the resisted variants inside each card, km a year per category. A click keeps a card open.
+- **Session suggestions** (DESIGN.md 8.4, asked for by the coach on 2026-10-03): `season/library.txt` holds sessions shared by every plan and band (the coach's old sessions and the course's model sessions). A session with no work written shows a short list in its editor, filtered to the week and ordered by how likely each is to be picked (see "Rules the engine applies"). The reader understands ranges (`2-4x`, `10-20'`).
 - Tests for the engine, the command line and the server (`npm test`), and a check of the page in headless Firefox (`npm run page-check`).
 - The real 2026–27 season in `season/`: 45 weeks from Monday 28 Sep 2026, three plans, last season's races moved to the matching 2027 weekends as unconfirmed guesses.
 
@@ -50,6 +51,7 @@ src/engine.js        load, sheet, weekView, eventsFor, check, fileText
 src/km.js            km counted from sessions; the km estimate per microcycle
 src/grid.js          the capacity grid: sessions and km per zone and week, and their state
 src/checks.js        what the course would question about a session and a week
+src/suggest.js       the sessions suggested for a slot: library.txt and the band's own sessions, filtered and ordered
 src/zones.js         the zone cards: what each zone is, from the course slides
 src/lang.js          the page's words in English and Portuguese: tr(), dec(), the Portuguese table
 src/report.js        the command line's text output
@@ -74,7 +76,9 @@ node kayplan.js show season [--plan <id>]              the annual sheet as a tab
 node kayplan.js show week [n] [--plan <id>] [--band <name>]   a week's sessions with the zone working
 node kayplan.js show grid [--plan <id>] [--band <name>]   the capacity grid: sessions and km per zone and week
 node kayplan.js show checks [--plan <id>] [--band <name>]   what the course would question, week by week
+node kayplan.js show suggestions <date> <am|pm> [--plan <id>] [--band <name>] [--zone <zone>] [--find <words>] [--place <place>]   the sessions suggested for a slot
 node kayplan.js show zone <zone>                       a zone's card: what it is and how the course trains it
+node kayplan.js show types                             what each week type is for, with its load
 node kayplan.js show events                            the races and events table
 node kayplan.js check                                  errors and warnings; exit code 1 on errors
 npm test                                               engine, command line and server
@@ -229,15 +233,39 @@ Only weeks whose type was set by hand: the week's Monday, the type, and a load %
 - The zone can also be written once for a set, before it or just after its bracket (`R2 3x(4'-6'-6'-4'/1')/3'`, `3x(4'-6'/1') R2/3'`), or once for the session with a colon (`R2: 3x(4'-6'/1')/3' + 2km`). It is then the zone of the work that has none of its own; rest never takes it. A zone after the rest of a set (`…/3' R1`) is the rest's zone. The course's `×` is read as `x`.
 - Off the water, write the work in time with its zone (`3x 10' R2/3'`). It counts for the main zone, gives minutes and no km.
 
+### `season/library.txt`
+
+```
+3-4x(8' R2 + 30'' R3+)/1'30''
+60-75' R1
+  a sprint of 15-20'' every 5'
+R2: 3x(4'-6'-6'-4'/1')/3'
+gym: 4-6 exercises, 2-3x 10-15 reps, tempo 2:2
+```
+
+- The sessions that are suggested, shared by every plan and band (the coach, 2026-10-03: no age on a line). The file is optional.
+- A line is the plan text, as in a session. `pool:`, `gym:` or `land:` in front when it is not on the water. Indented lines are notes; they go into the session's notes when it has none.
+- The order of the lines is the order they are suggested in within a zone: the coach's own sessions are first, the course's model sessions after them.
+- A line on the water needs a zone to be suggested. Write the zone next to the work or once at the head (`R2:`); a zone written after the rest of a set is the rest's zone.
+- The coach's old sessions gave intensity as a percentage of capacity (`@90`). They were turned into zones when they were put here: `@70` R1, `@75` R2, `@80` R3, `@90` R3+ (R6 for 20'' with a long rest). The coach has not confirmed this yet.
+- Sessions already in a plan are not copied here: the suggestions look them up.
+
 ## Rules the engine applies
 
 - **Main zone** (`infer` in `src/notation.js`): time per zone, distances turned into time with the band's pace, divided by the zone's reference volume; the largest share wins; R0 only when no other zone appears. Rest with a zone counts toward it; rest without one counts toward nothing. An F variant (`R1F`) is read as its base zone; `R2+` as R2, `R6+` as R6; only `R3+` is its own zone.
-- **Rep ranges** `(7-10)x` count as their middle. `OU` (alternatives) is not understood.
+- **Ranges** count as their middle (the coach, 2026-10-03): `2-4x` or `(7-10)x` for a count, `10-20'`, `15-20''`, `4-6km`, `200-400m` for an amount. An amount range is a smaller bare number, then a larger one with its unit; `4'-6'`, `500-300m` and `250-300` are ladders. `OU` (alternatives) is not understood.
 - **Ladders** (`4'-6'-4' R2/1'`): each amount takes the zone written after it, or else the last zone written in the effort (`4' R2-2' R3` is 4' of R2 and 2' of R3). The rest comes after every amount, so this one has three rests.
 - **The reader keeps every effort** (`readPlan` in `src/notation.js`): its repetitions, the rest written after it, whether it is inside brackets, and what is paddled before it first comes up. The checks are worked out from these.
 - **Checks** (`sessionChecks`, `checksView` in `src/checks.js`), per age band, never for a session marked `not-done`:
   - a session: a zone not in the band's `zones` line; contents out of the course's order (R5 and R6, then R3, R3+ and R4, then R2 and R1; R1 at the start is the warm-up, R7 has no place in the order); a repetition outside `rep`; the rest after a repetition under `rest`, only for repetitions outside brackets; time in a zone over `most` times its `reference`; work of a `warm` zone starting too early (not off the water). Distances are turned into time with the band's pace.
   - a week: two sessions that both need 48 h or more on the same or the next day, or two of the same content on one day when it needs 24 h; R1 or R2 in the morning and R3 to R6 in the afternoon of one day; more R7 sessions than `race-pace` (the second number in a `comp` block); a content of the block with no session, in a week that has sessions and is not a recovery week; a recovery week with a session that needs 48 h; such a session the day before a race of importance 1 or 2, or any session the day after it; an AT or CT week with fewer sessions than the week before.
+- **Suggestions** (`suggestions` in `src/suggest.js`), for one slot of one band. The candidates are the lines of `library.txt` and the band's own sessions in the plan (not marked `not-done`, not the slot itself), each different text once.
+  - Left out: a session with a zone not in the band's `zones` line; one in another place (the water unless the session's place is set; on a day inside a `no-water` event, anything off the water); in an R week anything but R1 and R0, in an AT or CT week anything but R7, R6, R1 and R0.
+  - Order of the zones: the block's contents with fewer sessions this week than the lower end of `develop`, the one missing most first; then other zones under the lower end of `maintain`; then the rest. In an AT or CT week: R7, R6, R1.
+  - Order in a zone: the band's latest earlier session of that zone; then the others it has had, the longest ago first; then the library in the order of its lines (in I, R, AT and CT weeks the smaller first).
+  - With nothing asked, the list takes one of each zone in turn and shows five (`SHOWN`). Asking for a zone lists every suggestion of that zone whatever the week is for. Words list every suggestion containing them in its text, zone, place or notes, whatever the week and the place.
+  - A suggestion that would be too close to another session (`tooClose` in `src/checks.js`) or in the wrong half of the day (`wrongHalf`) comes after all the others.
+  - There is no scaling to the band: a suggestion is the text as written. Only the band's `zones` line keeps a session away from an age.
 - **Km of a session** (`infer`): distances as written, times at the band's pace for the zone. R0 is left out. A distance with no zone counts toward the session's total and toward no zone; a time with no zone gives no km. A session off the water gives no km: its written time counts as minutes off the water, and its distances count for nothing.
 - **Km of a week and a season** (`kmView` in `src/km.js`): the sum over the band's sessions on the water that are not marked `not-done`. Season km are split into done (sessions before today) and planned (from today on).
 - **Km estimate per microcycle** (`kmView`): yearly km × coefficient ÷ sum of all coefficients, with coefficient = load % × content factor. The content factor is (hard-session km of the content + warm-up) ÷ (the same for R2); several contents average; no content is 1. An R7 block takes its km from the race it is aimed at: the most important race inside the block, else the next one after it, else the season's last race. A week that is not planned yet (no load) counts as an average planned week.
@@ -289,7 +317,9 @@ Only weeks whose type was set by hand: the week's Monday, the type, and a load %
 - **Events view:** the season runs across the top as on the sheet (Month, Monday), with one row of race and event codes for each plan, drawn by the same `raceCell` as the sheet's Races row. Clicking a code selects its entry in the table below; the selected event's code is filled like the selected week. The entry under the pointer has its code ringed in the rows above (a class put on the cells, not a redraw; `markPointed` puts it back after each draw). A race in no plan is in no row.
 - **Wording of the checks:** short, as a recommendation, with times as the coach writes them (`60'`, `1'30''`, `45''`), and never "the course gives" (the coach, 2026-10-03; their model: "R6: 60' ultrapassa máximo recomendado de 4'' a 30''").
 - **Checks:** a week where the course would question something has its number in the Microcycle row in dark red and underlined, for the selected band. The selected week lists them in words above its days, and the selected session lists its own under the main zone.
-- **Zone cards:** hovering or focusing a zone name shows its card; a click keeps it open and scrollable until Escape or a click elsewhere. A card states one value for each thing, in the same wording across zones, and never says where it comes from (no "the course", no slide, no "on another slide"): the coach asked for this on 2026-10-02. Where slides disagree the card takes the zone summary of slide 145; the sources are in the head of `src/zones.js`. Sessions per week and km a year are read from `tables.txt`, so the card and the grid show the same figures. The course's model sessions are not in the cards (the coach, 2026-10-02): they are to come as training suggestions (DESIGN.md 8.4); meanwhile they are in `docs/course-reference.md` and in a reader test in `test/notation.test.js`.
+- **Week types card:** hovering, focusing or clicking the Type row's label shows what each week type is for, with its load from the load table (`typesCard` in `src/zones.js`; `show types` prints it).
+- **Suggestions:** a selected session with no work written (no amount with or without a zone) shows the list under its plan text: the band's zones, the ones the week is missing in bold, then one row per suggestion with its main zone, text and minutes in that zone. A zone button lists that zone's suggestions; words typed in the plan text narrow the list (`r3`, `gym`); a click, or the arrow keys and Enter, puts the text, place and notes into the session, where it is saved and changed like any other. The plan text and the list share one space of a fixed size (the text is short while the list shows, and fills the space otherwise; a long list scrolls inside it), so the notes, the place and everything else in the panel stay where they are (the coach, 2026-10-03). The lower part of the page is at least 600 px high, and a redraw keeps the page scrolled where it was.
+- **Zone cards:** hovering or focusing a zone name shows its card; a click keeps it open and scrollable until Escape or a click elsewhere. A card states one value for each thing, in the same wording across zones, and never says where it comes from (no "the course", no slide, no "on another slide"): the coach asked for this on 2026-10-02. Where slides disagree the card takes the zone summary of slide 145; the sources are in the head of `src/zones.js`. Sessions per week and km a year are read from `tables.txt`, so the card and the grid show the same figures. The course's model sessions are not in the cards (the coach, 2026-10-02): they are in `season/library.txt` as suggestions.
 - **Km row:** the number in a cell is the week's estimate, and the cell fills from the bottom as the week's sessions cover it. With no estimate it shows the km from the sessions. How an estimate was worked out is in the cell's hover text.
 - **Capacity grid:** dark is developing, light is maintaining, an outline is below maintenance. A zone that is not suggested for the band's age has its name dimmed; its sessions are still counted and shaded. The Sessions/Km switch changes what the cells show, not the rows. The counts behind a shade are in the cell's hover text.
 - **Checking it.** `npm run page-check` clicks, types and drags through the page in headless Firefox on a copy of `test/page-season`, and checks the files that were saved. It leaves screenshots in a temporary folder and prints the path: look at them after changing the page. Add a step there for each new behaviour. The one-shot `firefox --screenshot` is of little use here, because it captures the page before the plan has loaded.

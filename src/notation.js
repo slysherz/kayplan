@@ -21,6 +21,8 @@ export function parsePlan(text, places) {
 //   times      how many times its own block repeats it ("8x 4'" is 8)
 //   restAfter  { sec, m, zone }: the rest written after it ("/1' R0"), or null
 //
+// A range counts as its middle: "2-4x 2'" is three times, "10-20'" is 15', "4-6km" is 5 km.
+//
 // Where the zone is written:
 //   after the work            8x 4' R2/1' R0
 //   after each amount         4' R2-6' R3
@@ -30,7 +32,9 @@ export function parsePlan(text, places) {
 export function readPlan(text, places) {
   const s = String(text || '').replace(/[‘’′´`]/g, "'").replace(/[“”″"]/g, "''");
   const landmarks = (places || []).slice().sort((a, b) => b.name.length - a.name.length);
-  const COUNT = /^(\d+)\s*[x×](?![a-z])\s*/i;
+  // "4x", or a range, "2-4x", which counts as its middle
+  const COUNT = /^(\d+)(?:\s*-\s*(\d+))?\s*[x×](?![a-z])\s*/i;
+  const times = m => m[2] ? (+m[1] + +m[2]) / 2 : +m[1];
   let pos = 0;
   function peek(re) { return re.exec(s.slice(pos)); }
   function ws() { const m = peek(/^\s+/); if (m) pos += m[0].length; }
@@ -49,6 +53,21 @@ export function readPlan(text, places) {
   }
   function amount() {
     let m;
+    // a range, "10-20'" or "4-6km": a smaller bare number, then a larger one with its unit. It counts
+    // as its middle. ("500-300" and "4'-6'" are two amounts.)
+    const mark = pos;
+    if ((m = peek(/^(\d+(?:[.,]\d+)?)\s*-\s*(?=\d+(?:[.,]\d+)?\s*(?:'|km(?![a-z])|m(?![a-z])))/i))) {
+      const lo = parseFloat(m[1].replace(',', '.'));
+      pos += m[0].length;
+      const hi = amount();
+      if (hi) {
+        const written = s.slice(mark, pos);
+        // the larger number, in the unit both are written in
+        const top = hi.sec ? (/''$/.test(written) ? hi.sec : hi.sec / 60) : /km$/i.test(written) ? hi.m / 1000 : hi.m;
+        if (lo < top) { const f = (lo + top) / 2 / top; return { sec: hi.sec * f, m: hi.m * f }; }
+      }
+      pos = mark;
+    }
     if ((m = peek(/^(\d+)\s*'(?!')\s*(?:(\d+)\s*'')?/))) { pos += m[0].length; return { sec: +m[1] * 60 + (m[2] ? +m[2] : 0), m: 0 }; }
     if ((m = peek(/^(\d+)\s*''/))) { pos += m[0].length; return { sec: +m[1], m: 0 }; }
     if ((m = peek(/^(\d+(?:[.,]\d+)?)\s*km(?![a-z])/i))) { pos += m[0].length; return { sec: 0, m: parseFloat(m[1].replace(',', '.')) * 1000 }; }
@@ -71,7 +90,7 @@ export function readPlan(text, places) {
       if (ch === '-') { pos++; continue; }
       const zz = zone();
       if (zz) { for (const r of reps) { if (!r.zone) r.zone = zz; } last = zz; continue; }
-      if ((m = peek(COUNT))) { pos += m[0].length; k *= +m[1]; continue; }
+      if ((m = peek(COUNT))) { pos += m[0].length; k *= times(m); continue; }
       const am = amount();
       if (am) { reps.push({ sec: am.sec, m: am.m, zone: null }); continue; }
       m = peek(/^[^\s+\/()]+/);
@@ -86,9 +105,9 @@ export function readPlan(text, places) {
     ws();
     // a zone written before a count or a bracket is the zone of that block's work
     const mark = pos, before = zone();
-    if (before) { ws(); if (peek(/^(\(|\d+\s*[x×](?![a-z]))/i)) zoneOf = before; else pos = mark; }
+    if (before) { ws(); if (peek(/^(\(|\d+(?:\s*-\s*\d+)?\s*[x×](?![a-z]))/i)) zoneOf = before; else pos = mark; }
     if ((m = peek(/^\(\s*(\d+)\s*-\s*(\d+)\s*\)\s*[x×]\s*/i))) { pos += m[0].length; count = (+m[1] + +m[2]) / 2; }
-    else if ((m = peek(COUNT))) { pos += m[0].length; count = +m[1]; }
+    else if ((m = peek(COUNT))) { pos += m[0].length; count = times(m); }
     ws();
     const set = s.charAt(pos) === '(';
     if (set) {

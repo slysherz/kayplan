@@ -121,6 +121,23 @@ export const ZINFO = {
   }
 };
 
+// What each week type is for (slide 186), for the card of the Type row.
+export const TYPEINFO = {
+  I: { name: 'Introductory', what: 'Prepares for the next level of load or the next mesocycle, with reduced load.' },
+  C: { name: 'Load', what: 'Enough volume to improve, without exhausting the athlete.' },
+  CH: { name: 'Shock', what: 'The highest stimulus: development sessions without full recovery between them.' },
+  R: { name: 'Recovery', what: 'Regeneration: low volume and intensity.' },
+  AT: { name: 'Activation', what: 'Before an important race: full recovery, low volume, high intensity, modelling the race.' },
+  CT: { name: 'Competition', what: 'The race week: the race, supplementary sessions and recovery.' }
+};
+
+// The card of the week types: { name, rows: [[type and load, what it is for]] }, one row for each type
+// of the load table, in its order, with its load.
+export function typesCard(tables) {
+  const rows = Object.keys(tables.load).map(t => [t + ' · ' + tables.load[t] + '%', TYPEINFO[t] ? tr(TYPEINFO[t].name) + '. ' + tr(TYPEINFO[t].what) : '']);
+  return { name: tr('Microcycle types'), rows };
+}
+
 const range = r => r[0] === r[1] ? String(r[0]) : r[0] + '–' + r[1];
 
 // The card of one zone: { zone, name, what, rows: [[label, text or list]] }, or null.

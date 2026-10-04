@@ -2,10 +2,11 @@
 
 import { DAYS, addDays, weekday } from './dates.js';
 import { minutesText, amountText, kmText } from './notation.js';
-import { sheet, weekView, eventView, check } from './engine.js';
+import { sheet, weekView, eventView, check, weekOf } from './engine.js';
+import { suggestions } from './suggest.js';
 import { kmView } from './km.js';
 import { gridView } from './grid.js';
-import { zoneCard } from './zones.js';
+import { zoneCard, typesCard } from './zones.js';
 import { sortEvents } from './format.js';
 import { checksView, sessionChecks } from './checks.js';
 
@@ -75,6 +76,17 @@ export function checksReport(data, planId, band, today) {
   return out.join('\n');
 }
 
+// the sessions suggested for one slot of one band, the most likely first
+export function suggestReport(data, planId, band, date, slot, today, ask) {
+  const r = suggestions(data, planId, band, date, slot, today, ask), n = weekOf(data.season, date);
+  const type = n ? sheet(data, planId, today).weeks[n - 1].type : null, missing = r.zones.filter(z => z.missing).map(z => z.zone);
+  const out = [planId + ' · ' + band + ' · ' + date + ' ' + slot + (n ? ' · week ' + n + (type ? ' (' + type + ')' : '') : '') + (missing.length ? ' · missing ' + missing.join(', ') : '')];
+  const rows = r.list.map(x => ['  ' + (x.main || '-'), x.min > 0 ? minutesText(x.min) : '', (x.place !== 'water' ? x.place + ': ' : '') + x.text, [x.used ? 'last ' + x.used : '', x.clash ? 'clashes' : ''].filter(Boolean).join(' · ')]);
+  if (rows.length) out.push(table(rows, [1]));
+  out.push(r.list.length < r.total ? '  ' + r.list.length + ' of ' + r.total : (r.total ? '' : '  nothing'));
+  return out.join('\n').trimEnd();
+}
+
 // one week: its sessions with the zone working and km, its totals, and its events
 export function weekReport(data, planId, n, today, band) {
   const w = weekView(data, planId, n, today);
@@ -135,6 +147,12 @@ export function gridReport(data, planId, band, today) {
     'D developing, M maintaining, b below maintenance, by the course\'s sessions a week' + (counted.some(k => k.includes('-')) ? '; ' + counted.filter(k => k.includes('-')).join(' and ') + ' are counted together' : '') + '\n' +
     (g.rows.some(r => r.suggested === false) ? '(zone) not in the course\'s long-term table for this age\n' : '') + '\n' +
     table(rows, [1]);
+}
+
+// the card of the week types
+export function typesReport(tables) {
+  const c = typesCard(tables);
+  return [c.name, ...c.rows.map(([label, v]) => label + ': ' + v)].join('\n');
 }
 
 // the card of one zone

@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { diskStore } from './src/store-disk.js';
 import { clockToday, isDate } from './src/dates.js';
 import { load, usable, planOf, weekOf } from './src/engine.js';
-import { seasonReport, weekReport, eventsReport, checkReport, gridReport, zoneReport, checksReport } from './src/report.js';
+import { seasonReport, weekReport, eventsReport, checkReport, gridReport, zoneReport, checksReport, typesReport, suggestReport } from './src/report.js';
 
 const USAGE = `usage: node kayplan.js <command> [options]
 
@@ -13,12 +13,17 @@ const USAGE = `usage: node kayplan.js <command> [options]
   show week [n]          a week's sessions with the zone working; without n, the current week
   show grid              the capacity grid: sessions a week per zone with their state, and km
   show checks            what the course would question about the sessions and weeks that are written
+  show suggestions <date> <am|pm>   the sessions suggested for a slot, the most likely first
   show zone <zone>       what a zone is and how the course says to train it, e.g. show zone R3
+  show types             what each week type is for, with its load
   show events            the races and events table
   check                  whether the plan is valid, plus the warnings
 
   --plan <id>            one plan (default: every plan)
-  --band <name>          show week, show grid, show checks: one age band (default: every band of the plan)
+  --band <name>          show week, show grid, show checks, show suggestions: one age band (default: every band of the plan)
+  --zone <zone>          show suggestions: every suggestion of one main zone
+  --find <words>         show suggestions: every suggestion with these words
+  --place <place>        show suggestions: pool, gym or land instead of the water
   --as-of <YYYY-MM-DD>   run as if today were this date
   --dir <folder>         the season folder (default: season/ next to this file)`;
 
@@ -32,12 +37,12 @@ const args = process.argv.slice(2);
 for (let i = 0; i < args.length; i++) {
   if (!args[i].startsWith('--')) { words.push(args[i]); continue; }
   const key = args[i].slice(2);
-  if (!['plan', 'band', 'as-of', 'dir'].includes(key) || i + 1 >= args.length) fail(USAGE);
+  if (!['plan', 'band', 'as-of', 'dir', 'zone', 'find', 'place'].includes(key) || i + 1 >= args.length) fail(USAGE);
   opts[key] = args[++i];
 }
 
 const command = words[0] === 'show' ? 'show ' + words[1] : words[0];
-if (!['show season', 'show week', 'show grid', 'show checks', 'show zone', 'show events', 'check'].includes(command)) fail(USAGE);
+if (!['show season', 'show week', 'show grid', 'show checks', 'show suggestions', 'show zone', 'show types', 'show events', 'check'].includes(command)) fail(USAGE);
 if (opts['as-of'] !== undefined && !isDate(opts['as-of'])) fail('--as-of needs a date like 2026-10-12');
 
 const today = opts['as-of'] || clockToday();
@@ -55,6 +60,8 @@ const plans = opts.plan !== undefined ? [opts.plan] : data.plans.map(p => p.id);
 
 if (command === 'show events') {
   console.log(eventsReport(data, today));
+} else if (command === 'show types') {
+  console.log(typesReport(data.tables));
 } else if (command === 'show zone') {
   const card = zoneReport(String(words[2] || '').toUpperCase(), data.tables);
   if (!card) fail('show zone needs a zone from R1 to R7, like: show zone R3+');
@@ -64,6 +71,13 @@ if (command === 'show events') {
   for (const id of plans) { for (const b of planOf(data, id).bands) { if (opts.band === undefined || opts.band === b) out.push(gridReport(data, id, b, today)); } }
   if (!out.length) fail('no band "' + opts.band + '" in ' + plans.join(', '));
   console.log(out.join('\n\n\n'));
+} else if (command === 'show suggestions') {
+  if (!isDate(words[2] || '') || !['am', 'pm'].includes(words[3])) fail('show suggestions needs a date and am or pm, like: show suggestions 2026-10-12 pm');
+  const ask = { zone: opts.zone ? opts.zone.toUpperCase() : undefined, query: opts.find, place: opts.place };
+  const out = [];
+  for (const id of plans) { for (const b of planOf(data, id).bands) { if (opts.band === undefined || opts.band === b) out.push(suggestReport(data, id, b, words[2], words[3], today, ask)); } }
+  if (!out.length) fail('no band "' + opts.band + '" in ' + plans.join(', '));
+  console.log(out.join('\n\n'));
 } else if (command === 'show checks') {
   const out = [];
   for (const id of plans) { for (const b of planOf(data, id).bands) { if (opts.band === undefined || opts.band === b) out.push(checksReport(data, id, b, today)); } }
