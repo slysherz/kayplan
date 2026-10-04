@@ -16,7 +16,7 @@ import { zoneCard, typesCard } from './zones.js';
 import { checksView } from './checks.js';
 import { suggestions } from './suggest.js';
 import { httpStore } from './store-http.js';
-import { githubStore } from './store-github.js';
+import { githubStore, setupLink, readSetup } from './store-github.js';
 import { tr, dec, setLang, getLang, LANGS } from './lang.js';
 
 const CW = 26, LAB = 104;   // width of a week column and of the row labels, in px
@@ -151,7 +151,13 @@ function tag(before) {
 // ---- the repository, when the plan is on GitHub -------------------------------------------
 
 function readAccount() {
-  try { account = JSON.parse(localStorage.getItem('kayplan-github') || 'null'); } catch (e) { account = null; }
+  // a setup link: keep what it carries in this browser, and take it out of the address
+  const sent = readSetup(location.hash);
+  if (sent) {
+    try { localStorage.setItem('kayplan-github', JSON.stringify({ ...JSON.parse(localStorage.getItem('kayplan-github') || '{}'), ...sent })); } catch (e) { /* no storage */ }
+    history.replaceState(null, '', location.pathname + location.search);
+  }
+  try { account = JSON.parse(localStorage.getItem('kayplan-github') || 'null'); } catch (e) { account = sent; }
   if (account && account.repo && account.token) store = githubStore(account);
   else signin = { message: '' };
 }
@@ -160,12 +166,35 @@ function drawSignin() {
   const a = account || {}, f = (name, label, value, type) => '<label class="fld"><span>' + label + '</span><input type="' + (type || 'text') + '" data-gh="' + name + '" value="' + esc(value || '') + '" autocomplete="off" autocapitalize="off" spellcheck="false"></label>';
   document.getElementById('root').innerHTML = '<div class="signin panel"><div class="pop-h"><div class="brand">Kayplan</div>' + (data ? '<button class="x" data-act="gh-close" aria-label="' + tr('Close') + '">×</button>' : '') + '</div>' +
     f('repo', tr('Repository'), a.repo).replace('<input ', '<input placeholder="owner/name" ') + f('dir', tr('Folder'), a.dir || 'season') + f('token', tr('Token'), a.token, 'password') +
-    '<div class="pop-r"><button class="b" data-act="gh-open">' + tr('Open') + '</button><span class="msg">' + esc(signin.message || '') + '</span></div></div>';
+    '<div class="pop-r"><button class="b" data-act="gh-open">' + tr('Open') + '</button><span class="msg">' + esc(signin.message || '') + '</span></div>' +
+    // with the plan open: a link that sets up another person's browser, with their own token
+    (data && usable(data) && a.repo && !a.readonly ? '<div class="pop-acts"><div class="eyebrow">' + tr('Link for another person') + '</div>' + f('ltoken', tr('Their token'), '', 'password') +
+      '<div class="pop-r"><select data-gh="lplan"><option value="">' + tr('All plans') + '</option>' + data.plans.map(p => '<option value="' + p.id + '">' + esc(p.name) + '</option>').join('') + '</select>' +
+      '<label class="inline"><input type="checkbox" data-gh="lro"><span>' + tr('Read only') + '</span></label></div>' +
+      '<div class="pop-r"><input type="text" class="mono link" data-gh="link" readonly><button class="b" data-act="gh-copy" disabled>' + tr('Copy link') + '</button></div></div>' : '') + '</div>';
+}
+
+// the link follows what is typed in its fields
+function drawLink() {
+  const q = name => document.querySelector('[data-gh="' + name + '"]'), out = q('link');
+  if (!out) return;
+  const token = q('ltoken').value.trim();
+  out.value = token ? setupLink(location.origin + location.pathname, { repo: account.repo, dir: account.dir, token, readonly: q('lro').checked, plan: q('lplan').value }) : '';
+  document.querySelector('[data-act="gh-copy"]').disabled = !token;
+}
+document.addEventListener('input', e => { if (e.target.dataset && /^l(token|plan|ro)$/.test(e.target.dataset.gh || '')) drawLink(); });
+document.addEventListener('change', e => { if (e.target.dataset && /^l(token|plan|ro)$/.test(e.target.dataset.gh || '')) drawLink(); });
+
+function copyLink() {
+  const out = document.querySelector('[data-gh="link"]');
+  out.select();
+  try { navigator.clipboard.writeText(out.value); } catch (e) { /* the link stays selected, to be copied by hand */ }
 }
 
 function openAccount() {
   const v = name => document.querySelector('[data-gh="' + name + '"]').value.trim();
-  account = { ...(account || {}), repo: v('repo'), dir: v('dir') || 'season', token: v('token') };
+  // typed by hand, it is the coach's own: not read only, every plan
+  account = { ...(account || {}), repo: v('repo'), dir: v('dir') || 'season', token: v('token'), readonly: false, plan: null };
   if (!/^[\w.-]+\/[\w.-]+$/.test(account.repo)) { signin = { message: tr('Write the repository as owner/name') }; drawSignin(); return; }
   try { localStorage.setItem('kayplan-github', JSON.stringify(account)); } catch (e) { /* no storage: asked again next time */ }
   store = githubStore(account);
@@ -529,11 +558,15 @@ function suggested() {
 // ---- the phone: one day, to read before a training session ------------------------------------
 
 // a narrow window gets the day page unless the full page was asked for
-const phone = () => (window.innerWidth <= 760 || params.has('phone')) && !state.full;
+// someone who can only read gets it on any screen, and no full page
+const reader = () => !!(account && account.readonly);
+const phone = () => reader() || ((window.innerWidth <= 760 || params.has('phone')) && !state.full);
 
 // Every plan's sessions of one day, the morning first. Nothing is edited here.
 function phoneView() {
   const today = now(), d = dayView(data, state.day || today, today);
+  // a link made for one plan shows that plan only
+  if (account && account.plan && d.plans.some(p => p.id === account.plan)) d.plans = d.plans.filter(p => p.id === account.plan);
   const seen = new Set(), events = d.plans.flatMap(p => p.events).filter(e => !seen.has(e.name) && seen.add(e.name));
   const cards = ['am', 'pm'].flatMap(slot => d.plans.flatMap(p => p.sessions.filter(s => s.slot === slot).map(s => {
     const c = zc(s.main);
@@ -553,7 +586,7 @@ function phoneView() {
     '<button class="nav" data-act="day" data-v="' + addDays(d.date, 1) + '" aria-label="' + tr('Next day') + '">›</button>' +
     '<button class="b" data-act="day" data-v=""' + (d.today ? ' disabled' : '') + '>' + tr('Today') + '</button><span id="status">' + statusHtml() + '</span></header>' +
     '<div id="app" class="ph">' + events.map(banner).join('') + cards.join('') + none +
-    '<div class="ph-f"><button class="b" data-act="full">' + tr('Full page') + '</button>' +
+    '<div class="ph-f">' + (reader() ? '<span></span>' : '<button class="b" data-act="full">' + tr('Full page') + '</button>') +
     '<span class="seg">' + LANGS.map(l => '<button class="segb' + (l === getLang() ? ' on' : '') + '" data-act="lang" data-v="' + l + '">' + l.toUpperCase() + '</button>').join('') + '</span></div></div>';
 }
 
@@ -808,6 +841,7 @@ document.addEventListener('click', e => {
   const gh = e.target.closest('[data-act^="gh-"]');
   if (gh) {
     if (gh.dataset.act === 'gh-open') openAccount();
+    else if (gh.dataset.act === 'gh-copy') copyLink();
     else { signin = null; render(); }
     return;
   }
@@ -949,7 +983,7 @@ document.addEventListener('input', e => {
 });
 
 document.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && e.target.dataset && e.target.dataset.gh) { openAccount(); return; }
+  if (e.key === 'Enter' && e.target.dataset && /^(repo|dir|token)$/.test(e.target.dataset.gh || '')) { openAccount(); return; }
   if (e.key === 'Escape' && pinned) unpin();
   if (e.key === 'Escape' && (state.edit || state.problems)) { state.edit = null; state.problems = false; render(); }
   // the arrows go from the plan text into the suggestions and along them

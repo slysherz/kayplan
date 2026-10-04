@@ -22,6 +22,31 @@ function decode(b64) {
   return new TextDecoder().decode(Uint8Array.from(s, c => c.charCodeAt(0)));
 }
 
+// A setup link: the page's address with the repository and a token after the #, so that opening it
+// is all another person has to do. That part of an address is never sent to the server.
+// who: { repo, dir, token, readonly, plan }
+//   readonly  the token only reads: the page then shows the day page and nothing to edit
+//   plan      show only this plan
+export function setupLink(page, who) {
+  const a = { repo: who.repo, dir: who.dir || 'season', token: who.token };
+  if (who.readonly) a.readonly = true;
+  if (who.plan) a.plan = who.plan;
+  return page.replace(/#.*$/, '') + '#setup=' + encode(JSON.stringify(a)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+// what a setup link carries, from the part of the address after the #; null when there is none or it cannot be read
+export function readSetup(hash) {
+  const m = /(?:^|[#&])setup=([A-Za-z0-9_-]+)/.exec(hash || '');
+  if (!m) return null;
+  try {
+    const a = JSON.parse(decode(m[1].replace(/-/g, '+').replace(/_/g, '/')));
+    if (!a || typeof a.repo !== 'string' || typeof a.token !== 'string' || !a.repo || !a.token) return null;
+    return { repo: a.repo, dir: typeof a.dir === 'string' && a.dir ? a.dir : 'season', token: a.token, readonly: a.readonly === true, plan: typeof a.plan === 'string' && a.plan ? a.plan : null };
+  } catch (e) {
+    return null;
+  }
+}
+
 export function githubStore(settings) {
   const api = (settings.api || 'https://api.github.com').replace(/\/$/, ''), repo = settings.repo, dir = (settings.dir || 'season').replace(/^\/+|\/+$/g, '');
   const send = settings.fetch || ((...a) => fetch(...a));
