@@ -482,8 +482,10 @@ export function parseSessions(source) {
 export function parseLibrary(source) {
   const { blocks, errors } = readBlocks(source);
   const value = blocks.map(b => {
-    const m = /^(pool|gym|land):\s*(.*)$/.exec(b.head);
-    return { place: m ? m[1] : 'water', text: (m ? m[2] : b.head).replace(/\s+/g, ' ').trim(), notes: b.sub.map(s => s.text).join('\n'), line: b.line };
+    const m = /^(pool|gym|land):\s*(.*)$/.exec(b.head), rest = m ? m[2] : b.head;
+    // "name = session": the name is shown in place of the text
+    const n = /^([^=]*)=(.*)$/.exec(rest), squash = t => t.replace(/\s+/g, ' ').trim();
+    return { place: m ? m[1] : 'water', name: n ? squash(n[1]) : '', text: squash(n ? n[2] : rest), notes: b.sub.map(s => s.text).join('\n'), line: b.line };
   });
   return { value, errors };
 }
@@ -491,10 +493,15 @@ export function parseLibrary(source) {
 export function serializeLibrary(library) {
   const lines = [];
   for (const s of library) {
-    lines.push((s.place && s.place !== 'water' ? s.place + ': ' : '') + s.text);
+    lines.push((s.place && s.place !== 'water' ? s.place + ': ' : '') + (s.name ? s.name + ' = ' : '') + s.text);
     for (const n of String(s.notes || '').split(/\r?\n/)) { if (n.trim()) lines.push('  ' + n.trim()); }
   }
   return text(lines);
+}
+
+// a session's text as it is compared: the spaces and the case do not count
+export function plain(text) {
+  return String(text || '').replace(/\s+/g, '').toLowerCase();
 }
 
 export function sessionKey(s) {

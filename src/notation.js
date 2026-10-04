@@ -263,3 +263,106 @@ export function amountText(a) {
   if (a.sec > 0) out.push(minutesText(a.sec / 60));
   return out.join(' + ');
 }
+
+// ---- the text laid out to be read (DESIGN.md 8.5) ---------------------------
+
+// the parts between the "+" that are outside brackets; the "+" of R3+ belongs to the zone
+function partsOf(t) {
+  const out = [];
+  let depth = 0, from = 0;
+  for (let i = 0; i < t.length; i++) {
+    const ch = t.charAt(i);
+    if (ch === '(') depth++;
+    else if (ch === ')') depth = Math.max(0, depth - 1);
+    else if (ch === '+' && depth === 0 && !/(^|[^A-Za-z0-9])R3$/i.test(t.slice(0, i))) { out.push(t.slice(from, i).trim()); from = i + 1; }
+  }
+  out.push(t.slice(from).trim());
+  return out.filter(Boolean);
+}
+
+// The text over several lines: [{ depth, text, part }].
+// One line for each part between "+"; a set longer than width opens on one line, has its own parts
+// under it, one step in and as many on a line as fit, and closes on a line with its rest. The parts
+// of the session are one under the other with no "+"; inside a set a line that continues starts
+// with "+". oneLine puts the lines back together.
+//   part   the part as written, on its first line; null on the lines that continue it
+// A zone written for the whole session ("R2:") is on the first line.
+export function outline(text, width) {
+  const t = String(text || '').replace(/\s+/g, ' ').trim(), lines = [];
+  const head = /^R[0-7]\+?F?\s*:\s*/i.exec(t);
+  function put(part, depth, lead, top) {
+    const open = part.indexOf('(');
+    let close = -1;
+    for (let i = open, d = 0; open >= 0 && i < part.length; i++) {
+      if (part.charAt(i) === '(') d++;
+      else if (part.charAt(i) === ')' && --d === 0) { close = i; break; }
+    }
+    const inner = close < 0 ? [] : partsOf(part.slice(open + 1, close));
+    if (lead.length + part.length + depth * 2 <= width || inner.length < 2) { lines.push({ depth, text: lead + part, part: top ? part : null }); return; }
+    lines.push({ depth, text: lead + part.slice(0, open + 1), part: top ? part : null });
+    // the set's own parts, as many on a line as fit; one that is itself too long is laid out the same way
+    const room = width - (depth + 1) * 2, fits = p => p.length + 2 <= room || p.indexOf('(') < 0;
+    let line = '';
+    inner.forEach((p, i) => {
+      const lead = i ? '+ ' : '';
+      if (line && fits(p) && line.length + 3 + p.length <= room) { line += ' + ' + p; return; }
+      if (line) lines.push({ depth: depth + 1, text: line, part: null });
+      line = '';
+      if (fits(p)) line = lead + p; else put(p, depth + 1, lead, false);
+    });
+    if (line) lines.push({ depth: depth + 1, text: line, part: null });
+    lines.push({ depth, text: part.slice(close), part: null });
+  }
+  partsOf(head ? t.slice(head[0].length) : t).forEach((p, i) => put(p, 0, head && !i ? head[0].trim() + ' ' : '', true));
+  return lines;
+}
+
+// minutes with the rests, and km as infer counts them
+function sizeOf(text, tables, band, offWater) {
+  const tot = readPlan(text, tables.places).totals, own = tables.pace[band] || {}, shared = tables.pace.default || {};
+  let min = 0, km = 0;
+  for (const z in tot) {
+    const v = ZONES.includes(z) ? own[z] || shared[z] || 0 : 0;
+    min += tot[z].sec / 60 + (v && !offWater ? tot[z].m / 1000 / v * 60 : 0);
+    if (!offWater && z !== 'R0' && z !== 'rest') km += tot[z].m / 1000 + tot[z].sec / 3600 * v;
+  }
+  return { min, km };
+}
+
+// A session laid out with what each part comes to: { lines: [{ depth, text, min, km }], min, km }.
+// min and km are on a part's first line and null on the lines that continue it.
+//   min   minutes, the rests counted; a distance with no pace takes none
+//   km    as infer counts them: nothing for R0, for rest with no zone, or off the water
+export function sessionLines(text, tables, band, offWater, width) {
+  const head = /^\s*R[0-7]\+?F?\s*:\s*/i.exec(String(text || ''));
+  let min = 0, km = 0;
+  const lines = outline(text, width).map(l => {
+    if (l.part === null) return { depth: l.depth, text: l.text, min: null, km: null };
+    const x = sizeOf((head ? head[0] : '') + l.part, tables, band, offWater);
+    min += x.min; km += x.km;
+    return { depth: l.depth, text: l.text, min: x.min, km: x.km };
+  });
+  return { lines, min, km };
+}
+
+// the session as it is shown where it is typed: outline's lines, a step in for each depth
+export function linesText(text, width) {
+  return outline(text, width).map(l => '  '.repeat(l.depth) + l.text).join('\n');
+}
+
+// Lines back to the one line a session is stored as. A new line is a "+", unless it starts with
+// "+", ")" or "/", or the line above ends with "+", "(", "/" or ":".
+export function oneLine(text) {
+  let out = '';
+  for (const raw of String(text || '').split(/\r?\n/)) {
+    const l = raw.replace(/\s+/g, ' ').trim();
+    if (!l) continue;
+    // the "+" of R3+ is the zone's, not a "+" left open
+    const open = /[(\/:]$/.test(out) || (/\+$/.test(out) && !/(^|[^A-Za-z0-9])R3\+$/i.test(out));
+    if (!out) out = l;
+    else if (/\($/.test(out) || /^\)/.test(l)) out += l;
+    else if (open || /^[+\/]/.test(l)) out += ' ' + l;
+    else out += ' + ' + l;
+  }
+  return out;
+}
