@@ -172,6 +172,24 @@ export function weekView(data, planId, n, today) {
   return { ...week, plan: sh.plan, mesoInfo: week.meso === null ? null : sh.mesos[week.meso], macroInfo: week.macro === null ? null : sh.macros[week.macro], days };
 }
 
+// One day across every plan, for the phone at the water's edge: what each group does that day.
+// { date, weekday, today, week, plans: [{ id, name, type, meso, events, sessions }], prev, next }
+//   sessions    the day's sessions that have something written, each as sessionView gives it
+//   prev, next  the nearest other days that have such a session, or null
+export function dayView(data, date, today) {
+  const n = weekOf(data.season, date), written = s => !!(String(s.text || '').trim() || String(s.notes || '').trim());
+  const plans = data.plans.map(plan => {
+    const sh = n ? sheet(data, plan.id, today) : null, wk = sh ? sh.weeks[n - 1] : null;
+    return {
+      id: plan.id, name: plan.name, type: wk ? wk.type : null, meso: wk && wk.meso !== null ? sh.mesos[wk.meso].name : null,
+      events: wk ? wk.events.filter(e => e.date <= date && e.to >= date) : [],
+      sessions: format.sortSessions(plan.sessions.filter(s => s.date === date && written(s)), plan.bands).map(s => sessionView(data, s, today))
+    };
+  });
+  const dates = [...new Set(data.plans.flatMap(p => p.sessions.filter(written).map(s => s.date)))].sort();
+  return { date, weekday: weekday(date), today: date === today, week: n, plans, prev: dates.filter(d => d < date).pop() || null, next: dates.find(d => d > date) || null };
+}
+
 // ---- check ------------------------------------------------------------------
 
 // Whether the plan is valid, plus the warnings. Returns [{ level: 'error' | 'warning', file, line, message }].
