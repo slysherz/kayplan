@@ -225,6 +225,13 @@ export function check(data, today) {
     for (const b of Object.keys(data.tables.zones)) { if (!bands.includes(b)) add('warning', 'tables.txt', null, tr('zones are given for "{0}", which is not a band of any plan', b)); }
   }
 
+  // a library line on the water that has no zone is never suggested
+  if (!out.some(o => o.level === 'error' && (o.file === 'tables.txt' || o.file === 'library.txt'))) {
+    for (const s of data.library) {
+      if (s.place === 'water' && !infer(s.text, data.tables, null, false).main) add('warning', 'library.txt', s.line, tr('"{0}" has no zone and is never suggested', s.text));
+    }
+  }
+
   const ids = data.plans.map(p => p.id);
   for (const e of data.events) {
     for (const id of Object.keys(e.plans || {})) {

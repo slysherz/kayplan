@@ -144,3 +144,10 @@ test('show suggestions: the list as text', async () => {
   assert.match(suggestReport(data, 'group-a', 'older', '2026-01-13', 'pm', TODAY), /\n {2}5 of 8$/);
   assert.match(suggestReport(data, 'group-a', 'older', '2026-01-13', 'pm', TODAY, { place: 'pool' }), /\n {2}nothing$/);
 });
+
+test('check: a library line on the water with no zone is a warning', async () => {
+  const { check } = await import('../src/engine.js');
+  const data = await season(f => { f['library.txt'] += "8x 4'/1'\nyoga\ngym: circuit\n"; });
+  assert.deepEqual(check(data, TODAY).filter(p => p.file === 'library.txt').map(p => [p.level, p.line, p.message]),
+    [['warning', 9, '"8x 4\'/1\'" has no zone and is never suggested'], ['warning', 10, '"yoga" has no zone and is never suggested']]);
+});

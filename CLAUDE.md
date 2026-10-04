@@ -254,6 +254,10 @@ gym: 4-6 exercises, 2-3x 10-15 reps, tempo 2:2
 - A line is the plan text, as in a session. `pool:`, `gym:` or `land:` in front when it is not on the water. Indented lines are notes; they go into the session's notes when it has none.
 - The order of the lines is the order they are suggested in within a zone: the coach's own sessions are first, the course's model sessions after them.
 - A line on the water needs a zone to be suggested. Write the zone next to the work or once at the head (`R2:`); a zone written after the rest of a set is the rest's zone.
+- Where the lines come from, in the file's order: the club's weekly plans of 2026 (192 water sessions, by main zone and, in a zone, the most used first), the club's daily plans of 2022 (those that read cleanly and are not already there), the coach's sessions of December 2025, and the course's model sessions. They were extracted on 2026-10-04 from two zip files the coach put in `season/`; the zips hold athletes' names, are ignored by git, and must never be committed.
+- **The club writes its zones on another scale than the course** (its own table, R1 to R7: R4 anaerobic threshold, R5 VO2max, R6 lactate tolerance and sprints, R7 maximal speed under 10''). Kayplan counts on the course's scale, so the club's sessions were translated when they were put here: R1, R2, R3 unchanged; club R4 → R3+; club R5 → R4; club R6 → R6 (in the plans it is only used for sprints of 10'' to 30''); club R7 → R6; "ritmo de prova/máximo" → R7; "técnica" → R1. This is Claude's reading of the club's table against the course's lactate and stroke-rate figures; the coach has not confirmed it. A session the coach types on the club's scale is read on the course's scale: this is open (see "Waiting for the coach").
+- "Outro bloco igual" was written out. Sprints inside a continuous paddle ("10'' R6 a cada 10'"), brakes, portages and standing starts are notes.
+- Not taken from the zips: gym and running sessions (no notation for exercises), the 2018 daily plans and the seniors' plans of 2015–16 (other zone scales), the federation's plans of 2017 (no zones written), a thesis and a strength lecture.
 - The coach's old sessions gave intensity as a percentage of capacity (`@90`). They were turned into zones when they were put here: `@70` R1, `@75` R2, `@80` R3, `@90` R3+ (R6 for 20'' with a long rest). The coach has not confirmed this yet.
 - Sessions already in a plan are not copied here: the suggestions look them up.
 
@@ -300,6 +304,9 @@ gym: 4-6 exercises, 2-3x 10-15 reps, tempo 2:2
 - A block after the last race aims at the last race (as the mockup does); in a plan with no races, R7 counts like R2.
 
 ## Waiting for the coach
+
+- **Which zone scale the club writes in.** The club's plans use its own R1–R7 table, the tool the course's. The library was translated (see `library.txt` above), but a session typed on the club's scale is counted wrongly (club R4 is read as lactic capacity, club R7 as race pace). Options given to the coach on 2026-10-04: write on the course's scale, or add a table of the club's names for zones that the reader translates.
+- **Two checks say something about most of the club's sessions.** Of the 226 library sessions from the club, 130 start R3 or R3+ work before the 30' of `warm` (the club warms up 10') and 125 are out of the course's order of contents (sprints at the end, R2 before R3). The coach was told; `warm` can be deleted or lowered in `tables.txt`, the order check has no switch yet.
 
 - `pace default` in `tables.txt` holds invented placeholder speeds from the mockup. Since level 2 they decide every km that is written as time, so they matter: ask for real ones per band.
 - `yearly` holds the course's high-performance figures (the coach chose them as a starting point). With two to four sessions a week the estimates sit well above what the sessions cover.
