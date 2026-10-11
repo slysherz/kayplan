@@ -3,7 +3,7 @@
 
 import { isDate } from './dates.js';
 import { tr } from './lang.js';
-import { KINDS, RACE_TYPES, BOATS, SLOTS, PLACES, sessionKey } from './format.js';
+import { KINDS, RACE_TYPES, BOATS, PLACES, sessionKey, nextSlot } from './format.js';
 
 function fail(message) {
   const e = new Error(message);
@@ -29,19 +29,22 @@ export function setWeek(plan, monday, type, load, tables) {
 
 // ---- sessions ---------------------------------------------------------------
 
-// Add a session, or replace the one in the same date, slot and band.
+// Add a session, or replace the one in the same date, band and place in the day's order (slot).
+// A session with no slot is added after the band's others of that day.
 export function putSession(plan, session) {
   if (!isDate(session.date)) fail(tr('a session needs a date'));
-  if (!SLOTS.includes(session.slot)) fail(tr('a session is in the morning (am) or the afternoon (pm)'));
   if (!plan.bands.includes(session.band)) fail(tr('plan {0} has no band "{1}"', plan.id, session.band));
   const place = session.place || 'water';
   if (!PLACES.includes(place)) fail(tr('a session is on the water, or in the pool, the gym or on land'));
-  const s = { date: session.date, slot: session.slot, band: session.band, place, notDone: !!session.notDone, text: oneLine(session.text), notes: String(session.notes || '') };
+  const slot = Number.isInteger(session.slot) && session.slot > 0 ? session.slot : nextSlot(plan.sessions, session.date, session.band);
+  const s = { date: session.date, slot, band: session.band, place, alt: !!session.alt, notDone: !!session.notDone, text: oneLine(session.text), notes: String(session.notes || '') };
   return { ...plan, sessions: [...plan.sessions.filter(x => sessionKey(x) !== sessionKey(s)), s] };
 }
 
 export function removeSession(plan, key) {
-  return { ...plan, sessions: plan.sessions.filter(s => sessionKey(s) !== key) };
+  // the ones after it on that day move up, as they will be numbered when the file is read again
+  const gone = plan.sessions.find(s => sessionKey(s) === key);
+  return { ...plan, sessions: plan.sessions.filter(s => s !== gone).map(s => gone && s.date === gone.date && s.band === gone.band && s.slot > gone.slot ? { ...s, slot: s.slot - 1 } : s) };
 }
 
 // ---- events -----------------------------------------------------------------

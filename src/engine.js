@@ -132,7 +132,7 @@ export function nameOf(data, s) {
 // A session with what is worked out from its text, and whether it counts as done.
 // A session whose date has passed counts as done unless it is marked not done.
 export function sessionView(data, s, today) {
-  return { ...s, name: nameOf(data, s), ...infer(s.text, data.tables, s.band, s.place !== 'water'), status: s.notDone ? 'not done' : (s.date < today ? 'done' : 'planned') };
+  return { ...s, name: nameOf(data, s), ...infer(s.text, data.tables, s.band, s.place !== 'water'), status: s.notDone ? 'not done' : s.alt ? 'alternative' : (s.date < today ? 'done' : 'planned') };
 }
 
 // ---- the annual sheet -------------------------------------------------------
@@ -271,11 +271,7 @@ export function check(data, today) {
       // a missing pattern type is already reported once, for tables.txt
       if (data.tables.load[h.type] === undefined && !PATTERN_TYPES.includes(h.type)) add('error', f.weeks, h.line, tr('there is no week type "{0}" in tables.txt', h.type));
     }
-    const seen = new Set();
     for (const s of plan.sessions) {
-      const key = format.sessionKey(s);
-      if (seen.has(key)) add('error', f.sessions, s.line, tr('there are two sessions for {0}', key));
-      seen.add(key);
       if (!inSeason(s.date)) add('error', f.sessions, s.line, tr('{0} is outside the season', s.date));
       if (!plan.bands.includes(s.band)) add('error', f.sessions, s.line, tr('plan {0} has no band "{1}"', plan.id, s.band));
     }

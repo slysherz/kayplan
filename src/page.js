@@ -8,7 +8,7 @@ import { clockToday, isDate, shortDate, addDays, weekday, DAYS, MONTHS } from '.
 import { minutesText, amountText, kmText, infer, outline, sessionLines, linesText, oneLine } from './notation.js';
 import * as cycles from './cycles.js';
 import * as edits from './edits.js';
-import { KINDS, RACE_TYPES, BOATS, PLACES, sessionKey, sortEvents } from './format.js';
+import { KINDS, RACE_TYPES, BOATS, PLACES, sessionKey, sortEvents, nextSlot } from './format.js';
 import { load, usable, planOf, planFiles, sheet, weekView, eventView, check, fileText, weekOf, endedWeeks, dayView } from './engine.js';
 import { kmView } from './km.js';
 import { gridView } from './grid.js';
@@ -42,8 +42,7 @@ const patternName = x => ({
 const kindName = x => ({ race: tr('Race'), test: tr('Test'), camp: tr('Camp'), holiday: tr('Holiday'), 'no-water': tr('No water') })[x];
 const raceTypeName = x => ({ sprint: tr('Sprint'), fundo: tr('Fundo'), maratona: tr('Maratona') })[x];
 const boatName = x => ({ solo: tr('Solo'), crew: tr('Tripulações'), mixed: tr('Mixed') })[x];
-const placeName = x => ({ water: tr('Water'), pool: tr('Pool'), gym: tr('Gym'), land: tr('Land') })[x];
-const slotName = x => ({ am: tr('AM'), pm: tr('PM') })[x];
+const placeName = x => ({ water: tr('Water'), pool: tr('Pool'), gym: tr('Gym'), land: tr('Run') })[x];
 const stateName = x => ({ developing: tr('developing'), maintaining: tr('maintaining'), 'below maintenance': tr('below maintenance'), trained: tr('trained'), absent: tr('absent') })[x];
 
 const params = new URLSearchParams(location.search);
@@ -348,7 +347,7 @@ function banner(e) {
 function chip(s) {
   const c = zc(s.main);
   return '<button class="chip' + (sessionKey(s) === sessionKey(ctx.session) ? ' on' : '') + (s.notDone ? ' off' : '') + '" data-act="pick" data-v="' + sessionKey(s) + '" data-ses="' + sessionKey(s) + '" style="background:' + c.bg + ';color:' + c.fg + '">' +
-    '<span class="chip-h">' + slotName(s.slot) + ' · ' + (s.main || tr('no zone')) + (s.place !== 'water' ? ' · ' + placeName(s.place).toLowerCase() : '') + (s.notDone ? ' · ' + tr('not done') : '') + '</span>' +
+    '<span class="chip-h">' + placeName(s.place) + (s.main ? ' · ' + s.main : s.place === 'water' ? ' · ' + tr('no zone') : '') + (s.alt ? ' · ' + tr('alternative') : '') + (s.notDone ? ' · ' + tr('not done') : '') + '</span>' +
     (s.name ? '<span class="chip-t">' + esc(s.name) + '</span>' : '<span class="chip-t mono">' + esc(s.text || tr('Empty session')) + '</span>') + '</button>';
 }
 
@@ -465,7 +464,7 @@ function sheetView() {
   const on = w => w.n === state.week ? ' on' : '';
   // what the course would question, for the selected band: per week, and per session of the selected week
   const said = (c, days) => [...c.week, ...days.flatMap(d => d.sessions.filter(s => c.sessions[sessionKey(s)]).flatMap(s =>
-    c.sessions[sessionKey(s)].map(t => tr(DAYS[d.weekday]) + ' ' + slotName(s.slot) + ' · ' + t)))];
+    c.sessions[sessionKey(s)].map(t => tr(DAYS[d.weekday]) + ' · ' + t)))];
   const flagged = w => ctx.checks[w.n - 1].count ? ' warn' : '';
   // season km from sessions against the yearly km
   const se = km.season;
@@ -503,10 +502,9 @@ function sheetView() {
   const weekKm = '<span class="mono" data-id="week-km">' + (wkm.estimate === null ? kmText(wkm.km) + ' km' : tr('{0} of {1} km', kmText(wkm.km), Math.round(wkm.estimate))) + (wkm.offMin > 0 ? ' · ' + tr('{0} off the water', minutesText(wkm.offMin)) : '') + '</span>';
 
   const days = wk.days.map(d => {
-    const slots = ['am', 'pm'].map(slot => {
-      const s = d.sessions.find(x => x.slot === slot && x.band === state.band);
-      return s ? chip(s) : '<button class="add" data-act="add" data-v="' + slot + '" data-date="' + d.date + '" aria-label="' + tr('Add session') + '">+ ' + slotName(slot) + '</button>';
-    }).join('');
+    // the band's sessions in their order, then one button for each place a session can be added in
+    const slots = d.sessions.filter(x => x.band === state.band).map(chip).join('') +
+      '<div class="adds">' + ['water', 'gym', 'pool', 'land'].map(p => '<button class="add" data-act="add" data-v="' + p + '" data-date="' + d.date + '" aria-label="' + tr('Add session') + ' · ' + placeName(p) + '">+ ' + placeName(p) + '</button>').join('') + '</div>';
     return '<div class="day' + (d.today ? ' now' : '') + '"><div class="day-h"><b>' + tr(DAYS[d.weekday]) + '</b><span class="muted">' + shortDate(d.date) + '</span></div>' + d.events.map(banner).join('') + slots + '</div>';
   }).join('');
 
@@ -520,7 +518,7 @@ function sheetView() {
     // each piece with a zone, and its other unit
     const other = session.pieces.map(x => x.text + ' ≈ ' + x.approx).join(' · ');
     const c = zc(session.main);
-    right = '<div class="ed-col' + (ctx.sug ? ' asking' : '') + '"><div class="eyebrow">' + tr('Session') + '</div><div class="when">' + tr(DAYS[wk.days.findIndex(d => d.date === session.date)]) + ' ' + shortDate(session.date) + ' · ' + slotName(session.slot) + (session.name ? ' · ' + esc(session.name) : '') + '</div>' +
+    right = '<div class="ed-col' + (ctx.sug ? ' asking' : '') + '"><div class="eyebrow">' + tr('Session') + '</div><div class="when">' + tr(DAYS[wk.days.findIndex(d => d.date === session.date)]) + ' ' + shortDate(session.date) + (session.name ? ' · ' + esc(session.name) : '') + '</div>' +
       '<div class="fld"><span>' + tr('Main zone') + '</span><div class="inf"><b class="zpill" style="background:' + c.bg + ';color:' + c.fg + '">' + (session.main || '–') + '</b><small>' + esc(work.join(' · ')) + (other ? '<span class="mono other">' + esc(other) + '</span>' : '') + '</small></div></div>' +
       (doubts.length ? '<div class="chks" data-id="s-checks">' + doubts.map(t => '<div>' + esc(t) + '</div>').join('') + '</div>' : '') +
       '<label class="fld f-plan"><span>' + tr('Plan') + '</span><textarea class="mono plan" data-input="text" data-fid="s-text" spellcheck="false">' + esc(linesText(session.text, 40)) + '</textarea></label>' +
@@ -528,6 +526,7 @@ function sheetView() {
       '<label class="fld f-notes"><span>' + tr('Notes') + '</span><textarea data-input="notes" data-fid="s-notes">' + esc(session.notes) + '</textarea></label>' +
       '<div class="pop-r"><label class="inline"><span>' + tr('Place') + '</span><select data-change="place" data-fid="s-place">' + PLACES.map(x => '<option value="' + x + '"' + (x === session.place ? ' selected' : '') + '>' + placeName(x) + '</option>').join('') + '</select></label>' +
       '<label class="inline"><input type="checkbox" data-change="notdone" data-fid="s-notdone"' + (session.notDone ? ' checked' : '') + '><span>' + tr('Not done') + '</span></label>' +
+      '<label class="inline"><input type="checkbox" data-change="alt" data-fid="s-alt"' + (session.alt ? ' checked' : '') + '><span>' + tr('Alternative') + '</span></label>' +
       '<button class="del" data-act="del">' + tr('Delete session') + '</button></div></div>';
   }
 
@@ -570,13 +569,13 @@ function phoneView() {
   // a link made for one plan shows that plan only
   if (account && account.plan && d.plans.some(p => p.id === account.plan)) d.plans = d.plans.filter(p => p.id === account.plan);
   const seen = new Set(), events = d.plans.flatMap(p => p.events).filter(e => !seen.has(e.name) && seen.add(e.name));
-  const cards = ['am', 'pm'].flatMap(slot => d.plans.flatMap(p => p.sessions.filter(s => s.slot === slot).map(s => {
+  const cards = [0].flatMap(() => d.plans.flatMap(p => p.sessions.map(s => {
     const c = zc(s.main);
     let work = s.parts.slice().reverse().map(x => x.zone + ' ≈ ' + minutesText(x.min));
     if (s.place === 'water' && s.totalKm > 0) work.push('≈ ' + dec(s.totalKm, 1) + ' km');
     const other = s.pieces.map(x => x.text + ' ≈ ' + x.approx).join(' · ');
     return '<div class="ph-s panel' + (s.notDone ? ' off' : '') + '"><div class="ph-h"><b class="zpill" style="background:' + c.bg + ';color:' + c.fg + '">' + (s.main || '–') + '</b>' +
-      '<div><b>' + esc(p.name) + ' · ' + esc(s.band) + '</b><span class="muted">' + slotName(s.slot) + (s.place !== 'water' ? ' · ' + placeName(s.place) : '') + (s.notDone ? ' · ' + tr('not done') : '') + '</span></div></div>' +
+      '<div><b>' + esc(p.name) + ' · ' + esc(s.band) + '</b><span class="muted">' + placeName(s.place) + (s.alt ? ' · ' + tr('alternative') : '') + (s.notDone ? ' · ' + tr('not done') : '') + '</span></div></div>' +
       (s.name ? '<b class="ph-name">' + esc(s.name) + '</b>' : '') +
       (s.text ? '<div class="ph-t mono">' + outline(s.text, 26).map(l => '<div style="padding-left:' + l.depth * 14 + 'px">' + esc(l.text) + '</div>').join('') + '</div>' : '') +
       (work.length ? '<div class="ph-w muted">' + esc(work.join(' · ')) + (other ? '<span class="mono">' + esc(other) + '</span>' : '') + '</div>' : '') +
@@ -934,7 +933,7 @@ document.addEventListener('click', e => {
   else if (act === 'edit-macro') { state.edit = { kind: 'macro', i: +v, week: weekAt(e, t, ctx.sh.macros[+v]) }; state.problems = false; }
   else if (/^m-|^mac-/.test(act)) { planAct(act, v); return; }
   else if (act === 'add') {
-    const s = { date: t.dataset.date, slot: v, band: state.band, place: 'water', text: '', notes: '' };
+    const s = { date: t.dataset.date, slot: nextSlot(ctx.plan.sessions, t.dataset.date, state.band), band: state.band, place: v, text: '', notes: '' };
     state.sel = sessionKey(s);
     state.zone = null;
     toSession = true;
@@ -1003,6 +1002,7 @@ document.addEventListener('change', e => {
   if (c === 'splitw' && state.edit) state.edit.week = +el.value;
   else if (c === 'type') change([f.weeks], () => setPlan(edits.setWeek(ctx.plan, ctx.wk.monday, el.value || null, null, data.tables)));
   else if (c === 'pat' && state.edit) change([f.cycles], () => setPlan(cycles.setMeso(ctx.plan, state.edit.i, { pat: el.value })));
+  else if (c === 'alt' && ctx.session) change([f.sessions], () => setPlan(edits.putSession(ctx.plan, { ...ctx.session, alt: el.checked })));
   else if (c === 'notdone' && ctx.session) change([f.sessions], () => setPlan(edits.putSession(ctx.plan, { ...ctx.session, notDone: el.checked })));
   else if (c === 'place' && ctx.session) change([f.sessions], () => setPlan(edits.putSession(ctx.plan, { ...ctx.session, place: el.value })));
 });
