@@ -1,6 +1,7 @@
 // The capacity grid (DESIGN.md 7.1): week by week, how much each zone is trained, against the
 // course's sessions per week to develop and to maintain each content (Grau II slides, "Nº Sessões/CT").
 
+import { counted } from './format.js';
 import { sheet, sessionView, weekOf } from './engine.js';
 import { kmView } from './km.js';
 import { CONTENT_ZONES } from './cycles.js';
@@ -33,7 +34,7 @@ export function gridView(data, planId, band, today) {
   const counts = {};
   for (const s of sh.plan.sessions) {
     const n = weekOf(data.season, s.date);
-    if (s.band !== band || s.notDone || !n) continue;
+    if (s.band !== band || !counted(s) || !n) continue;
     const main = sessionView(data, s, today).main;
     if (!main) continue;
     counts[main] = counts[main] || {};

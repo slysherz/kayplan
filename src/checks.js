@@ -4,7 +4,7 @@
 
 import { ZONES, minutesOf, minutesText } from './notation.js';
 import { sheet, sessionView, eventsFor, weekOf } from './engine.js';
-import { sessionKey, sortSessions } from './format.js';
+import { sessionKey, sortSessions, counted } from './format.js';
 import { addDays, daysBetween, weekday, DAYS } from './dates.js';
 import { tr } from './lang.js';
 
@@ -39,20 +39,20 @@ export function tooClose(a, b, tables) {
   return 0;
 }
 
-// volume in the morning and quality in the afternoon of the same day (slide 196)
+// volume first and quality after it on the same day (slide 196: quality in the morning)
 export function wrongHalf(am, pm) {
   return ORDER[am.main] === 2 && ORDER[pm.main] < 2;
 }
 
-// "Tue AM (R3)"
+// "Tue (R3)"
 function named(s) {
-  return tr(DAYS[weekday(s.date)]) + ' ' + (s.slot === 'am' ? tr('AM') : tr('PM')) + ' (' + s.main + ')';
+  return tr(DAYS[weekday(s.date)]) + ' (' + s.main + ')';
 }
 
 // One session, as sessionView gives it: [text]. A session marked "not done" is not checked.
 export function sessionChecks(s, tables) {
   const out = [];
-  if (s.notDone) return out;
+  if (!counted(s)) return out;
   const band = s.band, off = s.place !== 'water';
   // off the water a distance is not paddled, so only written time is looked at
   const mins = (a, zone) => minutesOf(off ? { sec: a.sec, m: 0 } : a, ZONES.includes(zone) ? zone : 'R0', tables, band);
@@ -126,7 +126,7 @@ export function sessionChecks(s, tables) {
 // count     how many texts there are in all
 export function checksView(data, planId, band, today) {
   const sh = sheet(data, planId, today), tables = data.tables, plan = sh.plan;
-  const all = sortSessions(plan.sessions.filter(s => s.band === band && !s.notDone), plan.bands).map(s => sessionView(data, s, today));
+  const all = sortSessions(plan.sessions.filter(s => s.band === band && counted(s)), plan.bands).map(s => sessionView(data, s, today));
   const races = eventsFor(data, planId, today).filter(e => e.kind === 'race' && e.importance <= 2);
   const allowed = tables.zones[band];
   const content = z => contentOf(tables, z);
@@ -146,10 +146,11 @@ export function checksView(data, planId, band, today) {
       }
     }
 
-    // quality in the morning, volume in the afternoon (slide 196)
-    for (const pm of list.filter(s => s.slot === 'pm')) {
-      const am = list.find(s => s.date === pm.date && s.slot === 'am');
-      if (am && wrongHalf(am, pm)) week.push(tr('{0} before {1}: the quality session is recommended in the morning', named(am), named(pm)));
+    // quality first, volume after it (slide 196)
+    for (const pm of list) {
+      for (const am of list.filter(s => s.date === pm.date && s.slot < pm.slot)) {
+        if (wrongHalf(am, pm)) week.push(tr('{0} before {1}: the quality session is recommended first', named(am), named(pm)));
+      }
     }
 
     // race-pace sessions in the week (the race-pace table)

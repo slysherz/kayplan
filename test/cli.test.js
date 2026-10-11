@@ -67,7 +67,7 @@ test('command line: check', async t => {
   t.after(() => fs.rm(dir, { recursive: true }));
   assert.deepEqual(run(dir, 'check', '--as-of', '2026-01-21'), { code: 0, out: 'ok\n', err: '' });
   assert.deepEqual(run(dir, 'check', '--as-of', '2026-02-15'), { code: 0, out: 'warning: events.txt:1: Spring regatta (2026-02-14) is in the past and its date was never confirmed\n0 errors, 1 warnings\n', err: '' });
-  await store.write('plans/group-a/sessions.txt', '2026-01-20 pm guest: 6km R1\n');
+  await store.write('plans/group-a/sessions.txt', '2026-01-20 guest: 6km R1\n');
   assert.deepEqual(run(dir, 'check', '--as-of', '2026-01-21'), { code: 1, out: 'error: plans/group-a/sessions.txt:1: plan group-a has no band "guest"\n1 errors, 0 warnings\n', err: '' });
 });
 

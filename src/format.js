@@ -12,7 +12,6 @@ import { PATTERNS, CONTENT_ZONES } from './cycles.js';
 export const KINDS = ['race', 'test', 'camp', 'holiday', 'no-water'];
 export const RACE_TYPES = ['sprint', 'fundo', 'maratona'];
 export const BOATS = ['solo', 'crew', 'mixed'];
-export const SLOTS = ['am', 'pm'];
 // where a session happens; km are only counted on the water
 export const PLACES = ['water', 'pool', 'gym', 'land'];
 
@@ -452,22 +451,33 @@ export function serializeWeeks(hand) {
 }
 
 // ---- plans/<plan>/sessions.txt ----------------------------------------------
-// 2026-10-11 am junior: 1km R1 + 8x 4' R2/1' R0 + 1km R1
+// 2026-10-11 junior: 1km R1 + 8x 4' R2/1' R0 + 1km R1
 //   K2 on the last four reps
-// 2026-10-14 pm junior not-done: 6km R1
-// 2026-10-15 pm junior pool: 3x 10' R2/3'
+// 2026-10-11 junior gym: circuit
+// 2026-10-11 junior gym alt: long circuit
+// 2026-10-14 junior not-done: 6km R1
 //
-// Date, slot, band, then the place when it is not the water (pool, gym, land), then "not-done" when
-// it did not happen. Everything after the first colon is the plan text, on one line. Indented lines
-// are notes.
+// Date, band, then the place when it is not the water (pool, gym, land), then "alt" when it is done
+// in place of the others and counts for nothing, then "not-done" when it did not happen. Everything
+// after the first colon is the plan text, on one line. Indented lines are notes.
+// A band has any number of sessions on a day, in the order of their lines: slot is that order, from 1.
+// The older "date am band:" and "date pm band:" are still read, the morning first.
 
 export function parseSessions(source) {
   const { blocks, errors } = readBlocks(source);
   const value = [];
   for (const b of blocks) {
-    const m = /^(\S+) (am|pm) ([a-z0-9][a-z0-9-]*)(?: (pool|gym|land))?( not-done)?:(?: (.*))?$/.exec(b.head);
-    if (!m || !isDate(m[1])) { errors.push({ line: b.line, message: 'a session is written "date slot band: plan", like "2026-10-11 am junior: 6km R1"' }); continue; }
-    value.push({ date: m[1], slot: m[2], band: m[3], place: m[4] || 'water', notDone: !!m[5], text: (m[6] || '').trim(), notes: b.sub.map(s => s.text).join('\n'), line: b.line });
+    const m = /^(\S+) (?:(am|pm) )?([a-z0-9][a-z0-9-]*)(?: (water|pool|gym|land))?( alt)?( not-done)?:(?: (.*))?$/.exec(b.head);
+    if (!m || !isDate(m[1])) { errors.push({ line: b.line, message: 'a session is written "date band: plan", like "2026-10-11 junior: 6km R1"' }); continue; }
+    value.push({ date: m[1], half: m[2] === 'am' ? 0 : m[2] === 'pm' ? 1 : 2, band: m[3], place: m[4] || 'water', alt: !!m[5], notDone: !!m[6], text: (m[7] || '').trim(), notes: b.sub.map(s => s.text).join('\n'), line: b.line });
+  }
+  // the order on the day: the lines as they come, an older morning line before an afternoon one
+  const seen = new Map();
+  for (const s of value.map((s, i) => ({ s, i })).sort((a, b) => a.s.half - b.s.half || a.i - b.i).map(x => x.s)) {
+    const k = s.date + ' ' + s.band;
+    seen.set(k, (seen.get(k) || 0) + 1);
+    s.slot = seen.get(k);
+    delete s.half;
   }
   return { value, errors };
 }
@@ -506,25 +516,35 @@ export function plain(text) {
   return String(text || '').replace(/\s+/g, '').toLowerCase();
 }
 
+// a session that is planned work: not marked not done, and not an alternative to the others
+export function counted(s) {
+  return !s.notDone && !s.alt;
+}
+
+// the place a new session of this band takes on this day: after the ones that are there
+export function nextSlot(sessions, date, band) {
+  return sessions.reduce((n, s) => s.date === date && s.band === band ? Math.max(n, s.slot) : n, 0) + 1;
+}
+
 export function sessionKey(s) {
   return s.date + ' ' + s.slot + ' ' + s.band;
 }
 
-// bands gives the order of the bands within a slot
+// by day, then band (bands gives their order), then the order on the day
 export function sortSessions(sessions, bands) {
   const rank = b => { const i = (bands || []).indexOf(b); return i < 0 ? 1000 : i; };
   return sessions.slice().sort((a, b) =>
     a.date !== b.date ? (a.date < b.date ? -1 : 1) :
-    a.slot !== b.slot ? (a.slot < b.slot ? -1 : 1) :
     rank(a.band) !== rank(b.band) ? rank(a.band) - rank(b.band) :
-    a.band < b.band ? -1 : a.band > b.band ? 1 : 0);
+    a.band !== b.band ? (a.band < b.band ? -1 : 1) :
+    a.slot - b.slot);
 }
 
 export function serializeSessions(sessions, bands) {
   const lines = [];
   for (const s of sortSessions(sessions, bands)) {
     const plan = String(s.text || '').replace(/\s+/g, ' ').trim();
-    lines.push(s.date + ' ' + s.slot + ' ' + s.band + (s.place && s.place !== 'water' ? ' ' + s.place : '') + (s.notDone ? ' not-done' : '') + ':' + (plan ? ' ' + plan : ''));
+    lines.push(s.date + ' ' + s.band + (s.place && s.place !== 'water' ? ' ' + s.place : '') + (s.alt ? ' alt' : '') + (s.notDone ? ' not-done' : '') + ':' + (plan ? ' ' + plan : ''));
     const notes = String(s.notes || '').split(/\r?\n/).map(n => n.trim());
     while (notes.length && notes[0] === '') notes.shift();
     while (notes.length && notes[notes.length - 1] === '') notes.pop();

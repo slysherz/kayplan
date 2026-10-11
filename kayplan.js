@@ -8,6 +8,7 @@ import { clockToday, isDate } from './src/dates.js';
 import { load, usable, planOf, weekOf } from './src/engine.js';
 import { weekSheet, sheetHtml } from './src/export.js';
 import { setLang } from './src/lang.js';
+import { nextSlot } from './src/format.js';
 import { seasonReport, weekReport, eventsReport, checkReport, gridReport, zoneReport, checksReport, typesReport, suggestReport, dayReport } from './src/report.js';
 
 const USAGE = `usage: node kayplan.js <command> [options]
@@ -17,7 +18,7 @@ const USAGE = `usage: node kayplan.js <command> [options]
   show day [date]        what every plan does on one day; without a date, today
   show grid              the capacity grid: sessions a week per zone with their state, and km
   show checks            what the course would question about the sessions and weeks that are written
-  show suggestions <date> <am|pm>   the sessions suggested for a slot, the most likely first
+  show suggestions <date> [n]   the sessions suggested for the band's nth session of a day (default: a new one), the most likely first
   show zone <zone>       what a zone is and how the course says to train it, e.g. show zone R3
   show types             what each week type is for, with its load
   show events            the races and events table
@@ -82,10 +83,10 @@ if (command === 'show events') {
   if (!out.length) fail('no band "' + opts.band + '" in ' + plans.join(', '));
   console.log(out.join('\n\n\n'));
 } else if (command === 'show suggestions') {
-  if (!isDate(words[2] || '') || !['am', 'pm'].includes(words[3])) fail('show suggestions needs a date and am or pm, like: show suggestions 2026-10-12 pm');
+  if (!isDate(words[2] || '') || (words[3] !== undefined && !/^[1-9]\d*$/.test(words[3]))) fail('show suggestions needs a date, like: show suggestions 2026-10-12');
   const ask = { zone: opts.zone ? opts.zone.toUpperCase() : undefined, query: opts.find, place: opts.place };
   const out = [];
-  for (const id of plans) { for (const b of planOf(data, id).bands) { if (opts.band === undefined || opts.band === b) out.push(suggestReport(data, id, b, words[2], words[3], today, ask)); } }
+  for (const id of plans) { for (const b of planOf(data, id).bands) { if (opts.band === undefined || opts.band === b) out.push(suggestReport(data, id, b, words[2], words[3] ? +words[3] : nextSlot(planOf(data, id).sessions, words[2], b), today, ask)); } }
   if (!out.length) fail('no band "' + opts.band + '" in ' + plans.join(', '));
   console.log(out.join('\n\n'));
 } else if (command === 'show checks') {

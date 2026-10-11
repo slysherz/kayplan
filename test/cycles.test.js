@@ -13,10 +13,10 @@ function plan() {
     macros: parseCycles(CYCLES).value,
     hand: [{ monday: '2026-01-26', type: 'R', load: null }, { monday: '2026-02-23', type: 'CH', load: 90 }],   // weeks 4 and 8
     sessions: [
-      { date: '2026-01-06', slot: 'pm', band: 'older', text: 'week 1 Tue' },
-      { date: '2026-01-31', slot: 'am', band: 'older', text: 'week 4 Sat' },
-      { date: '2026-02-24', slot: 'pm', band: 'older', text: 'week 8 Tue' },
-      { date: '2026-03-17', slot: 'pm', band: 'older', text: 'week 11 Tue' }
+      { date: '2026-01-06', slot: 2, band: 'older', text: 'week 1 Tue' },
+      { date: '2026-01-31', slot: 1, band: 'older', text: 'week 4 Sat' },
+      { date: '2026-02-24', slot: 2, band: 'older', text: 'week 8 Tue' },
+      { date: '2026-03-17', slot: 2, band: 'older', text: 'week 11 Tue' }
     ]
   };
 }

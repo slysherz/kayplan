@@ -133,7 +133,7 @@ test('km counted from sessions: per week, per zone, done and planned', async () 
 });
 
 test('km counted from sessions: off the water gives minutes, not km', async () => {
-  const data = await load({ 'plans/group-a/sessions.txt': "2026-01-20 pm older pool: 10' R1 + 3x 10' R2/3'\n2026-01-21 am older gym not-done: 40' circuit\n2026-01-22 am older: 4km R1\n" });
+  const data = await load({ 'plans/group-a/sessions.txt': "2026-01-20 older pool: 10' R1 + 3x 10' R2/3'\n2026-01-21 older gym not-done: 40' circuit\n2026-01-22 older: 4km R1\n" });
   const w = kmView(data, 'group-a', 'older', TODAY).weeks[2];
   assert.deepEqual([w.km, w.zones, w.offMin], [4, { R1: 4 }, 40]);
   const v = e.weekView(data, 'group-a', 3, TODAY).days[1].sessions[0];

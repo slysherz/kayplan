@@ -15,7 +15,7 @@ const MONTH_NAMES = {
   en: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
   pt: ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
 };
-const PLACE = { water: 'Water', pool: 'Pool', gym: 'Gym', land: 'Land' };
+const PLACE = { water: 'Water', pool: 'Pool', gym: 'Gym', land: 'Run' };
 
 const month = iso => (MONTH_NAMES[getLang()] || MONTH_NAMES.en)[+iso.slice(5, 7) - 1];
 const day = iso => tr('{0} {1}', +iso.slice(8), month(iso));
@@ -23,12 +23,13 @@ const day = iso => tr('{0} {1}', +iso.slice(8), month(iso));
 const range = (a, b) => tr('{0} to {1}', a.slice(0, 7) === b.slice(0, 7) ? +a.slice(8) : day(a), day(b));
 
 // What the sheet of one band's week holds.
-// { title, season, period, file, days: [{ name, events, sessions: [{ place, lines, notes }] }] }
+// { title, season, period, file, days: [{ name, events, sessions: [{ place, alt, lines, notes }] }] }
 //   title    the club's name (name: in season.txt), or the plan's
 //   season   "Season 2026–27 · September/October": the months of the week's block, or of the week
 //   period   the macrocycle and the week's dates
 //   file     the name the sheet is saved under
 //   lines    the session's text as outline lays it out; the sheet centres them, so no line is stepped in
+//   alt      it is done in place of the others: these come last, under their own line
 // A session with nothing written, or marked not done, is left out.
 export function weekSheet(data, planId, band, n, today) {
   const w = weekView(data, planId, n, today), s = data.season;
@@ -43,8 +44,8 @@ export function weekSheet(data, planId, band, n, today) {
     days: w.days.map(d => ({
       name: (WEEKDAYS[getLang()] || WEEKDAYS.en)[d.weekday],
       events: d.events.map(e => e.name),
-      sessions: d.sessions.filter(x => x.band === band && !x.notDone && String(x.text || '').trim()).map(x => ({
-        place: tr(PLACE[x.place] || 'Water'),
+      sessions: d.sessions.filter(x => x.band === band && !x.notDone && String(x.text || '').trim()).sort((a, b) => a.alt - b.alt).map(x => ({
+        place: tr(PLACE[x.place] || 'Water'), alt: x.alt,
         lines: outline(x.text, 30).map(l => l.text),
         notes: String(x.notes || '').split(/\r?\n/).map(t => t.trim()).filter(Boolean)
       }))
@@ -57,7 +58,8 @@ const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(
 // The sheet as a page of its own, ready to be printed or saved as a PDF.
 export function sheetHtml(sh) {
   const col = d => '<td>' + d.events.map(e => '<i>' + esc(e) + '</i>').join('') +
-    d.sessions.map(x => '<b>' + esc(x.place) + '</b><p>' + x.lines.map(esc).join('<br>') + '</p>' + x.notes.map(t => '<small>(' + esc(t) + ')</small>').join('')).join('<u>+</u>') + '</td>';
+    d.sessions.map((x, i) => (x.alt ? (i && d.sessions[i - 1].alt ? '<u>+</u>' : '<em>' + esc(tr('For those not on the water')) + ';</em>') : i ? '<u>+</u>' : '') +
+      '<b>' + esc(x.place) + '</b><p>' + x.lines.map(esc).join('<br>') + '</p>' + x.notes.map(t => '<small>(' + esc(t) + ')</small>').join('')).join('') + '</td>';
   return '<!doctype html><html><head><meta charset="utf-8"><title>' + esc(sh.file) + '</title><style>' +
     '@page { size: A4 landscape; margin: 12mm 10mm; }' +
     'html, body { margin: 0; }' +
@@ -70,7 +72,8 @@ export function sheetHtml(sh) {
     'caption h3 { margin: 0; padding: 1pt 3pt 1pt 9%; font: italic 7pt Arial, Helvetica, sans-serif; }' +
     'th { background: #0000FF; color: #FFFFFF; font: italic 8pt Arial, Helvetica, sans-serif; padding: 1pt 0; border-color: #0000FF; }' +
     'td { vertical-align: top; text-align: center; height: 95mm; padding: 2pt 3pt 6pt; border-left-color: #000000; border-right-color: #000000; border-bottom-color: #000000; }' +
-    'td b, td i, td p, td small, td u { display: block; }' +
+    'td b, td i, td p, td small, td u, td em { display: block; }' +
+    'td em { font-style: normal; font-size: 7pt; text-align: left; margin: 14pt 0 10pt; }' +
     'td b { font-size: 9pt; margin-bottom: 11pt; }' +
     'td i { font-size: 8pt; margin-bottom: 6pt; }' +
     'td p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.35; }' +

@@ -70,7 +70,7 @@ export function checksReport(data, planId, band, today) {
     if (!c.count) continue;
     out.push('week ' + c.n);
     for (const t of c.week) out.push('  ' + t);
-    for (const key of Object.keys(c.sessions)) for (const t of c.sessions[key]) out.push('  ' + key.split(' ').slice(0, 2).join(' ') + ' · ' + t);
+    for (const key of Object.keys(c.sessions)) for (const t of c.sessions[key]) out.push('  ' + key.split(' ')[0] + ' · ' + t);
   }
   if (out.length === 1) out.push('nothing');
   return out.join('\n');
@@ -80,7 +80,7 @@ export function checksReport(data, planId, band, today) {
 export function suggestReport(data, planId, band, date, slot, today, ask) {
   const r = suggestions(data, planId, band, date, slot, today, ask), n = weekOf(data.season, date);
   const type = n ? sheet(data, planId, today).weeks[n - 1].type : null, missing = r.zones.filter(z => z.missing).map(z => z.zone);
-  const out = [planId + ' · ' + band + ' · ' + date + ' ' + slot + (n ? ' · week ' + n + (type ? ' (' + type + ')' : '') : '') + (missing.length ? ' · missing ' + missing.join(', ') : '')];
+  const out = [planId + ' · ' + band + ' · ' + date + ' · session ' + slot + (n ? ' · week ' + n + (type ? ' (' + type + ')' : '') : '') + (missing.length ? ' · missing ' + missing.join(', ') : '')];
   const rows = r.list.map(x => ['  ' + (x.main || '-'), x.min > 0 ? minutesText(x.min) : '', (x.place !== 'water' ? x.place + ': ' : '') + (x.name ? x.name + ' = ' : '') + x.text, [x.used ? 'last ' + x.used : '', x.clash ? 'clashes' : ''].filter(Boolean).join(' · ')]);
   if (rows.length) out.push(table(rows, [1]));
   out.push(r.list.length < r.total ? '  ' + r.list.length + ' of ' + r.total : (r.total ? '' : '  nothing'));
@@ -94,7 +94,7 @@ export function dayReport(data, date, today) {
   for (const p of d.plans) for (const e of p.events) { if (!seen.has(e.name)) { seen.add(e.name); out.push('  ' + eventText(e)); } }
   for (const p of d.plans) {
     for (const s of p.sessions) {
-      out.push(s.slot + ' ' + p.id + ' ' + s.band + (s.place !== 'water' ? ' ' + s.place : '') + (s.notDone ? ' · not done' : '') + ' · ' + (s.main || 'no zone') + ' · ' + (s.name ? s.name + ' = ' : '') + (s.text || '(empty)'));
+      out.push(p.id + ' ' + s.band + ' ' + s.place + (s.alt ? ' · alternative' : '') + (s.notDone ? ' · not done' : '') + ' · ' + (s.main || 'no zone') + ' · ' + (s.name ? s.name + ' = ' : '') + (s.text || '(empty)'));
       for (const line of s.notes ? s.notes.split('\n') : []) out.push(('    ' + line).trimEnd());
     }
   }
@@ -127,7 +127,7 @@ export function weekReport(data, planId, n, today, band) {
     for (const e of d.events) out.push('  ' + eventText(e));
     for (const s of d.sessions) {
       if (band && s.band !== band) continue;
-      out.push('  ' + s.slot + ' ' + s.band + (s.place !== 'water' ? ' ' + s.place : '') + ' · ' + s.status + ' · main zone ' + (s.main || 'none') + ' · ' + (s.text || '(empty)'));
+      out.push('  ' + s.slot + ' ' + s.band + ' ' + s.place + ' · ' + s.status + ' · main zone ' + (s.main || 'none') + ' · ' + (s.text || '(empty)'));
       const work = s.parts.slice().reverse().map(p => p.zone + ' ' + minutesText(p.min));
       if (s.unzoned) work.push('no zone ' + amountText(s.unzoned));
       if (s.place === 'water' && s.totalKm > 0) work.push(one(s.totalKm) + ' km');

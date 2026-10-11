@@ -83,14 +83,14 @@ export function fixture() {
     'plans/group-a/plan.txt': 'name: Group A\nbands: older, younger\n',
     'plans/group-a/cycles.txt': CYCLES,
     'plans/group-a/weeks.txt': '2026-01-19 R\n2026-02-02 C 70\n',
-    'plans/group-a/sessions.txt': `2026-01-20 pm older: 1km R1 + 8x 4' R2/1' R0 + 1km R1
+    'plans/group-a/sessions.txt': `2026-01-20 older: 1km R1 + 8x 4' R2/1' R0 + 1km R1
   crew boats on the last four
 
   watch the stroke rate
-2026-01-20 pm younger: 2x2000m
-2026-01-22 am older not-done: 6km R1 + 4x(15'' R7 + 15'' R0)
+2026-01-20 younger: 2x2000m
+2026-01-22 older not-done: 6km R1 + 4x(15'' R7 + 15'' R0)
   no water
-2026-01-24 am older: 20' R1 + 4x 10'' R6/2' + 10' R1
+2026-01-24 older: 20' R1 + 4x 10'' R6/2' + 10' R1
 `,
     'plans/group-b/plan.txt': 'name: Group B\nbands: masters\n',
     'plans/group-b/cycles.txt': 'Only macro\n  12 none  -  Unplanned\n',

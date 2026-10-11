@@ -155,37 +155,47 @@ test('weeks set by hand', () => {
 test('sessions', () => {
   const sessions = f.parseSessions(files['plans/group-a/sessions.txt']).value;
   assert.deepEqual(strip(sessions), [
-    { date: '2026-01-20', slot: 'pm', band: 'older', place: 'water', notDone: false, text: "1km R1 + 8x 4' R2/1' R0 + 1km R1", notes: 'crew boats on the last four\n\nwatch the stroke rate' },
-    { date: '2026-01-20', slot: 'pm', band: 'younger', place: 'water', notDone: false, text: '2x2000m', notes: '' },
-    { date: '2026-01-22', slot: 'am', band: 'older', place: 'water', notDone: true, text: "6km R1 + 4x(15'' R7 + 15'' R0)", notes: 'no water' },
-    { date: '2026-01-24', slot: 'am', band: 'older', place: 'water', notDone: false, text: "20' R1 + 4x 10'' R6/2' + 10' R1", notes: '' }
+    { date: '2026-01-20', slot: 1, band: 'older', place: 'water', alt: false, notDone: false, text: "1km R1 + 8x 4' R2/1' R0 + 1km R1", notes: 'crew boats on the last four\n\nwatch the stroke rate' },
+    { date: '2026-01-20', slot: 1, band: 'younger', place: 'water', alt: false, notDone: false, text: '2x2000m', notes: '' },
+    { date: '2026-01-22', slot: 1, band: 'older', place: 'water', alt: false, notDone: true, text: "6km R1 + 4x(15'' R7 + 15'' R0)", notes: 'no water' },
+    { date: '2026-01-24', slot: 1, band: 'older', place: 'water', alt: false, notDone: false, text: "20' R1 + 4x 10'' R6/2' + 10' R1", notes: '' }
   ]);
   assert.equal(sessions[2].line, 6);
   // the plan text is kept as typed, colons and bars included
-  assert.equal(f.parseSessions('2026-01-20 am older: unilateral (D | E): 2x 300m\n').value[0].text, 'unilateral (D | E): 2x 300m');
-  assert.equal(f.parseSessions('2026-01-20 am older:\n').value[0].text, '');
+  assert.equal(f.parseSessions('2026-01-20 older: unilateral (D | E): 2x 300m\n').value[0].text, 'unilateral (D | E): 2x 300m');
+  assert.equal(f.parseSessions('2026-01-20 older:\n').value[0].text, '');
   // the place, when it is not the water
-  const pool = f.parseSessions("2026-01-20 am older pool: 3x 10' R2/3'\n2026-01-21 am older gym not-done: circuit\n").value;
+  const pool = f.parseSessions("2026-01-20 older pool: 3x 10' R2/3'\n2026-01-21 older gym not-done: circuit\n").value;
   assert.deepEqual(pool.map(x => [x.place, x.notDone, x.text]), [['pool', false, "3x 10' R2/3'"], ['gym', true, 'circuit']]);
-  assert.equal(f.serializeSessions(pool, ['older']), "2026-01-20 am older pool: 3x 10' R2/3'\n2026-01-21 am older gym not-done: circuit\n");
-  assert.equal(f.serializeSessions([{ date: '2026-01-20', slot: 'am', band: 'older', place: 'water', text: '6km R1' }]), '2026-01-20 am older: 6km R1\n');
-  assert.match(f.parseSessions('2026-01-20 am older lake: 6km R1\n').errors[0].message, /a session is written/);
+  assert.equal(f.serializeSessions(pool, ['older']), "2026-01-20 older pool: 3x 10' R2/3'\n2026-01-21 older gym not-done: circuit\n");
+  assert.equal(f.serializeSessions([{ date: '2026-01-20', slot: 1, band: 'older', place: 'water', text: '6km R1' }]), '2026-01-20 older: 6km R1\n');
+  // any number on a day, in the order of their lines; one done in place of the others is "alt"
+  const day = "2026-01-20 older: 6km R1\n2026-01-20 older gym: circuit\n2026-01-20 older gym alt not-done: long circuit\n  for those not on the water\n2026-01-20 younger land: 20' R1\n";
+  assert.deepEqual(f.parseSessions(day).value.map(x => [x.band, x.slot, x.place, x.alt, x.notDone]), [['older', 1, 'water', false, false], ['older', 2, 'gym', false, false], ['older', 3, 'gym', true, true], ['younger', 1, 'land', false, false]]);
+  assert.equal(f.serializeSessions(f.parseSessions(day).value, ['older', 'younger']), day);
+  assert.deepEqual([f.counted({}), f.counted({ alt: true }), f.counted({ notDone: true })], [true, false, false]);
+  assert.equal(f.nextSlot(f.parseSessions(day).value, '2026-01-20', 'older'), 4);
+  // the older lines with the half of the day are read, the morning first whatever the order of the lines
+  const old = f.parseSessions("2026-01-20 pm older gym: circuit\n2026-01-20 am older: 6km R1\n").value;
+  assert.deepEqual(old.map(x => [x.slot, x.place]), [[2, 'gym'], [1, 'water']]);
+  assert.equal(f.serializeSessions(old, ['older']), "2026-01-20 older: 6km R1\n2026-01-20 older gym: circuit\n");
+  assert.match(f.parseSessions('2026-01-20 older lake: 6km R1\n').errors[0].message, /a session is written/);
   assert.match(f.parseSessions('2026-01-20 noon older: 6km R1\n').errors[0].message, /a session is written/);
-  assert.match(f.parseSessions('2026-01-32 am older: 6km R1\n').errors[0].message, /a session is written/);
+  assert.match(f.parseSessions('2026-01-32 older: 6km R1\n').errors[0].message, /a session is written/);
   assert.match(f.parseSessions('6km R1\n').errors[0].message, /a session is written/);
 });
 
-test('sessions are written in date, slot and band order, on one line each', () => {
+test('sessions are written in date, band and day order, on one line each', () => {
   const text = f.serializeSessions([
-    { date: '2026-01-21', slot: 'am', band: 'younger', notDone: false, text: '  4km\n R1 ', notes: '\n  first\n\n\nsecond  \n\n' },
-    { date: '2026-01-20', slot: 'pm', band: 'older', notDone: true, text: '', notes: '' },
-    { date: '2026-01-21', slot: 'am', band: 'older', notDone: false, text: '6km R1', notes: '' },
-    { date: '2026-01-20', slot: 'am', band: 'guest', notDone: false, text: 'yoga', notes: '' }
+    { date: '2026-01-21', slot: 1, band: 'younger', notDone: false, text: '  4km\n R1 ', notes: '\n  first\n\n\nsecond  \n\n' },
+    { date: '2026-01-20', slot: 1, band: 'older', notDone: true, text: '', notes: '' },
+    { date: '2026-01-21', slot: 1, band: 'older', notDone: false, text: '6km R1', notes: '' },
+    { date: '2026-01-20', slot: 1, band: 'guest', notDone: false, text: 'yoga', notes: '' }
   ], ['older', 'younger']);
-  assert.equal(text, `2026-01-20 am guest: yoga
-2026-01-20 pm older not-done:
-2026-01-21 am older: 6km R1
-2026-01-21 am younger: 4km R1
+  assert.equal(text, `2026-01-20 older not-done:
+2026-01-20 guest: yoga
+2026-01-21 older: 6km R1
+2026-01-21 younger: 4km R1
   first
 
 

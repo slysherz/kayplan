@@ -10,7 +10,7 @@ const tables = parseTables(TABLES).value;
 // what the checks say about one session text, for the band "older" (no zones line) unless another is given
 function said(text, band = 'older', more = {}) {
   const data = { tables };
-  return sessionChecks(sessionView(data, { date: '2026-01-20', slot: 'am', band, place: 'water', text, notes: '', notDone: false, ...more }, '2026-01-01'), tables);
+  return sessionChecks(sessionView(data, { date: '2026-01-20', slot: 1, band, place: 'water', text, notes: '', notDone: false, ...more }, '2026-01-01'), tables);
 }
 
 test('tables: the lines the checks compare with', () => {
@@ -25,7 +25,7 @@ test('tables: the lines the checks compare with', () => {
   assert.deepEqual(bad, [1, 2, 3, 4, 5, 6]);
   // a season with none of these lines has none of these checks
   const none = parseTables(TABLES.split('\n').filter(l => !/^(rep|rest|recovery|warm|race-pace|most) /.test(l)).join('\n')).value;
-  const s = sessionView({ tables: none }, { date: '2026-01-20', slot: 'am', band: 'older', place: 'water', text: "5x 10' R3/1'", notes: '' }, '2026-01-01');
+  const s = sessionView({ tables: none }, { date: '2026-01-20', slot: 1, band: 'older', place: 'water', text: "5x 10' R3/1'", notes: '' }, '2026-01-01');
   assert.deepEqual(sessionChecks(s, none), []);
 });
 
@@ -83,44 +83,44 @@ async function week(sessions, n, events) {
 }
 
 test('a week: hard sessions too close together', async () => {
-  const w = await week(`2026-03-02 am older: 5km R1 + 5x 4' R3/4'
-2026-03-03 am older: 5km R1 + 5x 4' R3/4'
-2026-03-05 am older: 5km R1 + 5x 4' R3/4'
-2026-03-07 am older: 6km R1
-2026-03-07 pm older: 6km R1
+  const w = await week(`2026-03-02 older: 5km R1 + 5x 4' R3/4'
+2026-03-03 older: 5km R1 + 5x 4' R3/4'
+2026-03-05 older: 5km R1 + 5x 4' R3/4'
+2026-03-07 older: 6km R1
+2026-03-07 older: 6km R1
 `, 9);
-  assert.deepEqual(w.week, ['Mon AM (R3) and Tue AM (R3) are less than 48 h apart', 'Sat AM (R1) and Sat PM (R1) are less than 24 h apart']);
+  assert.deepEqual(w.week, ['Mon (R3) and Tue (R3) are less than 48 h apart', 'Sat (R1) and Sat (R1) are less than 24 h apart']);
   // across the weekend, and not for a session marked not done
-  const next = await week(`2026-03-01 am older: 5km R1 + 5x 4' R3/4'
-2026-03-02 am older: 5km R1 + 4x 2' R3+/2'
-2026-03-03 am older not-done: 5km R1 + 5x 4' R3/4'
+  const next = await week(`2026-03-01 older: 5km R1 + 5x 4' R3/4'
+2026-03-02 older: 5km R1 + 4x 2' R3+/2'
+2026-03-03 older not-done: 5km R1 + 5x 4' R3/4'
 `, 9);
-  assert.deepEqual(next.week, ['Sun AM (R3) and Mon AM (R3+) are less than 48 h apart']);
+  assert.deepEqual(next.week, ['Sun (R3) and Mon (R3+) are less than 48 h apart']);
 });
 
 test('a week: quality in the morning, race-pace sessions, the block\'s content', async () => {
-  const w = await week(`2026-03-03 am older: 8km R2
-2026-03-03 pm older: 5km R1 + 5x 4' R3/4'
+  const w = await week(`2026-03-03 older: 8km R2
+2026-03-03 older: 5km R1 + 5x 4' R3/4'
 `, 9);
-  assert.deepEqual(w.week, ['Tue AM (R2) before Tue PM (R3): the quality session is recommended in the morning']);
+  assert.deepEqual(w.week, ['Tue (R2) before Tue (R3): the quality session is recommended first']);
   const r7 = "5km R1 + 4x 3' R7/8'\n";
-  const prep = await week('2026-03-02 am older: ' + r7 + '2026-03-04 am older: ' + r7 + '2026-03-06 am older: ' + r7 + '2026-03-07 am older: 5km R1 + 5x 4\' R3/4\'\n', 9);
+  const prep = await week('2026-03-02 older: ' + r7 + '2026-03-04 older: ' + r7 + '2026-03-06 older: ' + r7 + '2026-03-07 older: 5km R1 + 5x 4\' R3/4\'\n', 9);
   assert.deepEqual(prep.week, ['3 R7 sessions exceed the recommended maximum of 2 a week in the preparatory period']);
-  const comp = await week('2026-03-16 am older: ' + r7 + '2026-03-17 am older: ' + r7 + '2026-03-18 am older: ' + r7, 11);
+  const comp = await week('2026-03-16 older: ' + r7 + '2026-03-17 older: ' + r7 + '2026-03-18 older: ' + r7, 11);
   assert.deepEqual(comp.week, []);
   // a block of R3 with a week of R1 only; a week with no session says nothing
-  assert.deepEqual((await week('2026-03-02 am older: 8km R1\n', 9)).week, ["R3-R3+ is the block's content and has no session this week"]);
-  assert.deepEqual((await week('2026-03-02 am older: 8km R1\n', 8)).week, []);
+  assert.deepEqual((await week('2026-03-02 older: 8km R1\n', 9)).week, ["R3-R3+ is the block's content and has no session this week"]);
+  assert.deepEqual((await week('2026-03-02 older: 8km R1\n', 8)).week, []);
 });
 
 test('a week: recovery weeks, the days around a race, the taper', async () => {
   // week 10 is the recovery week of the R3 block
-  assert.deepEqual((await week("2026-03-10 am older: 5km R1 + 5x 4' R3/4'\n", 10)).week, ['A recovery week with Tue AM (R3): low volume and intensity are recommended']);
+  assert.deepEqual((await week("2026-03-10 older: 5km R1 + 5x 4' R3/4'\n", 10)).week, ['A recovery week with Tue (R3): low volume and intensity are recommended']);
   const race = '2026-03-14 Big race\n  kind: race\n  type: sprint\n  boats: solo\n  plans: group-a 1\n';
-  const w = await week("2026-03-13 am older: 5km R1 + 5x 4' R3/4'\n2026-03-15 am older: 6km R1\n", 10, race);
-  assert.deepEqual(w.week, ['A recovery week with Fri AM (R3): low volume and intensity are recommended', 'Fri AM (R3) is the day before Big race: a light day is recommended', 'Sun is the day after Big race: a day off is recommended']);
+  const w = await week("2026-03-13 older: 5km R1 + 5x 4' R3/4'\n2026-03-15 older: 6km R1\n", 10, race);
+  assert.deepEqual(w.week, ['A recovery week with Fri (R3): low volume and intensity are recommended', 'Fri (R3) is the day before Big race: a light day is recommended', 'Sun is the day after Big race: a day off is recommended']);
   // week 12 is the race week of the competitive block
-  const taper = await week("2026-03-16 am older: 5km R1 + 4x 3' R7/8'\n2026-03-18 am older: 6km R1\n2026-03-20 am older: 6km R1\n2026-03-24 am older: 5km R1 + 4x 3' R7/8'\n", 12);
+  const taper = await week("2026-03-16 older: 5km R1 + 4x 3' R7/8'\n2026-03-18 older: 6km R1\n2026-03-20 older: 6km R1\n2026-03-24 older: 5km R1 + 4x 3' R7/8'\n", 12);
   assert.deepEqual(taper.week, ['1 sessions, 3 the week before: in the taper, lower the volume and keep the number of sessions']);
 });
 
@@ -129,9 +129,9 @@ test('show checks lists every week with something, session by session', async ()
   const data = await load(memoryStore(files));
   assert.equal(checksReport(data, 'group-a', 'older', '2026-01-21'), `group-a · older · what the course would question
 week 3
-  2026-01-24 am · R6: 2' of rest, below the recommended minimum of 3'`);
+  2026-01-24 · R6: 2' of rest, below the recommended minimum of 3'`);
   assert.equal(checksReport(data, 'group-b', 'masters', '2026-01-21'), 'group-b · masters · what the course would question\nnothing');
   const c = checksView(data, 'group-a', 'older', '2026-01-21');
   assert.deepEqual(c.map(x => x.count).filter(Boolean), [1]);
-  assert.deepEqual(Object.keys(c[2].sessions), ['2026-01-24 am older']);
+  assert.deepEqual(Object.keys(c[2].sessions), ['2026-01-24 1 older']);
 });

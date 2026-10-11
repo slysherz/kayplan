@@ -63,13 +63,13 @@ test('the grid: a row per zone, sessions by main zone', async () => {
 
 test('the grid: R3 with R3+ and R4 with R5 are counted together, as in the course', async () => {
   const sessions = [
-    "2026-01-19 pm older: 2km R1 + 4x 4' R3/4' R1",          // R3
-    "2026-01-20 pm older: 2km R1 + 5x 3' R3+/3' R1",         // R3+
-    "2026-01-21 pm older: 2km R1 + 6x 300m R4/4'",           // R4
-    "2026-01-22 pm older pool: 10' R1 + 3x 10' R2/3'",       // R2, in the pool
-    "2026-01-23 pm older: 20' R0 games",                     // R0 only: in no row
-    "2026-01-24 am older not-done: 2km R1 + 4x 200m R5/5'",  // R5, did not happen
-    "2026-01-24 pm older: 2km R1 + 2x 1000m R7/10'"          // R7
+    "2026-01-19 older: 2km R1 + 4x 4' R3/4' R1",          // R3
+    "2026-01-20 older: 2km R1 + 5x 3' R3+/3' R1",         // R3+
+    "2026-01-21 older: 2km R1 + 6x 300m R4/4'",           // R4
+    "2026-01-22 older pool: 10' R1 + 3x 10' R2/3'",       // R2, in the pool
+    "2026-01-23 older: 20' R0 games",                     // R0 only: in no row
+    "2026-01-24 older not-done: 2km R1 + 4x 200m R5/5'",  // R5, did not happen
+    "2026-01-24 older: 2km R1 + 2x 1000m R7/10'"          // R7
   ].join('\n') + '\n';
   const g = gridView(await load({ 'plans/group-a/sessions.txt': sessions }), 'group-a', 'older', TODAY);
   const w = z => row(g, z).weeks[2];

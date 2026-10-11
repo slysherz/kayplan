@@ -82,7 +82,7 @@ node kayplan.js show week [n] [--plan <id>] [--band <name>]   a week's sessions 
 node kayplan.js show day [date]                        what every plan does on one day (today without a date)
 node kayplan.js show grid [--plan <id>] [--band <name>]   the capacity grid: sessions and km per zone and week
 node kayplan.js show checks [--plan <id>] [--band <name>]   what the course would question, week by week
-node kayplan.js show suggestions <date> <am|pm> [--plan <id>] [--band <name>] [--zone <zone>] [--find <words>] [--place <place>]   the sessions suggested for a slot
+node kayplan.js show suggestions <date> [n] [--plan <id>] [--band <name>] [--zone <zone>] [--find <words>] [--place <place>]   the sessions suggested for a slot
 node kayplan.js show zone <zone>                       a zone's card: what it is and how the course trains it
 node kayplan.js show types                             what each week type is for, with its load
 node kayplan.js show events                            the races and events table
@@ -224,22 +224,23 @@ Only weeks whose type was set by hand: the week's Monday, the type, and a load %
 ### `season/plans/<plan>/sessions.txt`
 
 ```
-2026-10-10 am junior: 3x 2000m R2
-2026-10-10 am senior: 3x 2000m R2
-2026-10-11 am junior: 1km R1 + 8x 4' R2/1' R0 + 1km R1
-  K2 on the last four reps
-2026-10-14 pm junior not-done: 6km R1 + 4x(15'' R7 + 15'' R0)
+2026-10-10 junior: 3x 2000m R2
+2026-10-10 junior gym: Força I - 2 circuitos 8 rep
+2026-10-10 junior gym alt: Força I - 4 circuitos 10 rep
+  para quem não fizer água
+2026-10-10 senior: 3x 2000m R2
+2026-10-14 junior not-done: 6km R1 + 4x(15'' R7 + 15'' R0)
   no water
-2026-10-15 pm junior pool: 10' R1 + 3x 10' R2/3'
+2026-10-15 junior pool: 10' R1 + 3x 10' R2/3'
 ```
 
-- Head: date, slot (`am` or `pm`), band, then the place when it is not the water (`pool`, `gym`, `land`), then `not-done` if it did not happen. Everything after the first colon is the plan text, on one line, in the notation of DESIGN.md 8.1.
+- Head: date, band, then the place when it is not the water (`pool`, `gym`, `land`), then `alt` if it is an alternative, then `not-done` if it did not happen. Everything after the first colon is the plan text, on one line, in the notation of DESIGN.md 8.1.
 - Indented lines are notes.
-- One session per date, slot and band.
-- A session whose date has passed counts as done unless it is marked `not-done`.
-- Write the zone next to the work (`6km R1`): the main zone and the km are worked out from the text and never stored. Work with no zone has no main zone; `show week` prints it as "no zone".
-- The zone can also be written once for a set, before it or just after its bracket (`R2 3x(4'-6'-6'-4'/1')/3'`, `3x(4'-6'/1') R2/3'`), or once for the session with a colon (`R2: 3x(4'-6'/1')/3' + 2km`). It is then the zone of the work that has none of its own; rest never takes it. A zone after the rest of a set (`…/3' R1`) is the rest's zone. The course's `×` is read as `x`.
-- Off the water, write the work in time with its zone (`3x 10' R2/3'`). It counts for the main zone, gives minutes and no km.
+- **A band has any number of sessions on a day, each in a place** (the coach, 2026-10-11: water, gym, pool and run in place of morning and afternoon, and more than one of each). Their order is the order of the lines; in the code `slot` is that order, from 1, given when the file is read (`parseSessions`), and a session's key is date, slot and band. A new session goes after the band's others of that day (`nextSlot`); removing one moves the later ones up. There is no way yet to change the order on the page.
+- `alt` marks a session done in place of the others ("para quem não fizer água"). It counts for nothing: not in the km, the minutes off the water, the capacity grid, the checks or the suggestions (`counted` in `src/format.js`, with `not-done`). The week sheet prints the day's alternatives last, under "Quem não fizer água;".
+- The older lines with `am` or `pm` after the date are still read, the morning first; a file is written in the new form the next time the page saves it.
+- `land` is shown as "Corrida" (Run).
+- With the half of the day gone, the course's "quality in the morning" (slide 196) is checked as "quality first": a volume session before a quality one on the same day. A check names a session by its day and zone, "Tue (R3)".
 
 ### `season/library.txt`
 

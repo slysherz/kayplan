@@ -7,7 +7,7 @@ import { sheet, sessionView, weekOf } from './engine.js';
 import { contents } from './grid.js';
 import { tooClose, wrongHalf } from './checks.js';
 import { CONTENT_ZONES } from './cycles.js';
-import { sessionKey, plain } from './format.js';
+import { sessionKey, plain, counted } from './format.js';
 
 // how many are listed when nothing was asked for
 export const SHOWN = 5;
@@ -49,7 +49,7 @@ export function suggestions(data, planId, band, date, slot, today, ask) {
   const sh = sheet(data, planId, today), tables = data.tables, n = weekOf(data.season, date);
   const wk = n ? sh.weeks[n - 1] : null, meso = wk && wk.meso !== null ? sh.mesos[wk.meso] : null;
   const allowed = tables.zones[band] || null, here = { date, slot, band };
-  const mine = sh.plan.sessions.filter(s => s.band === band && !s.notDone && sessionKey(s) !== sessionKey(here) && same(s.text)).map(s => sessionView(data, s, today));
+  const mine = sh.plan.sessions.filter(s => s.band === band && counted(s) && sessionKey(s) !== sessionKey(here) && same(s.text)).map(s => sessionView(data, s, today));
   const earlier = s => s.date < date || (s.date === date && s.slot < slot);
 
   // every different text once: the band's own sessions, then the library
@@ -85,7 +85,7 @@ export function suggestions(data, planId, band, date, slot, today, ask) {
     const part = v.parts.find(p => p.zone === v.main);
     const as = { ...here, main: v.main, place: c.place };
     const clash = mine.some(o => earlier(o) ? tooClose(o, as, tables) > 0 : tooClose(as, o, tables) > 0) ||
-      mine.some(o => o.date === date && o.slot !== slot && (slot === 'am' ? wrongHalf(as, o) : wrongHalf(o, as)));
+      mine.some(o => o.date === date && o.slot !== slot && (slot < o.slot ? wrongHalf(as, o) : wrongHalf(o, as)));
     list.push({ text: c.text, place: c.place, notes: c.notes, name: c.name, main: v.main, min: part ? part.min : v.offMin, share: part ? part.share : 0, used: c.used, order: c.order, clash });
   }
 

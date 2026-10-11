@@ -103,10 +103,10 @@ try {
   const commits = gh.commits.length;
   await open('plan=juniors&band=junior&week=7');
   await ff.wait('return !!document.querySelector(".sheet")');
-  await ff.click('.day:nth-child(2) .add[data-v="pm"]');
+  await ff.click('.day:nth-child(2) .add[data-v="water"]');
   await ff.keys("6km R1 + 4x 10'' R6/3'");
   await saved();
-  assert.match(season('plans/juniors/sessions.txt'), /^2026-11-10 pm junior: 6km R1 \+ 4x 10'' R6\/3'$/m);
+  assert.match(season('plans/juniors/sessions.txt'), /^2026-11-10 junior: 6km R1 \+ 4x 10'' R6\/3'$/m);
   assert.ok(gh.commits.length > commits);
   assert.equal(gh.commits[gh.commits.length - 1].message, 'Kayplan: plans/juniors/sessions.txt');
   // the page notices its own commit and stays as it is, with the typing where it was
@@ -119,7 +119,7 @@ try {
   ok('typing a session is committed to the repository, and a second save follows the first');
 
   // a change from another device appears by itself
-  gh.put('season/plans/juniors/sessions.txt', season('plans/juniors/sessions.txt') + "2026-11-12 am junior: 8km R1\n");
+  gh.put('season/plans/juniors/sessions.txt', season('plans/juniors/sessions.txt') + "2026-11-12 junior: 8km R1\n");
   await ff.wait('return [...document.querySelectorAll(".chip-t")].some(c => c.textContent === "8km R1")', 8000);
   // and a save over a file that changed elsewhere is refused, with the newer text shown
   gh.put('season/plans/juniors/sessions.txt', season('plans/juniors/sessions.txt').replace('8km R1', '9km R1'));
@@ -161,7 +161,7 @@ try {
   await ff.click('.ph .b[data-act=day]');
   assert.equal(await text('.ph-d b'), 'Sat 3 Oct');
   assert.deepEqual(await ff.js('return [...document.querySelectorAll(".ph-s")].map(c => [c.querySelector(".zpill").textContent, c.querySelector(".ph-h div b").textContent, c.querySelector(".ph-h div span").textContent, [...c.querySelectorAll(".ph-t div")].map(l => l.textContent).join(" | ")])'),
-    [['R2', 'Juniors · junior', 'AM', "1km R1 | 8x 4' R2/1'R0 | 1km R1"], ['R2', 'Juniors · senior', 'AM', '3x 2000m R2']]);
+    [['R2', 'Juniors · junior', 'Water', "1km R1 | 8x 4' R2/1'R0 | 1km R1"], ['R2', 'Juniors · senior', 'Water', '3x 2000m R2']]);
   assert.equal(await text('.ph-n'), 'K2 on the last four reps');
   assert.match(await text('.ph-w'), /R2 ≈ 32' · R1 ≈ 13' · R0 ≈ 8' · ≈ 7\.9 km/);
   assert.ok(await ff.js('return document.documentElement.scrollWidth <= window.innerWidth'), 'the page is no wider than the phone');
@@ -171,11 +171,11 @@ try {
   await ff.click('[aria-label="Previous day"]');
   assert.equal(await text('.ph-d b'), 'Thu 1 Oct');
   assert.equal(await count('.ph-s.off'), 1);
-  assert.match(await text('.ph-h div span'), /PM · not done/);
+  assert.match(await text('.ph-h div span'), /Water · not done/);
   await ff.click('[data-act=day][data-v=""]');
   assert.equal(await text('.ph-d b'), 'Fri 2 Oct');
   // a change made elsewhere appears here too
-  gh.put('season/plans/cadetes/sessions.txt', "2026-10-02 pm cadete: 8km R1\n  easy\n");
+  gh.put('season/plans/cadetes/sessions.txt', "2026-10-02 cadete: 8km R1\n  easy\n");
   await ff.wait('return !!document.querySelector(".ph-s")', 8000);
   assert.equal(await text('.ph-h div b'), 'Cadetes · cadete');
   // the day is in the address, so a reload stays on it; Portuguese
@@ -254,10 +254,10 @@ try {
   assert.ok(!/setup=/.test(await ff.js('return location.href')));
   assert.equal(await text('.acct'), REPO);
   await ff.click('.swk[data-v="7"]');
-  await ff.click('.day:nth-child(7) .add[data-v="am"]');
+  await ff.click('.day:nth-child(7) .add[data-v="water"]');
   await ff.keys('5km R1');
   await saved();
-  assert.match(season('plans/cadetes/sessions.txt'), /^2026-11-15 am cadete: 5km R1$/m);
+  assert.match(season('plans/cadetes/sessions.txt'), /^2026-11-15 cadete: 5km R1$/m);
   assert.ok(gh.commits.length > before);
   ok('a link with a token that writes opens the full page, and its saves are committed');
 

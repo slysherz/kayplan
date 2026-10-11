@@ -140,7 +140,7 @@ try {
   assert.equal(await text('.sty[data-v="3"]'), 'C');
   ok('week type and load set by hand are saved; back to the pattern removes them');
 
-  await ff.click('.day:nth-child(2) .add[data-v="pm"]');
+  await ff.click('.day:nth-child(2) .add[data-v="water"]');
   await ff.keys("1km R1 + 8x 4' R2/1' R0 + 1km R1");
   assert.equal(await text('.zpill'), 'R2');
   assert.match(await text('.inf small'), /R2 ≈ 32' · R1 ≈ 13' · R0 ≈ 8' · ≈ 7\.9 km/);
@@ -148,7 +148,7 @@ try {
   assert.equal(await text('[data-id=week-km]'), '8 of 76 km');
   assert.equal(await text('.cap[data-v="3"]'), '76');
   await saved();
-  assert.match(file('plans/juniors/sessions.txt'), /^2026-10-13 pm junior: 1km R1 \+ 8x 4' R2\/1' R0 \+ 1km R1$/m);
+  assert.match(file('plans/juniors/sessions.txt'), /^2026-10-13 junior: 1km R1 \+ 8x 4' R2\/1' R0 \+ 1km R1$/m);
   await ff.click('[data-fid=s-notes]');
   await ff.keys('first line' + ff.ENTER + 'second  line ');
   await saved();
@@ -169,20 +169,20 @@ try {
 
   await choose('[data-fid=s-place]', 'pool');
   await saved();
-  assert.match(file('plans/juniors/sessions.txt'), /^2026-10-13 pm junior pool: 1km R1 /m);
+  assert.match(file('plans/juniors/sessions.txt'), /^2026-10-13 junior pool: 1km R1 /m);
   assert.equal(await text('.zpill'), 'R2');
-  assert.match(await text('.chip.on .chip-h'), /PM · R2 · pool/);
+  assert.match(await text('.chip.on .chip-h'), /Pool · R2/);
   assert.equal(await text('[data-id=week-km]'), "0 of 76 km · 41' off the water");
   assert.equal(await count('.inf .other'), 0);
   await shot('02-pool');
   await choose('[data-fid=s-place]', 'water');
   await saved();
-  assert.match(file('plans/juniors/sessions.txt'), /^2026-10-13 pm junior: 1km R1 /m);
+  assert.match(file('plans/juniors/sessions.txt'), /^2026-10-13 junior: 1km R1 /m);
   ok('a session in the pool: no km, minutes off the water, the main zone still worked out');
 
   await ff.click('[data-fid=s-notdone]');
   await saved();
-  assert.match(file('plans/juniors/sessions.txt'), /^2026-10-13 pm junior not-done: /m);
+  assert.match(file('plans/juniors/sessions.txt'), /^2026-10-13 junior not-done: /m);
   assert.match(await text('[data-id=week-km]'), /^0 of 76 km$/);
   assert.match(await text('.chip.on .chip-h'), /not done/);
   await shot('02-session');
@@ -224,12 +224,12 @@ try {
   await ff.click('[data-act=m-right]');
   await saved();
   assert.match(file('plans/juniors/cycles.txt'), /^Macrocycle I\n +2 restart +R2-R3 +Base two\n +5 intro +R1-R2 +General I\n/);
-  assert.match(file('plans/juniors/sessions.txt'), /^2026-10-13 pm junior: 6km R1$/m);   // from 29 Sep, two weeks later
-  assert.match(file('plans/juniors/sessions.txt'), /^2026-10-17 am senior: 3x 2000m R2$/m);
+  assert.match(file('plans/juniors/sessions.txt'), /^2026-10-13 junior: 6km R1$/m);   // from 29 Sep, two weeks later
+  assert.match(file('plans/juniors/sessions.txt'), /^2026-10-17 senior: 3x 2000m R2$/m);
   assert.equal(file('plans/juniors/weeks.txt'), '');
   await ff.click('[data-act=m-left]');
   await saved();
-  assert.match(file('plans/juniors/sessions.txt'), /^2026-09-29 pm junior: 6km R1$/m);
+  assert.match(file('plans/juniors/sessions.txt'), /^2026-09-29 junior: 6km R1$/m);
   await ff.click('[data-act=pop-close]');
   ok('move a block later and back: its sessions travel with it');
 
@@ -357,9 +357,9 @@ try {
   await ff.click('[data-act=view][data-v=sheet]');
   await ff.click('.pill.band[data-v="junior"]');
   await ff.click('.swk[data-v="2"]');
-  fs.appendFileSync(path.join(DIR, 'plans/juniors/sessions.txt'), "2026-10-06 pm junior: 8km R1 + 6x 10'' R6/2'\n");
+  fs.appendFileSync(path.join(DIR, 'plans/juniors/sessions.txt'), "2026-10-06 junior: 8km R1 + 6x 10'' R6/2'\n");
   await ff.wait('return document.querySelectorAll(".chip").length === 1');
-  assert.match(await text('.chip .chip-h'), /PM · R6/);
+  assert.match(await text('.chip .chip-h'), /Water · R6/);
   ok('live reload: a session written to the file appears on the page');
 
   await ff.click('.chip');
@@ -373,7 +373,7 @@ try {
 
   fs.appendFileSync(path.join(DIR, 'plans/juniors/sessions.txt'), 'next tuesday: something\n');
   await ff.wait('return /1 problem/.test(document.getElementById("status").textContent)');
-  await ff.click('.day:nth-child(5) .add[data-v="am"]');
+  await ff.click('.day:nth-child(5) .add[data-v="water"]');
   assert.match(await text('.pop.problems'), /plans\/juniors\/sessions.txt:\d+ · a session is written/);
   await shot('07-problems');
   await ff.sleep(1200);
@@ -390,15 +390,15 @@ try {
   // ================= the capacity grid, with the course's counts =================
   fresh();
   put('plans/juniors/sessions.txt', [
-    "2026-10-05 pm junior: 2km R1 + 8x 4' R2/1' R0",            // week 2: three R2 sessions
-    "2026-10-06 pm junior: 2km R1 + 3x 2000m R2/3'",
-    "2026-10-08 pm junior pool: 10' R1 + 3x 10' R2/3'",          // one of them in the pool
-    "2026-10-10 am junior: 2km R1 + 4x 4' R3/4' R1",            // one R3 and one R3+
-    "2026-10-11 am junior: 2km R1 + 5x 3' R3+/3' R1",
-    "2026-10-13 pm junior: 2km R1 + 8x 4' R2/1' R0",            // week 3: two R2, one R6
-    "2026-10-15 pm junior: 2km R1 + 3x 2000m R2/3'",
-    "2026-10-17 am junior: 20' R1 + 6x 10'' R6/2' + 10' R1",
-    "2026-10-18 am junior not-done: 2km R1 + 8x 4' R2/1' R0"     // not done: not counted
+    "2026-10-05 junior: 2km R1 + 8x 4' R2/1' R0",            // week 2: three R2 sessions
+    "2026-10-06 junior: 2km R1 + 3x 2000m R2/3'",
+    "2026-10-08 junior pool: 10' R1 + 3x 10' R2/3'",          // one of them in the pool
+    "2026-10-10 junior: 2km R1 + 4x 4' R3/4' R1",            // one R3 and one R3+
+    "2026-10-11 junior: 2km R1 + 5x 3' R3+/3' R1",
+    "2026-10-13 junior: 2km R1 + 8x 4' R2/1' R0",            // week 3: two R2, one R6
+    "2026-10-15 junior: 2km R1 + 3x 2000m R2/3'",
+    "2026-10-17 junior: 20' R1 + 6x 10'' R6/2' + 10' R1",
+    "2026-10-18 junior not-done: 2km R1 + 8x 4' R2/1' R0"     // not done: not counted
   ].join('\n') + '\n');
   await open('plan=juniors&week=2');
   const g = (zone, week) => ff.js('const c = document.querySelector(arguments[0]); return c.textContent + " " + c.className.replace(/cap mono ?| ?cur/g, "")', '.zlab[data-tip="' + zone + '"] ~ .cap[data-v="' + week + '"]');
@@ -499,10 +499,10 @@ try {
   await ff.click('[data-act=pop-close]');
   ok('the week under the click is offered for a split, on a macrocycle and on a block');
 
-  await ff.click('.day:nth-child(6) .add[data-v="am"]');
+  await ff.click('.day:nth-child(6) .add[data-v="water"]');
   await ff.keys('controlo 1km');
   await saved();
-  assert.equal(file('plans/cadetes/sessions.txt'), '2026-10-03 am cadete: controlo 1km\n');
+  assert.equal(file('plans/cadetes/sessions.txt'), '2026-10-03 cadete: controlo 1km\n');
   assert.equal(await text('.zpill'), '–');
   assert.equal(await text('.inf small'), 'No zone found · ≈ 1.0 km');   // the distance still counts toward the week
   ok('the first session creates sessions.txt; a plan with no zone says so');
@@ -511,12 +511,12 @@ try {
   await new Promise(r => server.close(r));
   await ff.keys(' R3');
   await ff.wait('return /is the server running/.test(document.getElementById("status").textContent)', 9000);
-  assert.equal(file('plans/cadetes/sessions.txt'), '2026-10-03 am cadete: controlo 1km\n');
+  assert.equal(file('plans/cadetes/sessions.txt'), '2026-10-03 cadete: controlo 1km\n');
   server = createServer(DIR);
   await new Promise(r => server.listen(PORT, '127.0.0.1', r));
   await ff.wait('return !/is the server running/.test(document.getElementById("status").textContent)', 12000);
   await saved();
-  assert.equal(file('plans/cadetes/sessions.txt'), '2026-10-03 am cadete: controlo 1km R3\n');
+  assert.equal(file('plans/cadetes/sessions.txt'), '2026-10-03 cadete: controlo 1km R3\n');
   assert.equal(await value('[data-fid=s-text]'), 'controlo 1km R3');
   ok('the server stops and starts again: the page says so, keeps the typing, and saves it afterwards');
 
@@ -532,22 +532,22 @@ try {
   await open('plan=juniors&week=2');
   assert.equal(await count('.swk.warn'), 0);
   assert.equal(await count('.chks'), 0);
-  await ff.click('.day:nth-child(1) .add[data-v="am"]');
+  await ff.click('.day:nth-child(1) .add[data-v="water"]');
   await ff.keys("1km R1 + 5x 4' R3/2'");
   await saved();
   assert.deepEqual(await ff.js('return [...document.querySelectorAll("[data-id=s-checks] div")].map(d => d.textContent)'),
     ["R3: 2' of rest after 4', below the recommended minimum of 1:1", "R3 starts 6'19'' into the session: at least 30' before it is recommended"]);
   assert.deepEqual(await ff.js('return [...document.querySelectorAll(".swk.warn")].map(b => b.textContent)'), ['2']);
   // the course's own way of writing: the zone once, before the set, with the multiplication sign
-  await ff.click('.day:nth-child(2) .add[data-v="am"]');
+  await ff.click('.day:nth-child(2) .add[data-v="water"]');
   await ff.keys("6km R1 + R3+ 4 × (6×30''/30'')/8' + 1km R1");
   await saved();
   assert.equal(await text('.zpill'), 'R3+');
   assert.match(await text('.inf small'), /R3\+ ≈ 12' · R1 ≈ 44'/);
   assert.equal(await count('[data-id=s-checks]'), 0);
   assert.deepEqual(await ff.js('return [...document.querySelectorAll("[data-id=w-checks] div")].map(d => d.textContent)'),
-    ['Mon AM (R3) and Tue AM (R3+) are less than 48 h apart', "R1 is the block's content and has no session this week", "R2 is the block's content and has no session this week",
-      "Mon AM · R3: 2' of rest after 4', below the recommended minimum of 1:1", "Mon AM · R3 starts 6'19'' into the session: at least 30' before it is recommended"]);
+    ['Mon (R3) and Tue (R3+) are less than 48 h apart', "R1 is the block's content and has no session this week", "R2 is the block's content and has no session this week",
+      "Mon · R3: 2' of rest after 4', below the recommended minimum of 1:1", "Mon · R3 starts 6'19'' into the session: at least 30' before it is recommended"]);
   await shot('12-checks');
   // the other band of the plan has its own sessions: its week 2 says nothing, only its week 1 is marked
   await ff.click('.pill.band[data-v="senior"]');
@@ -575,12 +575,52 @@ try {
   assert.equal(await count('#sheet-frame'), 1);
   ok('export: the week as a sheet of its own, sent to the printer');
 
+  // ================= several sessions a day, by place =================
+  fresh();
+  await open('plan=juniors&band=junior&week=7');
+  await ff.click('.day:nth-child(2) .add[data-v="water"]');
+  await ff.keys("60' R1");
+  await saved();
+  await ff.click('.day:nth-child(2) .add[data-v="gym"]');
+  await ff.keys('circuit');
+  await saved();
+  const kmBefore = await text('[data-id=week-km]');
+  await ff.click('.day:nth-child(2) .add[data-v="gym"]');
+  await ff.keys("long circuit 40'");
+  await ff.click('[data-fid=s-notes]');
+  await ff.keys('for those not on the water');
+  await saved();
+  assert.notEqual(await text('[data-id=week-km]'), kmBefore);
+  await choose('[data-fid=s-alt]', true);
+  await saved();
+  assert.match(file('plans/juniors/sessions.txt'), /^2026-11-10 junior: 60' R1\n2026-11-10 junior gym: circuit\n2026-11-10 junior gym alt: long circuit 40'\n  for those not on the water$/m);
+  // in the order they were added, each under its place; the alternative counts for nothing
+  assert.deepEqual(await ff.js('return [...document.querySelectorAll(".day:nth-child(2) .chip-h")].map(e => e.textContent)'), ['Water · R1', 'Gym', 'Gym · alternative']);
+  assert.equal(await text('[data-id=week-km]'), kmBefore);
+  assert.equal(await count('.day:nth-child(2) .add'), 4);
+  await ff.js('const a = document.getElementById("app"); a.scrollTop = a.scrollHeight;');
+  await shot('08-day-places');
+  await ff.js('window.printed = 0; Object.defineProperty(HTMLIFrameElement.prototype, "contentWindow", { get() { return { focus() {}, print() { window.printed++; } }; } });');
+  await ff.click('[data-act=export]');
+  await ff.wait('return window.printed === 1');
+  assert.match(await ff.js('return document.getElementById("sheet-frame").srcdoc'), /<b>Water<\/b><p>60' R1<\/p><u>\+<\/u><b>Gym<\/b><p>circuit<\/p><em>For those not on the water;<\/em><b>Gym<\/b><p>long circuit 40'<\/p><small>\(for those not on the water\)<\/small><\/td>/);
+  // deleting the one in the middle keeps the others, and the last stays selected-able
+  await ff.click('.day:nth-child(2) .chip:nth-of-type(2)');
+  await ff.click('[data-act=del]');
+  await saved();
+  assert.match(file('plans/juniors/sessions.txt'), /^2026-11-10 junior: 60' R1\n2026-11-10 junior gym alt: long circuit 40'\n/m);
+  await ff.click('.day:nth-child(2) .chip:nth-of-type(2)');
+  assert.equal(await value('[data-fid=s-text]'), "long circuit 40'");
+  await ff.sleep(2500);   // through the page's own reload
+  assert.equal(await value('[data-fid=s-text]'), "long circuit 40'");
+  ok('a day: any number of sessions, each in a place; an alternative counts for nothing and is exported under its own line');
+
   // ================= suggestions =================
   fresh();
   await open('plan=juniors&band=junior&week=7');
   const rows = () => ff.js('return [...document.querySelectorAll(".sug-r")].map(r => [r.querySelector("b").textContent, r.querySelector("span").textContent, r.querySelector("small").textContent])');
   assert.equal(await count('.sug'), 0);
-  await ff.click('.day:nth-child(2) .add[data-v="pm"]');
+  await ff.click('.day:nth-child(2) .add[data-v="water"]');
   // week 7 is in the block R2 and has no session: R2 first, with the session it had last time, then one of each zone
   assert.deepEqual(await rows(), [
     ['R2', "1km R1 + 8x 4' R2/1'R0 + 1km R1", "32'"], ['R1', '6km R1', "38'"], ['R3', "R3: 4x(3x 2'/30'')/6'", "24'"], ['R6', "R6: 3x(3x 50/3')/6'", "2'"], ['R2', 'R2 ladder', "60'"]]);
@@ -620,9 +660,9 @@ try {
   await shot('09-suggestions-used');
   await ff.keys(' + 2km R1');
   await saved();
-  assert.match(file('plans/juniors/sessions.txt'), /^2026-11-10 pm junior: R3: 4x\(3x 2'\/30''\)\/6' \+ 2km R1$/m);
+  assert.match(file('plans/juniors/sessions.txt'), /^2026-11-10 junior: R3: 4x\(3x 2'\/30''\)\/6' \+ 2km R1$/m);
   // the next morning an R3 session would be too close: it is not among the first
-  await ff.click('.day:nth-child(3) .add[data-v="am"]');
+  await ff.click('.day:nth-child(3) .add[data-v="water"]');
   assert.ok(!(await rows()).some(r => r[0] === 'R3'));
   // words narrow the list, in any place; the place and the notes come with the session
   await ff.keys('gym');
@@ -632,9 +672,9 @@ try {
   await saved();
   assert.equal(await value('[data-fid=s-place]'), 'gym');
   assert.equal(await value('[data-fid=s-notes]'), 'tempo 2:2');
-  assert.match(file('plans/juniors/sessions.txt'), /^2026-11-11 am junior gym: 4-6 exercises, 2-3x 10-15 reps\n  tempo 2:2$/m);
+  assert.match(file('plans/juniors/sessions.txt'), /^2026-11-11 junior gym: 4-6 exercises, 2-3x 10-15 reps\n  tempo 2:2$/m);
   // the arrows go from the text into the list, and Enter takes the row
-  await ff.click('.day:nth-child(5) .add[data-v="pm"]');
+  await ff.click('.day:nth-child(5) .add[data-v="water"]');
   await ff.keys(ff.DOWN + ff.DOWN);
   assert.equal(await ff.js('return [...document.querySelectorAll(".sug-r")].indexOf(document.activeElement)'), 1);
   const second = (await rows())[1][1];
@@ -658,7 +698,7 @@ try {
   assert.match(await text('.lower .sec-h b'), /Semana 6/);
   assert.match(await text('.lower .sec-h .muted'), /2 Nov – 8 Nov/);
   assert.equal(await text('.day-h b'), 'Seg');
-  assert.equal(await text('.add'), '+ Manhã');
+  assert.deepEqual(await ff.js('return [...document.querySelectorAll(".day:first-child .add")].map(b => b.textContent)'), ['+ Água', '+ Ginásio', '+ Piscina', '+ Corrida']);
   assert.match(await text('[data-fid=w-type] option'), /^Padrão · /);
   // a number written with a comma, and a hover text
   await ff.click('.swk[data-v="1"]');

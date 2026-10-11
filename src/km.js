@@ -2,6 +2,7 @@
 // Nothing here is typed by the coach except the tables: yearly km per band, and the km of a hard
 // session per content.
 
+import { counted } from './format.js';
 import { sheet, sessionView, weekOf } from './engine.js';
 
 // The race a block is aimed at: the most important race inside it, or else the next one after it,
@@ -60,7 +61,7 @@ export function kmView(data, planId, band, today) {
   const season = { yearly, done: 0, planned: 0, endedKm: 0, endedEstimate: 0 };
   for (const s of sh.plan.sessions) {
     const n = weekOf(data.season, s.date);
-    if (s.band !== band || s.notDone || !n) continue;
+    if (s.band !== band || !counted(s) || !n) continue;
     const v = sessionView(data, s, today), w = weeks[n - 1];
     w.km += v.totalKm;
     w.offMin += v.offMin;

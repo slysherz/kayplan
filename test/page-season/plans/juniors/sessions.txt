@@ -1,7 +1,7 @@
-2026-09-29 pm junior: 6km R1
-2026-10-01 pm junior not-done: 1km R1 + 2x(2' ED + 1' R0) + 1km R1
+2026-09-29 junior: 6km R1
+2026-10-01 junior not-done: 1km R1 + 2x(2' ED + 1' R0) + 1km R1
   no water
-2026-10-03 am junior: 1km R1 + 8x 4' R2/1'R0 + 1km R1
+2026-10-03 junior: 1km R1 + 8x 4' R2/1'R0 + 1km R1
   K2 on the last four reps
-2026-10-03 am senior: 3x 2000m R2
-2026-10-04 am junior: 2x2000m
+2026-10-03 senior: 3x 2000m R2
+2026-10-04 junior: 2x2000m

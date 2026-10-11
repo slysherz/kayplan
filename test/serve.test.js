@@ -53,7 +53,7 @@ test('saving through the server: revisions, conflicts, new files, removal', asyn
   await assert.rejects(store.write('events.txt', '', null), { code: 'conflict' });
   assert.equal((await disk.read('season.txt')).text, 'start: 2026-01-05\nweeks: 13\n');
   // text with accents and quotes arrives unchanged
-  const text = "2026-01-20 pm older: 1km R1 + 8x 4' R2/1' R0 – caça à baleia\n";
+  const text = "2026-01-20 older: 1km R1 + 8x 4' R2/1' R0 – caça à baleia\n";
   await store.write('plans/group-a/sessions.txt', text, (await store.read('plans/group-a/sessions.txt')).rev);
   assert.equal((await disk.read('plans/group-a/sessions.txt')).text, text);
   await store.write('plans/group-c/plan.txt', 'name: C\nbands: c\n', null);
