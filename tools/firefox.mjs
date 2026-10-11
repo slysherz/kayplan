@@ -60,6 +60,8 @@ export async function firefox(profile, size = [1440, 900]) {
     ENTER: '', END: '', ESCAPE: '', DOWN: '\uE015', UP: '\uE013',
     resize: (width, height) => cmd('WebDriver:SetWindowRect', { width, height }),
     nav: url => cmd('WebDriver:Navigate', { url }),
+    // the page as a PDF, A4 lying down, as the printer would make it
+    pdf: async file => fs.writeFileSync(file, Buffer.from((await cmd('WebDriver:Print', { orientation: 'landscape', background: true, shrinkToFit: false, page: { width: 29.7, height: 21 }, margin: { top: 1.2, bottom: 1.2, left: 1, right: 1 } })).value, 'base64')),
     // run script in the page; "return x" gives x back; arguments[] holds args
     js: async (script, ...args) => (await cmd('WebDriver:ExecuteScript', { script, args })).value,
     click: async sel => cmd('WebDriver:ElementClick', { id: (await cmd('WebDriver:FindElement', { using: 'css selector', value: sel })).value[ELEMENT] }),

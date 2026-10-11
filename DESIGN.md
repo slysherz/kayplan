@@ -537,6 +537,14 @@ Asked for by the coach on 2026-10-04.
 - **Names.** A line of the library can have a name (`R3 pyramid 1 = …`). A session with the same text and place is shown by that name wherever there is little room: the week, the list of suggestions. The session keeps its text; nothing links it to the library, so changing either one drops the name.
 - **Not built:** naming a session from the page (the library is edited as a file).
 
+### 8.6 The week sheet
+
+Asked for by the coach on 2026-10-11, to match the sheet the club already hands out.
+
+- **Export** makes the selected band's week as one A4 page lying down: the club's name, the season and its months, the period and the week's dates, then a column a day with each session's place, text and notes.
+- It is sent to the printer; saving as PDF there gives the file.
+- **Not built:** what the club's sheet has under the days (the sessions for those who do not go on the water, the warm-up, the gym tables, a quote). The plan has no place to write them yet.
+
 ## 9. Later, if needed
 
 None of this is in the first cut of any level. Each item is here because it came up during design; it gets built only if the basics of its level prove insufficient. Checks and monitoring belong to level 2; the planning, session and blueprint items belong to level 3.

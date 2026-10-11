@@ -555,6 +555,26 @@ try {
   assert.equal(await count('.chks'), 0);
   ok('checks: a session and a week say what the course would question; the course notation is read');
 
+  // ================= the week sheet =================
+  fresh();
+  put('season.txt', 'name: The Club\n' + file('season.txt'));
+  await open('plan=juniors&band=junior&week=1');
+  // the frame's own print is what is called: stand in for it, since no one is here to close the dialog
+  await ff.js('window.printed = 0; Object.defineProperty(HTMLIFrameElement.prototype, "contentWindow", { get() { return { focus() {}, print() { window.printed++; } }; } });');
+  await ff.click('[data-act=export]');
+  await ff.wait('return window.printed === 1');
+  const sheetDoc = await ff.js('return document.getElementById("sheet-frame").srcdoc');
+  assert.match(sheetDoc, /<title>The Club - Training plan 28 September to 4 October - junior<\/title>/);
+  assert.match(sheetDoc, /<h1>The Club<\/h1><h2>Season 2026–27 · [A-Za-z\/]+<\/h2><h3>[^<]*28 September to 4 October<\/h3>/);
+  assert.match(sheetDoc, /<th>Monday<\/th>.*<th>Sunday<\/th>/);
+  assert.match(sheetDoc, /<td><b>Water<\/b><p>1km R1<br>8x 4' R2\/1'R0<br>1km R1<\/p><small>\(K2 on the last four reps\)<\/small><\/td>/);
+  assert.equal(await ff.js('const r = document.getElementById("sheet-frame").getBoundingClientRect(); return r.width + r.height'), 0);
+  // a second export replaces the first frame
+  await ff.click('[data-act=export]');
+  await ff.wait('return window.printed === 2');
+  assert.equal(await count('#sheet-frame'), 1);
+  ok('export: the week as a sheet of its own, sent to the printer');
+
   // ================= suggestions =================
   fresh();
   await open('plan=juniors&band=junior&week=7');

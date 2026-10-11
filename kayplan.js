@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 // Kayplan on the command line: the same engine as the page, printed as text (DESIGN.md 6.5).
 
+import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { diskStore } from './src/store-disk.js';
 import { clockToday, isDate } from './src/dates.js';
 import { load, usable, planOf, weekOf } from './src/engine.js';
+import { weekSheet, sheetHtml } from './src/export.js';
+import { setLang } from './src/lang.js';
 import { seasonReport, weekReport, eventsReport, checkReport, gridReport, zoneReport, checksReport, typesReport, suggestReport, dayReport } from './src/report.js';
 
 const USAGE = `usage: node kayplan.js <command> [options]
@@ -18,6 +21,7 @@ const USAGE = `usage: node kayplan.js <command> [options]
   show zone <zone>       what a zone is and how the course says to train it, e.g. show zone R3
   show types             what each week type is for, with its load
   show events            the races and events table
+  export week [n]        a week as the sheet that is handed out, as a page to print; needs --band when the plan has several
   check                  whether the plan is valid, plus the warnings
 
   --plan <id>            one plan (default: every plan)
@@ -26,6 +30,8 @@ const USAGE = `usage: node kayplan.js <command> [options]
   --find <words>         show suggestions: every suggestion with these words
   --place <place>        show suggestions: pool, gym or land instead of the water
   --as-of <YYYY-MM-DD>   run as if today were this date
+  --out <file>           export week: the file to write (default: the sheet's name, .html, in the current folder)
+  --lang <en|pt>         export week: the language of the sheet (default: pt)
   --dir <folder>         the season folder (default: season/ next to this file)`;
 
 function fail(message) {
@@ -38,12 +44,12 @@ const args = process.argv.slice(2);
 for (let i = 0; i < args.length; i++) {
   if (!args[i].startsWith('--')) { words.push(args[i]); continue; }
   const key = args[i].slice(2);
-  if (!['plan', 'band', 'as-of', 'dir', 'zone', 'find', 'place'].includes(key) || i + 1 >= args.length) fail(USAGE);
+  if (!['plan', 'band', 'as-of', 'dir', 'zone', 'find', 'place', 'out', 'lang'].includes(key) || i + 1 >= args.length) fail(USAGE);
   opts[key] = args[++i];
 }
 
-const command = words[0] === 'show' ? 'show ' + words[1] : words[0];
-if (!['show season', 'show week', 'show day', 'show grid', 'show checks', 'show suggestions', 'show zone', 'show types', 'show events', 'check'].includes(command)) fail(USAGE);
+const command = words[0] === 'show' || words[0] === 'export' ? words[0] + ' ' + words[1] : words[0];
+if (!['show season', 'show week', 'show day', 'show grid', 'show checks', 'show suggestions', 'show zone', 'show types', 'show events', 'export week', 'check'].includes(command)) fail(USAGE);
 if (opts['as-of'] !== undefined && !isDate(opts['as-of'])) fail('--as-of needs a date like 2026-10-12');
 
 const today = opts['as-of'] || clockToday();
@@ -100,6 +106,16 @@ if (command === 'show events') {
   }
   const shown = opts.band !== undefined ? plans.filter(id => planOf(data, id).bands.includes(opts.band)) : plans;
   if (!shown.length) fail('no band "' + opts.band + '" in ' + plans.join(', '));
+  if (command === 'export week') {
+    // one sheet: the plan's only band, or the one that was asked for
+    const id = shown.find(x => opts.band !== undefined || planOf(data, x).bands.length === 1);
+    if (shown.length !== 1 || !id) fail('export week needs one plan and one band: --plan <id> --band <name>');
+    setLang(opts.lang === 'en' ? 'en' : 'pt');
+    const sh = weekSheet(data, id, opts.band || planOf(data, id).bands[0], n, today), file = opts.out || sh.file.replace(/[\/\\]/g, '-') + '.html';
+    fs.writeFileSync(file, sheetHtml(sh));
+    console.log(file);
+    process.exit(0);
+  }
   console.log(shown.map(id => weekReport(data, id, n, today, opts.band)).join('\n\n\n'));
 }
 

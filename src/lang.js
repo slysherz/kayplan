@@ -55,6 +55,12 @@ export const PT = {
   "GitHub refused the token": "O GitHub recusou o token",
   "The repository or the folder was not found with this token": "O repositório ou a pasta não foram encontrados com este token",
   "The plan changed on disk; your last change was not saved": "O plano mudou no disco; a última alteração não foi guardada",
+  // the week sheet
+  "Export": "Exportar",
+  "Season {0}": "Época {0}",
+  "Training plan": "Plano de Treino",
+  "{0} to {1}": "{0} a {1}",
+  "{0} {1}": "{0} de {1}",
   "The name \"{0}\" is also on line {1}": "O nome \"{0}\" também está na linha {1}",
   "\"{0}\" has no zone and is never suggested": "\"{0}\" não tem zona e nunca é sugerida",
   "{0} has a problem; fix it in the file first": "{0} tem um problema; corrija-o primeiro no ficheiro",

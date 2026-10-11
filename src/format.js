@@ -67,12 +67,14 @@ function text(lines) {
 
 export function parseSeason(source) {
   const { blocks, errors } = readBlocks(source);
-  const value = { start: null, weeks: null, plans: [] };
+  const value = { start: null, weeks: null, plans: [], name: '' };
   for (const b of blocks) {
     noSub(b, errors);
-    const m = /^(start|weeks|plans):\s*(.*)$/.exec(b.head);
+    const m = /^(start|weeks|plans|name):\s*(.*)$/.exec(b.head);
     if (!m) { errors.push({ line: b.line, message: 'cannot read "' + b.head + '"' }); continue; }
-    if (m[1] === 'plans') {
+    // the club's name, for the week sheet that is handed out
+    if (m[1] === 'name') value.name = m[2].trim();
+    else if (m[1] === 'plans') {
       // the order the plans are shown in
       const ids = m[2].split(',').map(x => x.trim()).filter(Boolean);
       const bad = ids.find(id => !SLUG.test(id)), twice = ids.find((id, i) => ids.indexOf(id) !== i);
@@ -94,7 +96,7 @@ export function parseSeason(source) {
 }
 
 export function serializeSeason(season) {
-  return text(['start: ' + season.start, 'weeks: ' + season.weeks, ...(season.plans && season.plans.length ? ['plans: ' + season.plans.join(', ')] : [])]);
+  return text([...(season.name ? ['name: ' + season.name] : []), 'start: ' + season.start, 'weeks: ' + season.weeks, ...(season.plans && season.plans.length ? ['plans: ' + season.plans.join(', ')] : [])]);
 }
 
 // ---- tables.txt -------------------------------------------------------------

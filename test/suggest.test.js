@@ -4,6 +4,9 @@ import { load, nameOf, check } from '../src/engine.js';
 import { suggestions, SHOWN } from '../src/suggest.js';
 import { parseLibrary, serializeLibrary } from '../src/format.js';
 import { suggestReport } from '../src/report.js';
+import { weekSheet, sheetHtml } from '../src/export.js';
+import { setLang } from '../src/lang.js';
+import { parseSeason, serializeSeason } from '../src/format.js';
 import { memoryStore, fixture, LIBRARY } from './helpers.js';
 
 const TODAY = '2026-01-06';
@@ -165,4 +168,31 @@ test('library.txt: a line can have a name, and a session with the same text is s
   const got = suggestions(data, 'group-a', 'older', '2026-02-03', 'pm', TODAY, { query: 'ladder' });
   assert.deepEqual(got.list.map(x => [x.name, x.text]), [['Ladder one', "R2: 3x(4'-6'-6'-4'/1')/3'"], ['Ladder one', "50' R1"]]);
   assert.deepEqual(check(data, TODAY).filter(p => p.file === 'library.txt').map(p => [p.level, p.line, p.message]), [['warning', 4, 'The name "Ladder one" is also on line 1']]);
+});
+
+test('the week sheet: a column a day, each session with its place, its lines and its notes', async () => {
+  const data = await season(f => {
+    f['season.txt'] = 'name: The Club\n' + f['season.txt'];
+    f['plans/group-a/sessions.txt'] += "2026-01-20 am older gym: circuit <A>\n2026-01-21 am older:\n";
+  });
+  assert.equal(data.season.name, 'The Club');
+  assert.equal(parseSeason(serializeSeason(data.season)).value.name, 'The Club');
+  const sh = weekSheet(data, 'group-a', 'older', 3, TODAY);
+  assert.deepEqual([sh.title, sh.period.replace(/^.*; /, ''), sh.file], ['The Club', '19 to 25 January', 'The Club - Training plan 19 to 25 January - older']);
+  assert.match(sh.season, /^Season 2026 · /);
+  assert.deepEqual(sh.days.map(d => d.name), ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']);
+  // the morning before the afternoon; the other band, the empty session and the one not done are left out
+  assert.deepEqual(sh.days[1].sessions, [
+    { place: 'Gym', lines: ['circuit <A>'], notes: [] },
+    { place: 'Water', lines: ['1km R1', "8x 4' R2/1' R0", '1km R1'], notes: ['crew boats on the last four', 'watch the stroke rate'] }]);
+  assert.deepEqual([sh.days[2].sessions, sh.days[3].sessions], [[], []]);
+  const html = sheetHtml(sh);
+  assert.match(html, /<b>Gym<\/b><p>circuit &lt;A&gt;<\/p><u>\+<\/u><b>Water<\/b><p>1km R1<br>8x 4' R2\/1' R0<br>1km R1<\/p><small>\(crew boats on the last four\)<\/small>/);
+  assert.match(html, /@page \{ size: A4 landscape/);
+  setLang('pt');
+  try {
+    const pt = weekSheet(data, 'group-a', 'older', 5, TODAY);
+    assert.deepEqual([pt.period.replace(/^.*; /, ''), pt.days[1].name], ['2 a 8 de Fevereiro', 'Terça']);
+    assert.equal(weekSheet(data, 'group-a', 'older', 4, TODAY).period.replace(/^.*; /, ''), '26 de Janeiro a 1 de Fevereiro');
+  } finally { setLang('en'); }
 });
