@@ -15,6 +15,7 @@ import { gridView } from './grid.js';
 import { zoneCard, typesCard } from './zones.js';
 import { checksView } from './checks.js';
 import { suggestions } from './suggest.js';
+import { weekSheet, sheetHtml } from './export.js';
 import { httpStore } from './store-http.js';
 import { githubStore, setupLink, readSetup } from './store-github.js';
 import { tr, dec, setLang, getLang, LANGS } from './lang.js';
@@ -535,7 +536,7 @@ function sheetView() {
     '<div class="lower"><div class="left"><div class="sec-h" style="margin:0">' +
     '<button class="nav" data-act="prev" aria-label="' + tr('Previous week') + '"' + (state.week > 1 ? '' : ' disabled') + '>‹</button><button class="nav" data-act="next" aria-label="' + tr('Next week') + '"' + (state.week < W.length ? '' : ' disabled') + '>›</button>' +
     '<b style="font-size:16px">' + tr('Week {0}', wk.n) + '</b><span class="muted">' + shortDate(wk.monday) + ' – ' + shortDate(wk.sunday) + (where ? ' · ' + where : '') + '</span>' +
-    '<span class="push"></span>' + typeSelect + loadInput + weekKm + '</div>' +
+    '<span class="push"></span>' + typeSelect + loadInput + weekKm + '<button class="b" data-act="export">' + tr('Export') + '</button></div>' +
     (weekSaid.length ? '<div class="chks" data-id="w-checks">' + weekSaid.map(t => '<div>' + esc(t) + '</div>').join('') + '</div>' : '') +
     '<div class="sx" style="flex:1 1 auto;display:flex"><div class="days">' + days + '</div></div></div>' +
     '<div class="panel right">' + right + '</div></div>';
@@ -895,6 +896,18 @@ document.addEventListener('click', e => {
   // the words change at once; the files are read again so that their problems are in the new language too
   else if (act === 'lang') { useLang(v, true); render(); reload(); return; }
   else if (act === 'day') state.day = v || null;
+  else if (act === 'export') {
+    // the week's sheet in a frame of its own, sent to the printer: "save as PDF" there gives the file
+    const old = document.getElementById('sheet-frame'), f = document.createElement('iframe');
+    if (old) old.remove();
+    f.id = 'sheet-frame';
+    f.setAttribute('aria-hidden', 'true');
+    f.style.cssText = 'position:fixed;width:0;height:0;border:0;visibility:hidden';
+    f.onload = () => { f.contentWindow.focus(); f.contentWindow.print(); };
+    f.srcdoc = sheetHtml(weekSheet(data, ctx.plan.id, state.band, state.week, ctx.today));
+    document.body.appendChild(f);
+    return;
+  }
   else if (act === 'full') { state.full = true; settle(); reveal = true; }
   else if (!ctx) { /* the rest needs a plan on screen */ }
   else if (act === 'today') { state.week = weekOf(data.season, now()); state.view = 'sheet'; state.sel = null; reveal = true; }
