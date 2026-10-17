@@ -32,8 +32,8 @@ export function parsePlan(text, places) {
 export function readPlan(text, places) {
   const s = String(text || '').replace(/[‘’′´`]/g, "'").replace(/[“”″"]/g, "''");
   const landmarks = (places || []).slice().sort((a, b) => b.name.length - a.name.length);
-  // "4x", or a range, "2-4x", which counts as its middle
-  const COUNT = /^(\d+)(?:\s*-\s*(\d+))?\s*[x×](?![a-z])\s*/i;
+  // "4x", "4×" or "4*", or a range, "2-4x", which counts as its middle
+  const COUNT = /^(\d+)(?:\s*-\s*(\d+))?\s*[x×*](?![a-z])\s*/i;
   const times = m => m[2] ? (+m[1] + +m[2]) / 2 : +m[1];
   let pos = 0;
   function peek(re) { return re.exec(s.slice(pos)); }
@@ -105,8 +105,8 @@ export function readPlan(text, places) {
     ws();
     // a zone written before a count or a bracket is the zone of that block's work
     const mark = pos, before = zone();
-    if (before) { ws(); if (peek(/^(\(|\d+(?:\s*-\s*\d+)?\s*[x×](?![a-z]))/i)) zoneOf = before; else pos = mark; }
-    if ((m = peek(/^\(\s*(\d+)\s*-\s*(\d+)\s*\)\s*[x×]\s*/i))) { pos += m[0].length; count = (+m[1] + +m[2]) / 2; }
+    if (before) { ws(); if (peek(/^(\(|\d+(?:\s*-\s*\d+)?\s*[x×*](?![a-z]))/i)) zoneOf = before; else pos = mark; }
+    if ((m = peek(/^\(\s*(\d+)\s*-\s*(\d+)\s*\)\s*[x×*]\s*/i))) { pos += m[0].length; count = (+m[1] + +m[2]) / 2; }
     else if ((m = peek(COUNT))) { pos += m[0].length; count = times(m); }
     ws();
     const set = s.charAt(pos) === '(';
@@ -267,7 +267,7 @@ export function amountText(a) {
 // ---- the text laid out to be read (DESIGN.md 8.5) ---------------------------
 
 // the parts between the "+" that are outside brackets; the "+" of R3+ belongs to the zone
-function partsOf(t) {
+export function partsOf(t) {
   const out = [];
   let depth = 0, from = 0;
   for (let i = 0; i < t.length; i++) {

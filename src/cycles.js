@@ -156,7 +156,8 @@ export function moveMeso(plan, i, dir, ended, start) {
   return {
     plan: close(plan, f, {
       hand: plan.hand.map(h => ({ ...h, monday: shifted(h.monday) })),
-      sessions: plan.sessions.map(s => ({ ...s, date: shifted(s.date) }))
+      sessions: plan.sessions.map(s => ({ ...s, date: shifted(s.date) })),
+      notes: plan.notes.map(x => ({ ...x, monday: shifted(x.monday) }))
     }),
     index: dir < 0 ? i - 1 : i + 1
   };

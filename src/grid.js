@@ -1,7 +1,7 @@
 // The capacity grid (DESIGN.md 7.1): week by week, how much each zone is trained, against the
 // course's sessions per week to develop and to maintain each content (Grau II slides, "Nº Sessões/CT").
 
-import { counted } from './format.js';
+import { counted, forBand } from './format.js';
 import { sheet, sessionView, weekOf } from './engine.js';
 import { kmView } from './km.js';
 import { CONTENT_ZONES } from './cycles.js';
@@ -26,16 +26,17 @@ export function stateOf(sessions, content) {
 //   yearly    the course's km a year in the zone for the band (the zone-km table), or null
 //   suggested whether the zone is one the course's long-term table gives the band's age (the zones
 //             table); null when the band has no line there
-//   sessions  the week's sessions whose main zone is this zone, on or off the water, not marked "not done"
+//   sessions  the week's sessions whose main zone is this zone, on or off the water, not marked "not done":
+//             the plan's and the band's own
 //   together  the same count over every zone of the row's content: this is what the state is judged on
 //   km        the week's km in the zone (water only)
 export function gridView(data, planId, band, today) {
-  const sh = sheet(data, planId, today), km = kmView(data, planId, band, today), list = contents(data.tables);
+  const sh = sheet(data, planId, today, band), km = kmView(data, planId, band, today), list = contents(data.tables);
   const counts = {};
   for (const s of sh.plan.sessions) {
     const n = weekOf(data.season, s.date);
-    if (s.band !== band || !counted(s) || !n) continue;
-    const main = sessionView(data, s, today).main;
+    if (!forBand(s, band) || !counted(s) || !n) continue;
+    const main = sessionView(data, s, today, band).main;
     if (!main) continue;
     counts[main] = counts[main] || {};
     counts[main][n] = (counts[main][n] || 0) + 1;

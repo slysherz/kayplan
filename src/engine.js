@@ -16,7 +16,7 @@ const PATTERN_TYPES = ['I', 'C', 'CH', 'R', 'AT', 'CT'];
 
 export function planFiles(id) {
   const dir = 'plans/' + id + '/';
-  return { plan: dir + 'plan.txt', cycles: dir + 'cycles.txt', weeks: dir + 'weeks.txt', sessions: dir + 'sessions.txt' };
+  return { plan: dir + 'plan.txt', cycles: dir + 'cycles.txt', weeks: dir + 'weeks.txt', sessions: dir + 'sessions.txt', notes: dir + 'notes.txt' };
 }
 
 // Read every file. Problems in the files are collected in errors, not thrown.
@@ -42,10 +42,10 @@ export async function load(store) {
   ids.sort((a, b) => rank(a) - rank(b));
   data.plans = await Promise.all(ids.map(async id => {
     const f = planFiles(id);
-    const [head, macros, hand, sessions] = await Promise.all([
-      file(f.plan, format.parsePlanFile), file(f.cycles, format.parseCycles), file(f.weeks, format.parseWeeks), file(f.sessions, format.parseSessions)
+    const [head, macros, hand, sessions, notes] = await Promise.all([
+      file(f.plan, format.parsePlanFile), file(f.cycles, format.parseCycles), file(f.weeks, format.parseWeeks), file(f.sessions, format.parseSessions), file(f.notes, format.parseNotes)
     ]);
-    return { id, name: head.name || id, bands: head.bands, macros, hand, sessions };
+    return { id, name: head.name || id, bands: head.bands, macros, hand, sessions, notes };
   }));
   data.errors.sort((a, b) => a.file < b.file ? -1 : a.file > b.file ? 1 : (a.line || 0) - (b.line || 0));
   return data;
@@ -54,11 +54,12 @@ export async function load(store) {
 // The text of one of the files the plan's edits change, written from the data.
 export function fileText(data, path) {
   if (path === 'events.txt') return format.serializeEvents(data.events);
-  const m = /^plans\/([^/]+)\/(cycles|weeks|sessions)\.txt$/.exec(path), plan = m && planOf(data, m[1]);
+  const m = /^plans\/([^/]+)\/(cycles|weeks|sessions|notes)\.txt$/.exec(path), plan = m && planOf(data, m[1]);
   if (!plan) throw new Error('not a file the plan writes: ' + path);
   if (m[2] === 'cycles') return format.serializeCycles(plan.macros);
   if (m[2] === 'weeks') return format.serializeWeeks(plan.hand);
-  return format.serializeSessions(plan.sessions, plan.bands);
+  if (m[2] === 'notes') return format.serializeNotes(plan.notes, plan.bands);
+  return format.serializeSessions(plan.sessions);
 }
 
 // false when the season itself cannot be read; nothing can be worked out then
@@ -106,11 +107,30 @@ export function eventView(data, e, today) {
   return { ...e, to, code: raceCode(e), weeks, unconfirmedPast: e.kind === 'race' && !e.confirmed && to < today };
 }
 
-// The events of one plan, in date order. Races carry the plan's importance.
-export function eventsFor(data, planId, today) {
-  return format.sortEvents(data.events)
-    .filter(e => e.plans === null || planId in e.plans)
-    .map(e => ({ ...eventView(data, e, today), importance: e.plans ? e.plans[planId] : null }));
+// What an event is for one band of a plan: the race's importance (null for another event, or for an
+// event of every plan), or undefined when the event is not for that band. The band's own entry comes
+// first, then its plan's (events.txt: "plans: cadete 1, juniors 2").
+export function bandEntry(e, planId, band) {
+  if (e.plans === null) return null;
+  if (band && Object.prototype.hasOwnProperty.call(e.plans, band)) return e.plans[band];
+  if (Object.prototype.hasOwnProperty.call(e.plans, planId)) return e.plans[planId];
+  return undefined;
+}
+
+// The events of one band of a plan, in date order, each with its importance for that band.
+// With no band, the events of any band of the plan, each with the importance it has for its most
+// important band.
+// Each also carries bands, the plan's bands it is for, and only: those bands when they are not all
+// of them and no band was asked for, else null.
+export function eventsFor(data, planId, today, band) {
+  const plan = planOf(data, planId), all = plan ? plan.bands : [];
+  return format.sortEvents(data.events).map(e => {
+    const bands = all.filter(b => bandEntry(e, planId, b) !== undefined);
+    const mine = band ? bandEntry(e, planId, band) : undefined;
+    if (band ? mine === undefined : !bands.length) return null;
+    const importance = band ? mine : e.kind === 'race' && e.plans ? Math.min(...bands.map(b => bandEntry(e, planId, b))) : null;
+    return { ...eventView(data, e, today), importance, bands, only: !band && bands.length < all.length ? bands : null };
+  }).filter(Boolean);
 }
 
 // ---- sessions ---------------------------------------------------------------
@@ -131,23 +151,54 @@ export function nameOf(data, s) {
 
 // A session with what is worked out from its text, and whether it counts as done.
 // A session whose date has passed counts as done unless it is marked not done.
-export function sessionView(data, s, today) {
-  return { ...s, name: nameOf(data, s), ...infer(s.text, data.tables, s.band, s.place !== 'water'), status: s.notDone ? 'not done' : s.alt ? 'alternative' : (s.date < today ? 'done' : 'planned') };
+// A session of the whole week counts as done once the week has ended.
+// band: the band it is worked out for (its pace); a session of one band is always worked out for it,
+// and one of the plan's with no band given at the default pace.
+//   name   what it is called: its title, else the name the library gives its text
+//   band   '' for a session of the plan's, done by every band
+export function sessionView(data, s, today, band) {
+  return { ...s, band: s.band || '', title: s.title || '', name: s.title || nameOf(data, s), ...infer(s.text, data.tables, s.band || band || null, s.place !== 'water'), status: s.notDone ? 'not done' : s.alt ? 'alternative' : (format.lastDay(s) < today ? 'done' : 'planned') };
 }
+
+// The sessions one band does, the plan's and its own, each worked out for that band, in their order.
+export function bandSessions(data, plan, band, today) {
+  return format.sortSessions(plan.sessions.filter(s => format.forBand(s, band))).map(s => sessionView(data, s, today, band));
+}
+
+// The parts of the notes file for the week that starts on this Monday, exactly as written for one
+// band, or for the plan when band is '': { notes, phrase }, each '' when there is none.
+export function noteParts(plan, monday, band) {
+  return Object.fromEntries(format.NOTE_KINDS.map(k => {
+    const n = plan.notes.find(x => x.monday === monday && (x.band || '') === (band || '') && (x.kind || 'notes') === k);
+    return [k, n ? n.text : ''];
+  }));
+}
+
+// What a band has for the whole week that starts on this Monday: { notes, phrase }, each '' when
+// there is none. Its notes are the plan's with the band's own after them, a blank line between;
+// its phrase is its own, else the plan's. With band '' it is the plan's alone.
+export function weekNotes(plan, monday, band) {
+  const all = noteParts(plan, monday, ''), own = band ? noteParts(plan, monday, band) : { notes: '', phrase: '' };
+  const trim = t => String(t || '').replace(/^\s*\n|\s+$/g, '');
+  return { notes: [all.notes, own.notes].map(trim).filter(Boolean).join('\n\n'), phrase: own.phrase.trim() ? own.phrase : all.phrase };
+}
+const hasNotes = n => format.NOTE_KINDS.some(k => String(n[k]).trim());
 
 // ---- the annual sheet -------------------------------------------------------
 
 // Everything the sheet shows for one plan: cycles with their weeks, and each week's type and load.
-export function sheet(data, planId, today) {
+// The races and events are those of the band given (eventsFor), or of any band of the plan.
+export function sheet(data, planId, today, band) {
   const plan = planOf(data, planId), season = data.season;
   const lay = layout(plan.macros);
   const hand = new Map(plan.hand.map(h => [h.monday, h]));
-  const events = eventsFor(data, planId, today);
+  const events = eventsFor(data, planId, today, band);
   const ended = endedWeeks(season, today), current = weekOf(season, today);
   const counts = {};
+  // a session of the plan's counts for every band
   for (const s of plan.sessions) {
     const n = weekOf(season, s.date);
-    if (n) { counts[n] = counts[n] || {}; counts[n][s.band] = (counts[n][s.band] || 0) + 1; }
+    if (n) { counts[n] = counts[n] || {}; for (const b of s.band ? [s.band] : plan.bands) counts[n][b] = (counts[n][b] || 0) + 1; }
   }
   const weeks = [];
   for (let n = 1; n <= season.weeks; n++) {
@@ -170,37 +221,55 @@ export function sheet(data, planId, today) {
   return { plan, macros: lay.macros, mesos: lay.mesos, weeks, ended, current, events };
 }
 
-// One week of one plan: its place in the cycles, and seven days with their events and sessions.
-export function weekView(data, planId, n, today) {
-  const sh = sheet(data, planId, today), week = sh.weeks[n - 1];
-  const rank = b => { const i = sh.plan.bands.indexOf(b); return i < 0 ? 1000 : i; };
+// One week of one plan: its place in the cycles, seven days with their events and sessions, the
+// sessions of the whole week (week: done on any day of it), and the week's notes and phrase of each
+// band as weekNotes gives them ({ band: { notes, phrase } }, and the plan's own under '').
+// With a band, only the sessions it does (the plan's and its own), worked out for it; without one,
+// every session, those of the plan's at the default pace.
+export function weekView(data, planId, n, today, band) {
+  const sh = sheet(data, planId, today, band), week = sh.weeks[n - 1];
+  const all = band ? bandSessions(data, sh.plan, band, today) : format.sortSessions(sh.plan.sessions).map(s => sessionView(data, s, today));
   const days = [];
   for (let d = 0; d < 7; d++) {
     const date = addDays(week.monday, d);
     days.push({
       date, weekday: d, today: date === today,
       events: week.events.filter(e => e.date <= date && e.to >= date),
-      sessions: format.sortSessions(sh.plan.sessions.filter(s => s.date === date), sh.plan.bands).map(s => sessionView(data, s, today))
+      sessions: all.filter(s => s.date === date && !s.week)
     });
   }
-  return { ...week, plan: sh.plan, mesoInfo: week.meso === null ? null : sh.mesos[week.meso], macroInfo: week.macro === null ? null : sh.macros[week.macro], days };
+  const anyDay = all.filter(s => s.week && s.date === week.monday);
+  const notes = Object.fromEntries(['', ...sh.plan.bands].map(b => [b, weekNotes(sh.plan, week.monday, b)]));
+  return { ...week, plan: sh.plan, band: band || '', mesoInfo: week.meso === null ? null : sh.mesos[week.meso], macroInfo: week.macro === null ? null : sh.macros[week.macro], days, week: anyDay, notes };
 }
 
 // One day across every plan, for the phone at the water's edge: what each group does that day.
-// { date, weekday, today, week, plans: [{ id, name, type, meso, events, sessions }], prev, next }
-//   sessions    the day's sessions that have something written, each as sessionView gives it
+// { date, weekday, today, week, plans: [{ id, name, type, meso, events, sessions, anyDay, notes }], prev, next }
+//   sessions    the day's sessions that have something written, each as sessionView gives it: one
+//               of the plan's once (band ''), at the default pace; one of a band with its band
+//   anyDay      the same for the sessions of the whole week, shown on each of its days
+//   events      the day's events of the bands that train that day (of any band when none does)
+//   notes       [{ band, notes, phrase }]: the week's notes as written, the plan's (band '') when
+//               anyone trains that day, then those of each band that trains that day
 //   prev, next  the nearest other days that have such a session, or null
 export function dayView(data, date, today) {
   const n = weekOf(data.season, date), written = s => !!(String(s.text || '').trim() || String(s.notes || '').trim());
   const plans = data.plans.map(plan => {
     const sh = n ? sheet(data, plan.id, today) : null, wk = sh ? sh.weeks[n - 1] : null;
+    const sessions = format.sortSessions(plan.sessions.filter(s => s.date === date && !s.week && written(s))).map(s => sessionView(data, s, today));
+    const anyDay = wk ? format.sortSessions(plan.sessions.filter(s => s.week && s.date === wk.monday && written(s))).map(s => sessionView(data, s, today)) : [];
+    const both = [...sessions, ...anyDay];
+    // a session of the plan's means every band trains
+    const bands = both.some(s => !s.band) ? plan.bands : plan.bands.filter(b => both.some(s => s.band === b));
     return {
       id: plan.id, name: plan.name, type: wk ? wk.type : null, meso: wk && wk.meso !== null ? sh.mesos[wk.meso].name : null,
-      events: wk ? wk.events.filter(e => e.date <= date && e.to >= date) : [],
-      sessions: format.sortSessions(plan.sessions.filter(s => s.date === date && written(s)), plan.bands).map(s => sessionView(data, s, today))
+      events: wk ? wk.events.filter(e => e.date <= date && e.to >= date && (!both.length || e.bands.some(b => bands.includes(b)))) : [],
+      sessions, anyDay,
+      notes: wk && both.length ? ['', ...bands].map(band => ({ band, ...noteParts(plan, wk.monday, band) })).filter(hasNotes) : []
     };
   });
-  const dates = [...new Set(data.plans.flatMap(p => p.sessions.filter(written).map(s => s.date)))].sort();
+  // a day with a session of its own: those of the whole week are on every day of it
+  const dates = [...new Set(data.plans.flatMap(p => p.sessions.filter(s => !s.week && written(s)).map(s => s.date)))].sort();
   return { date, weekday: weekday(date), today: date === today, week: n, plans, prev: dates.filter(d => d < date).pop() || null, next: dates.find(d => d > date) || null };
 }
 
@@ -249,10 +318,16 @@ export function check(data, today) {
     }
   }
 
-  const ids = data.plans.map(p => p.id);
+  // an event names plans and bands, so a band's name must say which band it is
+  const ids = data.plans.map(p => p.id), owners = {};
+  for (const p of data.plans) for (const b of p.bands) (owners[b] = owners[b] || []).push(p.id);
+  for (const b of Object.keys(owners)) {
+    if (owners[b].length > 1) add('error', planFiles(owners[b][1]).plan, null, tr('band "{0}" is also in plan {1}: a band can be in one plan only', b, owners[b][0]));
+    if (ids.includes(b)) add('error', planFiles(owners[b][0]).plan, null, tr('band "{0}" has the name of a plan', b));
+  }
   for (const e of data.events) {
     for (const id of Object.keys(e.plans || {})) {
-      if (!ids.includes(id)) add('error', 'events.txt', e.line, e.name + ': ' + tr('there is no plan "{0}"', id));
+      if (!ids.includes(id) && !owners[id]) add('error', 'events.txt', e.line, e.name + ': ' + tr('there is no plan or band "{0}"', id));
     }
     const v = eventView(data, e, today);
     if (!v.weeks.length) add('warning', 'events.txt', e.line, tr('{0} ({1}) is outside the season', e.name, e.date));
@@ -273,7 +348,11 @@ export function check(data, today) {
     }
     for (const s of plan.sessions) {
       if (!inSeason(s.date)) add('error', f.sessions, s.line, tr('{0} is outside the season', s.date));
-      if (!plan.bands.includes(s.band)) add('error', f.sessions, s.line, tr('plan {0} has no band "{1}"', plan.id, s.band));
+      if (s.band && !plan.bands.includes(s.band)) add('error', f.sessions, s.line, tr('plan {0} has no band "{1}"', plan.id, s.band));
+    }
+    for (const x of plan.notes) {
+      if (weekday(x.monday) !== 0 || !inSeason(x.monday)) add('error', f.notes, x.line, tr('{0} is not the Monday of a week in the season', x.monday));
+      if (x.band && !plan.bands.includes(x.band)) add('error', f.notes, x.line, tr('plan {0} has no band "{1}"', plan.id, x.band));
     }
   }
   return out;

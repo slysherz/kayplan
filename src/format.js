@@ -5,7 +5,7 @@
 // Every serialize function writes the one canonical form, so reading a canonical file and writing it
 // back gives the same text. There are no comments in the files.
 
-import { isDate, weekday } from './dates.js';
+import { isDate, weekday, addDays } from './dates.js';
 import { ZONES } from './notation.js';
 import { PATTERNS, CONTENT_ZONES } from './cycles.js';
 
@@ -298,10 +298,11 @@ export function serializeTables(tables) {
 //   kind: race
 //   type: fundo
 //   boats: mixed
-//   plans: juniors 1, cadetes 2
+//   plans: juniors 1, cadete 2
 //
-// plans: for a race, the plans aimed at it with the importance of each (1 to 3).
-// For other events, the plans it applies to; no plans line means every plan.
+// plans: for a race, the plans and bands aimed at it with the importance of each (1 to 3); a plan
+// means every band of it, a band that band alone, and a band's own entry comes before its plan's.
+// For other events, the plans and bands it applies to; no plans line means every plan.
 
 export function parseEvents(source) {
   const { blocks, errors } = readBlocks(source);
@@ -333,8 +334,8 @@ export function parseEvents(source) {
       e.plans = {};
       for (const part of f.plans.split(',')) {
         const m = /^([a-z0-9][a-z0-9-]*)(?: ([123]))?$/.exec(part.trim());
-        if (!m || (race && !m[2]) || (!race && m[2])) { err(race ? 'plans for a race are written "plan importance", like "juniors 1, cadetes 2"' : 'plans are written "juniors, cadetes"; only races have an importance'); break; }
-        if (m[1] in e.plans) { err('plan "' + m[1] + '" is given twice'); break; }
+        if (!m || (race && !m[2]) || (!race && m[2])) { err(race ? 'plans for a race are written "plan importance" or "band importance", like "juniors 1, cadete 2"' : 'plans are written "juniors, cadete"; only races have an importance'); break; }
+        if (m[1] in e.plans) { err('"' + m[1] + '" is given twice'); break; }
         e.plans[m[1]] = m[2] ? +m[2] : null;
       }
     } else if (race) e.plans = {};
@@ -376,7 +377,10 @@ export function parsePlanFile(source) {
     if (m[1] === 'name') value.name = m[2];
     else {
       const bands = m[2].split(',').map(s => s.trim()).filter(Boolean);
+      // a band's name cannot be one of the words a session's or a note's head has for something else
+      const taken = bands.find(x => SESSION_WORDS.includes(x) || x === 'phrase');
       if (bands.some(x => !SLUG.test(x)) || new Set(bands).size !== bands.length) errors.push({ line: b.line, message: 'bands are short names in lower case, each once, like "junior, senior"' });
+      else if (taken) errors.push({ line: b.line, message: '"' + taken + '" cannot be a band: the sessions use it for something else' });
       else value.bands = bands;
     }
   }
@@ -451,35 +455,120 @@ export function serializeWeeks(hand) {
 }
 
 // ---- plans/<plan>/sessions.txt ----------------------------------------------
-// 2026-10-11 junior: 1km R1 + 8x 4' R2/1' R0 + 1km R1
+// 2026-10-11: 1km R1 + 8x 4' R2/1' R0 + 1km R1
 //   K2 on the last four reps
-// 2026-10-11 junior gym: circuit
+// 2026-10-11 gym: circuit
 // 2026-10-11 junior gym alt: long circuit
-// 2026-10-14 junior not-done: 6km R1
+// 2026-10-14 not-done: 6km R1
+// 2026-10-12 gym week: Força I = Supino 60% + Tração 60%
 //
-// Date, band, then the place when it is not the water (pool, gym, land), then "alt" when it is done
-// in place of the others and counts for nothing, then "not-done" when it did not happen. Everything
-// after the first colon is the plan text, on one line. Indented lines are notes.
-// A band has any number of sessions on a day, in the order of their lines: slot is that order, from 1.
+// Date, then the band when the session is for that band only (with no band it is the plan's, done by
+// every band), then the place when it is not the water (pool, gym, land), "week" when it is done on
+// any day of the week that starts on that date (a Monday), "alt" when it is done in place of the
+// others and counts for nothing, "not-done" when it did not happen. Everything after the first colon
+// is the plan text, on one line, after its title and "=" when it has one. Indented lines are notes.
+// The words after the date are read in any order and written in this one; any word that is not one
+// of these is a band, and it comes first.
+// A day has any number of sessions, the plan's and the bands', in the order of their lines: slot is
+// that order, from 1, over the whole plan. The sessions of a week are numbered apart from those of
+// its Monday.
 // The older "date am band:" and "date pm band:" are still read, the morning first.
+
+// the words of a session's head that are not a band; a band cannot be called any of these
+export const SESSION_WORDS = ['water', 'pool', 'gym', 'land', 'week', 'alt', 'not-done', 'am', 'pm'];
+
+function readSessionHead(head) {
+  const colon = head.indexOf(':');
+  if (colon < 0) return null;
+  const words = head.slice(0, colon).trim().split(/\s+/), date = words.shift();
+  if (!isDate(date)) return null;
+  const s = { date, half: 2, band: '', place: 'water', week: false, alt: false, notDone: false, plan: head.slice(colon + 1).trim() };
+  const seen = new Set();
+  let placed = false;
+  for (let i = 0; i < words.length; i++) {
+    const w = words[i];
+    if (seen.has(w)) return null;
+    seen.add(w);
+    if (w === 'am' || w === 'pm') { if (i !== 0) return null; s.half = w === 'am' ? 0 : 1; }
+    else if (PLACES.includes(w)) { if (placed) return null; placed = true; s.place = w; }
+    else if (w === 'week') s.week = true;
+    else if (w === 'alt') s.alt = true;
+    else if (w === 'not-done') s.notDone = true;
+    // a band comes straight after the date (or after an old am or pm)
+    else if (SLUG.test(w) && !s.band && (i === 0 || (i === 1 && s.half < 2))) s.band = w;
+    else return null;
+  }
+  return s;
+}
 
 export function parseSessions(source) {
   const { blocks, errors } = readBlocks(source);
   const value = [];
   for (const b of blocks) {
-    const m = /^(\S+) (?:(am|pm) )?([a-z0-9][a-z0-9-]*)(?: (water|pool|gym|land))?( alt)?( not-done)?:(?: (.*))?$/.exec(b.head);
-    if (!m || !isDate(m[1])) { errors.push({ line: b.line, message: 'a session is written "date band: plan", like "2026-10-11 junior: 6km R1"' }); continue; }
-    value.push({ date: m[1], half: m[2] === 'am' ? 0 : m[2] === 'pm' ? 1 : 2, band: m[3], place: m[4] || 'water', alt: !!m[5], notDone: !!m[6], text: (m[7] || '').trim(), notes: b.sub.map(s => s.text).join('\n'), line: b.line });
+    const h = readSessionHead(b.head);
+    if (!h) { errors.push({ line: b.line, message: 'a session is written "date: plan", or "date band: plan" for one band, like "2026-10-11: 6km R1" or "2026-10-11 junior gym: circuit"' }); continue; }
+    if (h.week && weekday(h.date) !== 0) { errors.push({ line: b.line, message: 'a session of the whole week is written on its Monday' }); continue; }
+    // "title = plan": the title is shown above the plan and counts for nothing
+    const t = /^([^=]*)=(.*)$/.exec(h.plan), squash = x => x.replace(/\s+/g, ' ').trim();
+    value.push({ date: h.date, half: h.half, band: h.band, place: h.place, week: h.week, alt: h.alt, notDone: h.notDone, title: t ? squash(t[1]) : '', text: squash(t ? t[2] : h.plan), notes: b.sub.map(s => s.text).join('\n'), line: b.line });
   }
   // the order on the day: the lines as they come, an older morning line before an afternoon one
   const seen = new Map();
   for (const s of value.map((s, i) => ({ s, i })).sort((a, b) => a.s.half - b.s.half || a.i - b.i).map(x => x.s)) {
-    const k = s.date + ' ' + s.band;
+    const k = s.date + (s.week ? ' week' : '');
     seen.set(k, (seen.get(k) || 0) + 1);
     s.slot = seen.get(k);
     delete s.half;
   }
   return { value, errors };
+}
+
+// ---- plans/<plan>/notes.txt -------------------------------------------------
+// 2026-10-12
+//   Aquecimento antes de cada treino
+//   Em terra: 15' corrida
+//
+// 2026-10-12 phrase
+//   O corpo alcança o que a mente acredita
+//
+// 2026-10-12 junior
+//   Ginásio à quinta
+//
+// What the plan has for its whole week: the week's Monday, then the band when it is for that band
+// only, then "phrase" when it is the phrase and not the notes, then the text, indented. Blank lines
+// in it are kept. A band reads the plan's notes with its own after them, and its own phrase in place
+// of the plan's (weekNotes in engine.js).
+export const NOTE_KINDS = ['notes', 'phrase'];
+
+export function parseNotes(source) {
+  const { blocks, errors } = readBlocks(source);
+  const value = [], seen = new Set();
+  for (const b of blocks) {
+    const m = /^(\S+)(?: (?!phrase$)([a-z0-9][a-z0-9-]*))?(?: (phrase))?$/.exec(b.head), kind = m && (m[3] || 'notes'), band = m ? m[2] || '' : '';
+    const key = m && m[1] + ' ' + band + ' ' + kind;
+    if (!m || !isDate(m[1])) errors.push({ line: b.line, message: 'week notes start with the week\'s Monday, then the band when they are for one band, then "phrase" for the phrase, like "2026-10-12", "2026-10-12 phrase" or "2026-10-12 junior"' });
+    else if (seen.has(key)) errors.push({ line: b.line, message: 'the ' + kind + ' ' + (band ? 'of ' + band : 'of the plan') + ' for week ' + m[1] + ' are given twice' });
+    else { seen.add(key); value.push({ monday: m[1], band, kind, text: b.sub.map(s => s.text).join('\n'), line: b.line }); }
+  }
+  return { value, errors };
+}
+
+// lines of notes as they are written: each trimmed, with no blank line at either end
+function noteLines(t) {
+  const lines = String(t || '').split(/\r?\n/).map(n => n.trim());
+  while (lines.length && lines[0] === '') lines.shift();
+  while (lines.length && lines[lines.length - 1] === '') lines.pop();
+  return lines;
+}
+
+// the plan's parts first, then the bands' (bands gives their order)
+export function serializeNotes(notes, bands) {
+  const rank = b => { if (!b) return -1; const i = (bands || []).indexOf(b); return i < 0 ? 1000 : i; };
+  const kind = n => NOTE_KINDS.indexOf(n.kind || 'notes');
+  const out = notes.filter(n => noteLines(n.text).length).sort((a, b) =>
+    a.monday !== b.monday ? (a.monday < b.monday ? -1 : 1) : rank(a.band) - rank(b.band) || ((a.band || '') < (b.band || '') ? -1 : (a.band || '') > (b.band || '') ? 1 : 0) || kind(a) - kind(b))
+    .map(n => [n.monday + (n.band ? ' ' + n.band : '') + (n.kind && n.kind !== 'notes' ? ' ' + n.kind : ''), ...noteLines(n.text).map(l => l ? '  ' + l : '')].join('\n'));
+  return out.length ? out.join('\n\n') + '\n' : '';
 }
 
 // ---- library.txt ------------------------------------------------------------
@@ -521,34 +610,42 @@ export function counted(s) {
   return !s.notDone && !s.alt;
 }
 
-// the place a new session of this band takes on this day: after the ones that are there
-export function nextSlot(sessions, date, band) {
-  return sessions.reduce((n, s) => s.date === date && s.band === band ? Math.max(n, s.slot) : n, 0) + 1;
+// a session that one band does: the plan's, done by every band, and the band's own
+export function forBand(s, band) {
+  return !s.band || s.band === band;
 }
 
+// the place a new session takes on this day (or in this week): after every one that is there
+export function nextSlot(sessions, date, week) {
+  return sessions.reduce((n, s) => s.date === date && !!s.week === !!week ? Math.max(n, s.slot) : n, 0) + 1;
+}
+
+// "2026-10-13 1"; a session of the whole week has its slot after a "w": "2026-10-12 w1".
+// The slot is the session's place among all the plan's sessions of that day, so it is the key.
 export function sessionKey(s) {
-  return s.date + ' ' + s.slot + ' ' + s.band;
+  return s.date + ' ' + (s.week ? 'w' : '') + s.slot;
 }
 
-// by day, then band (bands gives their order), then the order on the day
-export function sortSessions(sessions, bands) {
-  const rank = b => { const i = (bands || []).indexOf(b); return i < 0 ? 1000 : i; };
+// by day, then the week's sessions before the Monday's, then the order on the day
+export function sortSessions(sessions) {
   return sessions.slice().sort((a, b) =>
     a.date !== b.date ? (a.date < b.date ? -1 : 1) :
-    rank(a.band) !== rank(b.band) ? rank(a.band) - rank(b.band) :
-    a.band !== b.band ? (a.band < b.band ? -1 : 1) :
+    !!a.week !== !!b.week ? (a.week ? -1 : 1) :
     a.slot - b.slot);
 }
 
-export function serializeSessions(sessions, bands) {
+// the last day a session can be done on: its day, or the Sunday of its week
+export function lastDay(s) {
+  return s.week ? addDays(s.date, 6) : s.date;
+}
+
+export function serializeSessions(sessions) {
   const lines = [];
-  for (const s of sortSessions(sessions, bands)) {
-    const plan = String(s.text || '').replace(/\s+/g, ' ').trim();
-    lines.push(s.date + ' ' + s.band + (s.place && s.place !== 'water' ? ' ' + s.place : '') + (s.alt ? ' alt' : '') + (s.notDone ? ' not-done' : '') + ':' + (plan ? ' ' + plan : ''));
-    const notes = String(s.notes || '').split(/\r?\n/).map(n => n.trim());
-    while (notes.length && notes[0] === '') notes.shift();
-    while (notes.length && notes[notes.length - 1] === '') notes.pop();
-    for (const n of notes) lines.push(n ? '  ' + n : '');
+  for (const s of sortSessions(sessions)) {
+    const squash = x => String(x || '').replace(/\s+/g, ' ').trim(), title = squash(s.title).replace(/=/g, '-'), plan = squash(s.text);
+    const written = (title ? title + ' =' : '') + (plan ? ' ' + plan : '');
+    lines.push(s.date + (s.band ? ' ' + s.band : '') + (s.place && s.place !== 'water' ? ' ' + s.place : '') + (s.week ? ' week' : '') + (s.alt ? ' alt' : '') + (s.notDone ? ' not-done' : '') + ':' + (written ? ' ' + written.trim() : ''));
+    for (const n of noteLines(s.notes)) lines.push(n ? '  ' + n : '');
   }
   return text(lines);
 }
