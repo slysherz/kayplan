@@ -6,7 +6,6 @@
     "start": "node serve.js",
     "test": "node --test test/*.test.js",
     "page-check": "node tools/page-check.mjs",
-    "hosted-check": "node tools/hosted-check.mjs",
-    "site": "node tools/build-site.mjs"
+    "hosted-check": "node tools/hosted-check.mjs"
   }
 }

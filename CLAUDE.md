@@ -4,7 +4,7 @@ Kayplan is a tool for one kayak coach to plan a club's training season. [DESIGN.
 
 ## Rules
 
-1. **No athlete names, ever.** No name, first name or initials of an athlete goes into any file in this folder, into test data, or into a commit message. The athletes are children and this folder becomes a GitHub repository. The plan is written for plans and age bands, never for individuals. The roster is in the coach's notes at `../provas.md`, outside this folder: read it if needed, copy nothing personal from it. Before every commit run `bash tools/check-names.sh`, which searches this folder and the commit messages for the roster's first names.
+1. **No athlete names, ever.** No name, first name or initials of an athlete goes into any file in this folder, into test data, or into a commit message. The athletes are children, this folder is a public GitHub repository, and the plan's repository is read by every token given to them. The plan is written for plans and age bands, never for individuals. The roster is in the coach's notes at `../provas.md`, outside this folder: read it if needed, copy nothing personal from it. Before every commit run `bash tools/check-names.sh`, which searches this folder, `data/` and the commit messages of both for the roster's first names.
 2. **Levels.** The tool is built in three levels (DESIGN.md 2.1), and a level is only started when the coach says the one above works. Level 1 is accepted. Level 2 is being built in steps the coach tries one at a time (see State). Session suggestions (DESIGN.md 8.4) were asked for by the coach on 2026-10-03 and are built. Do not add anything else from level 3 (scaling, generated plans) or from DESIGN.md section 9 unless the coach asks. Prefer a small thing that is right.
 3. **The screen stays calm.** The neutral palette and plain text cells of layout B in [mockups/level1-layouts.html](mockups/level1-layouts.html). No explanatory text on the page, no new colours, no icons.
 4. **One engine.** Everything worked out from the plan is computed in `src/` and used by both the page and the command line. Nothing is computed only in the page's code.
@@ -22,7 +22,7 @@ Built:
 - **Level 2, step 3: checks of sessions and weeks** (the coach asked for these from DESIGN.md section 9 on 2026-10-02). What the course would question about a session (a zone not for that age, the order of contents, repetition length, rest, too much of a zone, R3 before the warm-up is done) and about a week (hard sessions under 48 h apart, quality in the afternoon, too many R7 sessions, a block content with no session, intensity in a recovery week, the days around a race, the taper). They are words on the page and in `show week` and `show checks`; nothing is refused. The season-level checks of section 9 (order of blocks, residual effects before a race, build times) were offered and turned down.
 - **Zone cards from the course reference** (`docs/course-reference.md`): intensity markers, place in the session and the season, kinds of work for R6 and R7, the resisted variants inside each card, km a year per category. A click keeps a card open.
 - **Session suggestions** (DESIGN.md 8.4, asked for by the coach on 2026-10-03): `season/library.txt` holds sessions shared by every plan and band (the coach's old sessions and the course's model sessions). A session with no work written shows a short list in its editor, filtered to the week and ordered by how likely each is to be picked (see "Rules the engine applies"). The reader understands ranges (`2-4x`, `10-20'`).
-- **The plan on GitHub** (DESIGN.md 6.5, asked for by the coach on 2026-10-04): `src/store-github.js` reads and writes the plan's files in a folder of a GitHub repository; the page uses it whenever it is not served from this computer, asks once per browser for the repository and a token, and on a phone shows a simple page of the day's sessions. Pushed on 2026-10-04: this folder to the private `slysherz/kayplan-rioneiva-2027`, `site/` to the public `slysherz/kayplan` (push only when the coach says so). `npm run site` builds the page as plain files for GitHub Pages. [HOSTING.md](HOSTING.md) has the steps. It has only been run against a GitHub in memory (`test/fake-github.js`), never against the real one: the coach has to create the repositories and the token.
+- **The plan on GitHub** (DESIGN.md 6.5, asked for by the coach on 2026-10-04): `src/store-github.js` reads and writes the plan's files in a folder of a GitHub repository; the page uses it whenever it is not served from this computer, asks once per browser for the repository and a token, and on a phone shows a simple page of the day's sessions. Two repositories (split on 2026-10-17, the coach: "keep the code separate"): this folder, the code, is the public `slysherz/kayplan`, which GitHub Pages serves as it is (nothing is built); the plan is the private `slysherz/kayplan-rioneiva-2027`, holding `season/`, `docs/` and the club's sheet, where every save from the page is a commit. On this computer the plan's repository is cloned into `data/` (ignored here), and `season` and `docs` are links into it. Push only when the coach says so. [HOSTING.md](HOSTING.md) has the steps.
 - **Week notes and phrase** (the coach, 2026-10-17, from the club's weekly sheet: the warm-up and the motivational phrase): free text for a band's whole week, in `notes.txt`, each in its own field under the week's days on the page and in its own place on the exported sheet; on the day page after the sessions of a band that trains that day; in `show week` and `show day`.
 - **Sessions for any day of the week** (the coach, 2026-10-17: "sometimes the training sessions are there to do and can be done whenever"): a session of the whole week, written on its Monday with `week`. An "Any day" column before Monday on the page; at the bottom of the exported sheet, as the club's gym tables; on every day of the week on the day page.
 - Tests for the engine, the command line and the server (`npm test`), and a check of the page in headless Firefox (`npm run page-check`).
@@ -35,7 +35,7 @@ Not built:
 
 - **Frozen estimates.** DESIGN.md 6.7 says estimates of weeks that have ended are frozen. They are not: every estimate follows the plan as it is now, so changing a future block also changes past estimates. Freezing needs the estimate of each ended week to be stored, and the design stores nothing that is worked out. The coach has been told; it waits for a decision.
 - The rest of DESIGN.md section 9 (season-level checks, monitoring, load curves), and anything from level 3.
-- A commit per save on this computer. Through `serve.js` a save only writes the file; commits are made by hand (ask first). Through GitHub every save is a commit.
+- A commit per save on this computer. Through `serve.js` a save only writes the file; commits are made by hand in `data/` (ask first). Through GitHub every save is a commit.
 
 ## Layout
 
@@ -66,12 +66,12 @@ src/page.js, page.css  the page: draws what the engine works out, turns clicks i
 test/                node --test; test/page-season is the season the page check runs on
 tools/check-names.sh the names check
 tools/page-check.mjs the page check; tools/firefox.mjs drives headless Firefox for it
-tools/hosted-check.mjs the same for the page as hosted: the built site against a GitHub in memory, and a phone-sized window
-tools/build-site.mjs builds site/ (not in git): index.html and the modules the page loads, for a static host
+tools/hosted-check.mjs the same for the page as hosted: this folder as GitHub Pages serves it, against a GitHub in memory, and a phone-sized window
 HOSTING.md           how the page and the plan are put on GitHub
-season/              the plan: only what was typed
+data/                the plan's repository, cloned here (not in this repository): season/, docs/, the club's sheet
+season/              a link to data/season: the plan, only what was typed
 mockups/             the layout mockup with dummy data (reference for look and behaviour)
-docs/                the course slides as text: course-reference.md by topic, course-slides-1.md in slide order
+docs/                a link to data/docs: the course slides as text, not public: course-reference.md by topic, course-slides-1.md in slide order
 ```
 
 For a training rule or number, look in `docs/course-reference.md` first (one card per zone, then session, microcycle, mesocycle, season, ages, monitoring; every figure has its slide number). `docs/course-slides-1.md` has the full tables and the slides' own wording. Both cover part 1 of the course only.
@@ -89,7 +89,6 @@ node kayplan.js show suggestions <date> [n] [--plan <id>] [--band <name>] [--zon
 node kayplan.js show zone <zone>                       a zone's card: what it is and how the course trains it
 node kayplan.js show types                             what each week type is for, with its load
 node kayplan.js show events                            the races and events table
-npm run site                                           builds site/ for GitHub Pages (HOSTING.md)
 npm run hosted-check                                   checks the hosted page in headless Firefox against a GitHub in memory
 node kayplan.js check                                  errors and warnings; exit code 1 on errors
 npm test                                               engine, command line and server
@@ -108,6 +107,7 @@ The coach asks for changes in words ("write next week's sessions", "the Nacional
 1. Look first: `show season`, `show week n`, `show events`.
 2. Edit the text files in `season/`.
 3. Run `node kayplan.js check`, then `show` again to see the worked-out values.
+4. The files are in the plan's repository (`data/`): `git -C data pull` before starting, since the page commits there; commit there, never in this folder (ask first).
 
 Never store anything that is worked out: week positions of cycles, week types that follow a pattern, loads, main zones, today.
 

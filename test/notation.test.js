@@ -204,14 +204,17 @@ test('outline: a part a line, a long set over several, and the lines put togethe
 test('sessionLines: what each part comes to, and the parts add up to the session', async () => {
   const fs = await import('node:fs');
   const { parseTables, parseLibrary } = await import('../src/format.js');
-  const tables = parseTables(fs.readFileSync(new URL('../season/tables.txt', import.meta.url), 'utf8')).value;
+  const tables = parseTables(fs.readFileSync(new URL('page-season/tables.txt', import.meta.url), 'utf8')).value;
   const l = sessionLines("15' R1 + 6x 500m R3/4' R0 + 10' R1", tables, 'junior', false, 40);
   assert.deepEqual(l.lines.map(x => [x.text, Math.round(x.min), +x.km.toFixed(2)]), [["15' R1", 15, 2.38], ["6x 500m R3/4' R0", 39, 3], ["10' R1", 10, 1.58]]);
   assert.equal(Math.round(l.min), 64);
-  // every session of the library, at three widths: the parts add up to the whole, and the lines are the text
+  // every session of the library, at three widths: the parts add up to the whole, and the lines are the text;
+  // the club's library too when the season is next to the code (it is not in this repository)
   const flat = t => t.replace(/\s+/g, '');
+  const club = new URL('../season/library.txt', import.meta.url), library = new URL('page-season/library.txt', import.meta.url);
+  const sessions = [library, ...(fs.existsSync(club) ? [club] : [])].flatMap(f => parseLibrary(fs.readFileSync(f, 'utf8')).value);
   let n = 0;
-  for (const s of parseLibrary(fs.readFileSync(new URL('../season/library.txt', import.meta.url), 'utf8')).value) {
+  for (const s of sessions) {
     const off = s.place !== 'water', v = infer(s.text, tables, 'junior', off);
     for (const w of [20, 36, 200]) {
       const x = sessionLines(s.text, tables, 'junior', off, w);
@@ -225,7 +228,7 @@ test('sessionLines: what each part comes to, and the parts add up to the session
     }
     n++;
   }
-  assert.ok(n > 200);
+  assert.ok(n > (fs.existsSync(club) ? 200 : 5));
 });
 
 test('oneLine: the lines typed are one session; a new line is a "+"', () => {

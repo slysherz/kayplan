@@ -6,39 +6,36 @@ Two repositories:
 
 | Repository | Visibility | Holds |
 |---|---|---|
-| the plan, e.g. `kayplan-rioneiva-2027` | private | this whole folder: the plan in `season/`, the code, the course documents, the history |
-| the page, e.g. `kayplan` | public | only the built page (`site/`): no plan, no course documents |
+| the code, `kayplan` | public | this folder: the page, the command line, the tests, the design. GitHub Pages serves it as it is |
+| the plan, e.g. `kayplan-rioneiva-2027` | private | the plan in `season/`, the course documents in `docs/`, and the plan's history: every save from the page is a commit there |
 
+On this computer the plan's repository is cloned into `data/` inside this folder (ignored by this folder's git), and `season` and `docs` here are links to `data/season` and `data/docs`, so `node kayplan.js` and `node serve.js` find the plan where they always did.
 
-## 1. The private repository
-
-1. On GitHub: New repository, name `kayplan-rioneiva-2027`, **Private**, with no README.
-2. In this folder:
-
-```
-bash tools/check-names.sh
-git remote add origin git@github.com:slysherz/kayplan-rioneiva-2027.git
-git push -u origin main
-```
-
-## 2. The page
+## 1. The code and the page
 
 1. On GitHub: New repository, name `kayplan`, **Public**, with no README.
 2. In this folder:
 
 ```
-npm run site
-cd site
-git init -b main
-git add -A
-git commit -m "Kayplan page"
+bash tools/check-names.sh
 git remote add origin git@github.com:slysherz/kayplan.git
 git push -u origin main
 ```
 
 3. On GitHub, in the `kayplan` repository: Settings → Pages → Source "Deploy from a branch", branch `main`, folder `/ (root)`. After a minute the page is at `https://slysherz.github.io/kayplan/`.
 
-To publish a newer version of the page later: `npm run site`, then in `site/`: `git add -A`, `git commit -m "Update"`, `git push`.
+A newer version of the page is published by pushing this folder: `git push`. Nothing has to be built.
+
+## 2. The plan
+
+1. On GitHub: New repository, name `kayplan-rioneiva-2027`, **Private**, with no README.
+2. Put `season/` and `docs/` in it, and clone it into this folder:
+
+```
+git clone git@github.com:slysherz/kayplan-rioneiva-2027.git data
+ln -s data/season season
+ln -s data/docs docs
+```
 
 ## 3. The token
 
@@ -79,8 +76,8 @@ What each link gives:
 
 ## What to know
 
-- **Every save is a commit** in `kayplan-rioneiva-2027`, so the plan's whole history is on GitHub.
+- **Every save is a commit** in `kayplan-rioneiva-2027`, so the plan's whole history is on GitHub. The code's history is in `kayplan`, apart from it.
 - **Changes from another device** appear within about 20 seconds. If two devices change the same file at the same moment, the second is told that the plan changed and shows the newer text.
 - **The token is kept in the browser.** Anyone who can open that browser can change the plan. If a device is lost, delete the token on GitHub and make a new one.
-- **This computer.** `node serve.js` still works on the files here, but those files are now a copy: run `git pull` before using it and commit and push afterwards, or use the page on GitHub here too. The same goes for changes made with Claude in this folder.
-- **Athletes' names** must never go into either repository. `bash tools/check-names.sh` checks this folder before a push.
+- **This computer.** `node serve.js` still works on the files here, but those files are now a copy: run `git -C data pull` before using it and commit and push in `data/` afterwards, or use the page on GitHub here too. The same goes for changes to the plan made with Claude in this folder.
+- **Athletes' names** must never go into either repository. `bash tools/check-names.sh` checks this folder, `data/`, and the commit messages of both, before a push.

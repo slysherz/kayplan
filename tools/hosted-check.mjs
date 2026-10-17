@@ -1,5 +1,5 @@
-// Checks the page as it runs on a static host with the plan on GitHub: the built site/ and a GitHub
-// in memory (test/fake-github.js), in headless Firefox. It never talks to the real GitHub.
+// Checks the page as it runs on a static host with the plan on GitHub: this repository's files as
+// GitHub Pages serves them, and a GitHub in memory (test/fake-github.js), in headless Firefox. It never talks to the real GitHub.
 //
 //   node tools/hosted-check.mjs        (needs firefox)
 //
@@ -12,12 +12,13 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { firefox } from './firefox.mjs';
-import { buildSite } from './build-site.mjs';
 import { fakeGithub } from '../test/fake-github.js';
 
 const FIXTURE = fileURLToPath(new URL('../test/page-season/', import.meta.url));
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'kayplan-hosted-'));
-const SITE = buildSite(path.join(TMP, 'site')).out;
+// what GitHub Pages serves: the repository's files, without the plan that may be next to them here
+const SITE = fileURLToPath(new URL('..', import.meta.url));
+const NOT_IN_REPO = /^\/(season|docs|data)(\/|$)/;
 const TODAY = '2026-10-02', REPO = 'someone/plan';
 
 // the fixture season in the folder season/ of the repository
@@ -30,7 +31,7 @@ const files = { 'README.md': 'not the plan\n' };
 })(FIXTURE, 'season/');
 const gh = fakeGithub({ repo: REPO, token: 'secret', files });
 
-// one server: the built site as plain files, and the fake GitHub under /gh
+// one server: the repository's files as they are, and the fake GitHub under /gh
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' };
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
@@ -42,7 +43,7 @@ const server = http.createServer(async (req, res) => {
     return res.end(r.status === 304 ? undefined : await r.text());
   }
   const name = url.pathname === '/' ? '/index.html' : url.pathname, full = path.join(SITE, name);
-  if (!full.startsWith(SITE) || !fs.existsSync(full)) { res.writeHead(404); return res.end('not found'); }
+  if (!full.startsWith(SITE) || NOT_IN_REPO.test(name) || !fs.existsSync(full) || !fs.statSync(full).isFile()) { res.writeHead(404); return res.end('not found'); }
   res.writeHead(200, { 'content-type': TYPES[path.extname(full)] || 'application/octet-stream', 'cache-control': 'no-store' });
   res.end(fs.readFileSync(full));
 });

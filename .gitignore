@@ -1,6 +1,8 @@
 node_modules/
 *.tmp
-site/
-.token
 *.zip
+.token
 .token-read
+/data/
+/season
+/docs
