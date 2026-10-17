@@ -44,6 +44,11 @@ test("the course's way of writing a session", () => {
   // the multiplication sign
   assert.deepEqual(parsePlan("3 × (4′-6′-6′-4′ R2/1′)/3′"), parsePlan("3x(4'-6'-6'-4' R2/1')/3'"));
   assert.deepEqual(parsePlan('4 × 500m R3'), { R3: { sec: 0, m: 2000 } });
+  // and the club's asterisk
+  assert.deepEqual(parsePlan("3*(20'R1/5'R0)"), parsePlan("3x(20' R1/5' R0)"));
+  assert.deepEqual(parsePlan("10' R1 + 2*(5Km R1/5'R0)"), { R1: { sec: 600, m: 10000 }, R0: { sec: 600, m: 0 } });
+  assert.deepEqual(parsePlan("2-3*(4*30''/30'') R3+"), parsePlan("2-3x(4x 30''/30'') R3+"));
+  assert.deepEqual(parsePlan("R2 4 * 5'"), { R2: { sec: 1200, m: 0 } });
   // a zone after each amount: none is lost, and each amount keeps its own
   assert.deepEqual(parsePlan("3x(4' R2-6' R2/1')/3'"), { R2: { sec: 1800, m: 0 }, rest: { sec: 900, m: 0 } });
   assert.deepEqual(parsePlan("2x(4' R2-2' R3/1')"), { R2: { sec: 480, m: 0 }, R3: { sec: 240, m: 0 }, rest: { sec: 240, m: 0 } });
