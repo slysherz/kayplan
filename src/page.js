@@ -1090,8 +1090,16 @@ document.addEventListener('scroll', e => {
   if (m) m.scrollTop = e.target.scrollTop;
 }, true);
 
+// A letter typed with a dead key (~ then a for ã) is composed: redrawing in the middle would end the
+// composition and leave the ~ in the text, so the field is read when the composition ends. The copy
+// behind the plan box still follows, as it only draws.
 document.addEventListener('input', e => {
-  const el = e.target;
+  if (!e.isComposing) typed(e.target);
+  else if (e.target.dataset && e.target.dataset.input === 'text') syncMirror(e.target);
+});
+document.addEventListener('compositionend', e => typed(e.target));
+
+function typed(el) {
   if (!data || !el.dataset) return;
   if (el.dataset.ev) { eventField(el, true); return; }
   if (!ctx) return;
@@ -1115,7 +1123,7 @@ document.addEventListener('input', e => {
     if (!/^\d+$/.test(el.value.trim()) || v > 100 || w.type === null || (!w.hand && v === w.load)) return;
     change([f.weeks], () => setPlan(edits.setWeek(ctx.plan, w.monday, w.type, v, data.tables)), typing);
   }
-});
+}
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && e.target.dataset && /^(repo|dir|token)$/.test(e.target.dataset.gh || '')) { openAccount(); return; }

@@ -253,6 +253,26 @@ try {
   await saved();
   ok('a session\'s title: the first line of its plan, saved before an "=", shown above the plan and the plan lighter');
 
+  // a letter typed with a dead key (~ then a): the box is not redrawn while it is composed, so no ~ is left
+  await ff.click('.day:nth-child(4) .add[data-v="water"]');
+  await ff.keys("60' R1");
+  await ff.keys(ff.UP + 'M');
+  const compose = (v, ev) => ff.js('const t = document.querySelector("[data-fid=s-text]"); t.__mark = t.__mark || 1; t.value = t.value.replace(/^M[~ã]?/, "M" + arguments[0]); t.setSelectionRange(2, 2);' +
+    'if (arguments[1] === "start") t.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true, data: "" }));' +
+    't.dispatchEvent(new InputEvent("input", { bubbles: true, isComposing: arguments[1] !== "plain", data: arguments[0] }));' +
+    'if (arguments[1] === "end") t.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: arguments[0] }));', v, ev);
+  await compose('~', 'start');
+  assert.equal(await ff.js('return document.querySelector("[data-fid=s-text]").__mark'), 1);
+  assert.equal(await text('.plan-m .pm-t'), 'M~');
+  await compose('ã', 'end');
+  await ff.keys('os');
+  await saved();
+  assert.match(file('plans/juniors/sessions.txt'), /^2026-10-14: Mãos = 60' R1$/m);
+  assert.equal(await value('[data-fid=s-text]'), "Mãos\n60' R1");
+  await ff.click('.del');
+  await saved();
+  ok('a letter typed with a dead key is saved as one letter');
+
   // a new session is the plan's, done by every band; it can be made for the selected band alone and back
   await ff.click('.day:nth-child(3) .add[data-v="water"]');
   await ff.keys('6km R1');
