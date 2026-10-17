@@ -140,7 +140,7 @@ try {
   assert.equal(await text('.sty[data-v="3"]'), 'C');
   ok('week type and load set by hand are saved; back to the pattern removes them');
 
-  await ff.click('.day:nth-child(2) .add[data-v="water"]');
+  await ff.click('.day:nth-child(3) .add[data-v="water"]');
   await ff.keys("1km R1 + 8x 4' R2/1' R0 + 1km R1");
   assert.equal(await text('.zpill'), 'R2');
   assert.match(await text('.inf small'), /R2 ≈ 32' · R1 ≈ 13' · R0 ≈ 8' · ≈ 7\.9 km/);
@@ -148,7 +148,7 @@ try {
   assert.equal(await text('[data-id=week-km]'), '8 of 76 km');
   assert.equal(await text('.cap[data-v="3"]'), '76');
   await saved();
-  assert.match(file('plans/juniors/sessions.txt'), /^2026-10-13 junior: 1km R1 \+ 8x 4' R2\/1' R0 \+ 1km R1$/m);
+  assert.match(file('plans/juniors/sessions.txt'), /^2026-10-13: 1km R1 \+ 8x 4' R2\/1' R0 \+ 1km R1$/m);
   await ff.click('[data-fid=s-notes]');
   await ff.keys('first line' + ff.ENTER + 'second  line ');
   await saved();
@@ -161,7 +161,8 @@ try {
   await ff.click('[data-fid=s-text]');
   await ff.keys(ff.END + ff.ENTER + ' + 4x 10');
   // the text is shown a part a line; Enter starts a line, and a line is a "+" when it is stored
-  assert.equal(await value('[data-fid=s-text]'), "1km R1\n8x 4' R2/1' R0\n1km R1\n + 4x 10");
+  // the first line is the title, empty here
+  assert.equal(await value('[data-fid=s-text]'), "\n1km R1\n8x 4' R2/1' R0\n1km R1\n + 4x 10");
   await ff.keys("'' R6/2'");
   await saved();
   assert.match(file('plans/juniors/sessions.txt'), /1km R1 \+ 4x 10'' R6\/2'$/m);
@@ -169,7 +170,7 @@ try {
 
   await choose('[data-fid=s-place]', 'pool');
   await saved();
-  assert.match(file('plans/juniors/sessions.txt'), /^2026-10-13 junior pool: 1km R1 /m);
+  assert.match(file('plans/juniors/sessions.txt'), /^2026-10-13 pool: 1km R1 /m);
   assert.equal(await text('.zpill'), 'R2');
   assert.match(await text('.chip.on .chip-h'), /Pool · R2/);
   assert.equal(await text('[data-id=week-km]'), "0 of 76 km · 41' off the water");
@@ -177,12 +178,12 @@ try {
   await shot('02-pool');
   await choose('[data-fid=s-place]', 'water');
   await saved();
-  assert.match(file('plans/juniors/sessions.txt'), /^2026-10-13 junior: 1km R1 /m);
+  assert.match(file('plans/juniors/sessions.txt'), /^2026-10-13: 1km R1 /m);
   ok('a session in the pool: no km, minutes off the water, the main zone still worked out');
 
   await ff.click('[data-fid=s-notdone]');
   await saved();
-  assert.match(file('plans/juniors/sessions.txt'), /^2026-10-13 junior not-done: /m);
+  assert.match(file('plans/juniors/sessions.txt'), /^2026-10-13 not-done: /m);
   assert.match(await text('[data-id=week-km]'), /^0 of 76 km$/);
   assert.match(await text('.chip.on .chip-h'), /not done/);
   await shot('02-session');
@@ -190,6 +191,113 @@ try {
   await saved();
   assert.doesNotMatch(file('plans/juniors/sessions.txt'), /2026-10-13/);
   ok('not done, and delete');
+
+  await ff.click('[data-fid=w-notes]');
+  await ff.keys("Warm-up before every session" + ff.ENTER + "On land: 15' run" + ff.ENTER + ff.ENTER + 'Hello!');
+  await ff.click('[data-fid=w-phrase]');
+  await ff.keys('Mind over matter');
+  await saved();
+  // each in its own part of the file, so that nothing on the sheet is guessed from how the notes are laid out
+  assert.equal(file('plans/juniors/notes.txt'), "2026-10-12\n  Warm-up before every session\n  On land: 15' run\n\n  Hello!\n\n2026-10-12 phrase\n  Mind over matter\n");
+  await shot('02-week-notes');
+  await ff.click('[data-act=next]');
+  assert.deepEqual([await value('[data-fid=w-notes]'), await value('[data-fid=w-phrase]')], ['', '']);
+  await ff.click('[data-act=prev]');
+  assert.deepEqual([await value('[data-fid=w-notes]'), await value('[data-fid=w-phrase]')], ["Warm-up before every session\nOn land: 15' run\n\nHello!", 'Mind over matter']);
+  for (const f of ['w-notes', 'w-phrase']) {
+    await selectAll('[data-fid=' + f + ']');
+    await ff.keys(ff.BACKSPACE);
+  }
+  await saved();
+  assert.equal(file('plans/juniors/notes.txt'), '');
+  ok('week notes and phrase: each its own field, saved for the week and the plan, kept apart from the next week, removed when emptied');
+
+  await ff.click('.day.any .add[data-v="gym"]');
+  await ff.keys('Strength I');
+  await saved();
+  assert.match(file('plans/juniors/sessions.txt'), /^2026-10-12 gym week: Strength I$/m);
+  assert.equal(await count('.day.any .chip'), 1);
+  assert.equal(await count('.day:nth-child(2) .chip'), 0);
+  assert.equal(await text('.when'), 'Any day · 12 Oct – 18 Oct');
+  await ff.click('.day.any .add[data-v="water"]');
+  await ff.keys("4x 4' R3/4' R1");
+  await saved();
+  assert.match(file('plans/juniors/sessions.txt'), /^2026-10-12 gym week: Strength I\n2026-10-12 week: 4x 4' R3\/4' R1$/m);
+  assert.equal(await text('[data-id=week-km]'), '6 of 76 km');
+  await shot('02-any-day');
+  await ff.click('.del');
+  await ff.click('.day.any .chip');
+  await ff.click('.del');
+  await saved();
+  assert.doesNotMatch(file('plans/juniors/sessions.txt'), /week:/);
+  ok('a session for any day of the week: its own column, saved on the Monday with "week", counted in the week\'s km');
+
+  // the first line of the plan is the title: typed there, stored before an "=", shown above the plan
+  await ff.click('.day:nth-child(4) .add[data-v="water"]');
+  await ff.keys("60' R1");
+  await ff.keys(ff.UP + 'Técnica');
+  await saved();
+  assert.match(file('plans/juniors/sessions.txt'), /^2026-10-14: Técnica = 60' R1$/m);
+  assert.equal(await text('.zpill'), 'R1');
+  assert.deepEqual([await text('.day:nth-child(4) .chip-n'), await text('.day:nth-child(4) .chip-t')], ['Técnica', "60' R1"]);
+  assert.ok(await ff.js('return document.querySelector(".day:nth-child(4) .chip-t").classList.contains("light")'));
+  // the copy behind the box: the title's line marked, the plan under it lighter
+  assert.deepEqual([await text('.plan-m .pm-t'), await text('.plan-m .pm-r')], ['Técnica', "60' R1 "]);
+  assert.ok(await ff.js('return document.querySelector(".plan-m .pm-r").classList.contains("light")'));
+  assert.equal(await value('[data-fid=s-text]'), "Técnica\n60' R1");
+  // selected text shows: the box draws its own highlight over the copy
+  await ff.js('const t = document.querySelector("[data-fid=s-text]"); t.focus(); t.setSelectionRange(0, 7);');
+  assert.equal(await ff.js('return getComputedStyle(document.querySelector("[data-fid=s-text]"), "::selection").backgroundColor'), 'rgba(15, 92, 122, 0.28)');
+  await shot('02-title');
+  await ff.click('.del');
+  await saved();
+  ok('a session\'s title: the first line of its plan, saved before an "=", shown above the plan and the plan lighter');
+
+  // a new session is the plan's, done by every band; it can be made for the selected band alone and back
+  await ff.click('.day:nth-child(3) .add[data-v="water"]');
+  await ff.keys('6km R1');
+  await saved();
+  assert.match(file('plans/juniors/sessions.txt'), /^2026-10-13: 6km R1$/m);
+  assert.equal(await value('[data-fid=s-band]'), '');
+  assert.deepEqual(await ff.js('return [...document.querySelectorAll("[data-fid=s-band] option")].map(o => o.textContent)'), ['Everyone', 'junior']);
+  await choose('[data-fid=s-band]', 'junior');
+  await saved();
+  assert.match(file('plans/juniors/sessions.txt'), /^2026-10-13 junior: 6km R1$/m);
+  assert.equal(await value('[data-fid=s-band]'), 'junior');
+  assert.equal(await text('.day:nth-child(3) .chip-h'), 'Water · junior · R1');
+  await shot('02-band-only');
+  await ff.click('.pill.band[data-v="senior"]');
+  assert.equal(await count('.day:nth-child(3) .chip'), 0);
+  await ff.click('.pill.band[data-v="junior"]');
+  await ff.click('.day:nth-child(3) .chip');
+  await choose('[data-fid=s-band]', '');
+  await saved();
+  assert.match(file('plans/juniors/sessions.txt'), /^2026-10-13: 6km R1$/m);
+  assert.equal(await text('.day:nth-child(3) .chip-h'), 'Water · R1');
+  await ff.click('.pill.band[data-v="senior"]');
+  assert.equal(await count('.day:nth-child(3) .chip'), 1);
+  await ff.click('.day:nth-child(3) .chip');
+  await ff.click('.del');
+  await saved();
+  assert.doesNotMatch(file('plans/juniors/sessions.txt'), /2026-10-13/);
+  // a band's own week notes have a field of their own, under the plan's, for that band only
+  put('plans/juniors/notes.txt', '2026-10-12\n  Warm-up\n\n2026-10-12 junior\n  Gym on Thursday\n');
+  await ff.click('.pill.band[data-v="junior"]');
+  await ff.wait('return !!document.querySelector("[data-fid=wb-notes]")');
+  assert.deepEqual([await value('[data-fid=w-notes]'), await value('[data-fid=wb-notes]')], ['Warm-up', 'Gym on Thursday']);
+  assert.equal(await ff.js('return document.querySelector("[data-fid=wb-notes]").previousElementSibling.textContent'), 'Week notes · junior');
+  assert.equal(await count('[data-fid=wb-phrase]'), 0);
+  await ff.click('[data-fid=wb-notes]');
+  await ff.keys(' and Friday');
+  await saved();
+  assert.equal(file('plans/juniors/notes.txt'), '2026-10-12\n  Warm-up\n\n2026-10-12 junior\n  Gym on Thursday and Friday\n');
+  await shot('02-band-notes');
+  await ff.click('.pill.band[data-v="senior"]');
+  assert.deepEqual([await value('[data-fid=w-notes]'), await count('[data-fid=wb-notes]')], ['Warm-up', 0]);
+  put('plans/juniors/notes.txt', '');
+  await ff.wait('return document.querySelector("[data-fid=w-notes]").value === ""');
+  await ff.click('.pill.band[data-v="junior"]');
+  ok('a session is the plan\'s, done by every band, or made for the selected band alone and back; a band\'s own week notes in a field of their own');
 
   // ================= cycles =================
   await ff.click('.meso[data-v="1"]');
@@ -254,7 +362,7 @@ try {
   // ================= selectors and events =================
   fresh();
   await open('plan=juniors&week=23');
-  assert.match(await text('.day:nth-child(6) .race'), /Campeonato Regional de Fundo Norte.*Fundo · Mixed · date not confirmed/);
+  assert.match(await text('.day:nth-child(7) .race'), /Campeonato Regional de Fundo Norte.*Fundo · Mixed · date not confirmed/);
   await ff.click('.pill[data-v="iniciados"]');
   assert.equal(await text('.pill.band.on'), 'iniciado');
   assert.equal(await count('.rc'), 7);
@@ -284,23 +392,24 @@ try {
   await ff.click('.racecell .rc');
   const row = '.events tr.on ';
   assert.equal(await value(row + '[data-f=name]'), 'Campeonato Regional de Fundo Norte');
-  // the season across the top of the events view: a row of races for each plan, the chosen one marked
-  assert.deepEqual(await ff.js('return [...document.querySelectorAll("[data-races]")].map(r => r.dataset.races + " " + r.querySelectorAll(".rc").length + " " + r.querySelectorAll(".racecell").length)'), ['cadetes 9 45', 'iniciados 7 45', 'juniors 9 45']);
-  assert.equal(await count('.racecell.on'), 3);
+  // the season across the top of the events view: a row of races for each band, under its plan, the chosen one marked
+  const strip = () => ff.js('return [...document.querySelectorAll("[data-races]")].map(r => r.dataset.races + " " + r.querySelectorAll(".rc").length + " " + r.querySelectorAll(".racecell").length)');
+  assert.deepEqual(await strip(), ['cadetes 9 45', 'iniciados iniciado 7 45', 'iniciados menor 7 45', 'juniors junior 9 45', 'juniors senior 9 45']);
+  assert.equal(await count('.racecell.on'), 5);
   assert.equal(await count('.cell.now'), 1);
   await shot('05-events');
   // the entry under the pointer is ringed in the rows of the plans it is in, and stays so when the page is drawn again
   const ringed = () => ff.js('return [...document.querySelectorAll(".racecell.hov")].map(c => c.parentNode.dataset.races + " " + ([...c.parentNode.children].indexOf(c)))');
   await ff.hover('.events tbody tr:nth-child(4) td.place');   // Taça de Portugal de Regatas em Linha: week 29, not for Iniciados
-  assert.deepEqual(await ringed(), ['cadetes 29', 'juniors 29']);
+  assert.deepEqual(await ringed(), ['cadetes 29', 'juniors junior 29', 'juniors senior 29']);
   await shot('05-events-hover');
   await ff.js('document.querySelector("[data-act=view][data-v=events]").click()');   // drawn again, the pointer has not moved
-  assert.deepEqual(await ringed(), ['cadetes 29', 'juniors 29']);
+  assert.deepEqual(await ringed(), ['cadetes 29', 'juniors junior 29', 'juniors senior 29']);
   await ff.hover('.events thead th');
   assert.deepEqual(await ringed(), []);
-  await ff.click('[data-races=juniors] .racecell:nth-child(26) .rc');
+  await ff.click('[data-races="juniors junior"] .racecell:nth-child(26) .rc');
   assert.equal(await value(row + '[data-f=name]'), 'Campeonato Nacional de Fundo');
-  assert.equal(await count('.racecell.on'), 3);
+  assert.equal(await count('.racecell.on'), 5);
   await ff.click('[data-races=cadetes] .racecell:nth-child(24) .rc');
   assert.equal(await value(row + '[data-f=name]'), 'Campeonato Regional de Fundo Norte');
   await choose(row + '[data-f=confirmed]', true);
@@ -320,6 +429,32 @@ try {
   await saved();
   assert.match(file('events.txt'), /^2027-03-05 Campeonato Regional de Fundo Norte\n  until: 2027-03-07\n  place: Marco\n/);
   ok('place and date; a half-typed year is ignored');
+
+  // a race for one band of a plan: its own column under the plan's, its own row above, its own sheet
+  assert.deepEqual(await ff.js('return [...document.querySelectorAll(".events thead th")].slice(8, 15).map(t => t.textContent)'), ['Cadetes', 'Iniciados', 'iniciado', 'menor', 'Juniors', 'junior', 'senior']);
+  await ff.click('[data-races=cadetes] .racecell:nth-child(30) .rc');
+  assert.equal(await value(row + '[data-f=name]'), 'Taça de Portugal de Regatas em Linha');
+  await choose(row + '[data-f="plan:menor"]', '1');
+  await saved();
+  assert.match(file('events.txt'), /^2027-04-16 Taça de Portugal de Regatas em Linha\n[^]*?  plans: cadetes 2, menor 1, juniors 2\n/m);
+  assert.deepEqual(await strip(), ['cadetes 9 45', 'iniciados iniciado 6 45', 'iniciados menor 7 45', 'juniors junior 9 45', 'juniors senior 9 45']);
+  await shot('05-events-band');
+  await open('plan=iniciados&band=menor&week=29');
+  assert.equal(await text('.racecell:nth-child(30) .rc'), 'S+');
+  assert.match(await text('.day .race'), /^Taça de Portugal de Regatas em Linha/);
+  await shot('05-sheet-menor');
+  await ff.click('.pill.band[data-v="iniciado"]');
+  assert.equal(await count('.racecell:nth-child(30) .rc'), 0);
+  assert.equal(await count('.day .race'), 0);
+  await shot('05-sheet-iniciado');
+  await ff.click('[data-act=view][data-v=events]');
+  await ff.click('[data-races="iniciados menor"] .racecell:nth-child(30) .rc');
+  await choose(row + '[data-f="plan:menor"]', '');
+  await saved();
+  assert.match(file('events.txt'), /^2027-04-16 Taça de Portugal de Regatas em Linha\n[^]*?  plans: cadetes 2, juniors 2\n/m);
+  await open('plan=juniors&band=junior&week=1');
+  await ff.click('[data-act=view][data-v=events]');
+  ok('a race for one band: its column under its plan, its row of races, the sheet of that band alone');
 
   const n = await count('.events tbody tr');
   await ff.click('[data-act=ev-add]');
@@ -359,7 +494,7 @@ try {
   await ff.click('.swk[data-v="2"]');
   fs.appendFileSync(path.join(DIR, 'plans/juniors/sessions.txt'), "2026-10-06 junior: 8km R1 + 6x 10'' R6/2'\n");
   await ff.wait('return document.querySelectorAll(".chip").length === 1');
-  assert.match(await text('.chip .chip-h'), /Water · R6/);
+  assert.match(await text('.chip .chip-h'), /Water · junior · R6/);
   ok('live reload: a session written to the file appears on the page');
 
   await ff.click('.chip');
@@ -373,7 +508,7 @@ try {
 
   fs.appendFileSync(path.join(DIR, 'plans/juniors/sessions.txt'), 'next tuesday: something\n');
   await ff.wait('return /1 problem/.test(document.getElementById("status").textContent)');
-  await ff.click('.day:nth-child(5) .add[data-v="water"]');
+  await ff.click('.day:nth-child(6) .add[data-v="water"]');
   assert.match(await text('.pop.problems'), /plans\/juniors\/sessions.txt:\d+ · a session is written/);
   await shot('07-problems');
   await ff.sleep(1200);
@@ -381,6 +516,8 @@ try {
   await choose('[data-fid=w-type]', 'R');
   await saved();
   assert.equal(file('plans/juniors/weeks.txt'), '2026-10-05 R\n2026-10-12 R\n');
+  // below the problems, which cover the top of the page
+  await ff.js('document.querySelector(\'.swk[data-v="2"]\').scrollIntoView({ block: "end" })');
   await ff.click('.swk[data-v="2"]');
   assert.equal(await count('.msg'), 0);
   put('plans/juniors/sessions.txt', file('plans/juniors/sessions.txt').replace('next tuesday: something\n', ''));
@@ -499,10 +636,12 @@ try {
   await ff.click('[data-act=pop-close]');
   ok('the week under the click is offered for a split, on a macrocycle and on a block');
 
-  await ff.click('.day:nth-child(6) .add[data-v="water"]');
+  await ff.click('.day:nth-child(7) .add[data-v="water"]');
   await ff.keys('controlo 1km');
   await saved();
-  assert.equal(file('plans/cadetes/sessions.txt'), '2026-10-03 cadete: controlo 1km\n');
+  assert.equal(file('plans/cadetes/sessions.txt'), '2026-10-03: controlo 1km\n');
+  // a plan of one band has no choice of whom a session is for
+  assert.equal(await count('[data-fid=s-band]'), 0);
   assert.equal(await text('.zpill'), '–');
   assert.equal(await text('.inf small'), 'No zone found · ≈ 1.0 km');   // the distance still counts toward the week
   ok('the first session creates sessions.txt; a plan with no zone says so');
@@ -511,13 +650,13 @@ try {
   await new Promise(r => server.close(r));
   await ff.keys(' R3');
   await ff.wait('return /is the server running/.test(document.getElementById("status").textContent)', 9000);
-  assert.equal(file('plans/cadetes/sessions.txt'), '2026-10-03 cadete: controlo 1km\n');
+  assert.equal(file('plans/cadetes/sessions.txt'), '2026-10-03: controlo 1km\n');
   server = createServer(DIR);
   await new Promise(r => server.listen(PORT, '127.0.0.1', r));
   await ff.wait('return !/is the server running/.test(document.getElementById("status").textContent)', 12000);
   await saved();
-  assert.equal(file('plans/cadetes/sessions.txt'), '2026-10-03 cadete: controlo 1km R3\n');
-  assert.equal(await value('[data-fid=s-text]'), 'controlo 1km R3');
+  assert.equal(file('plans/cadetes/sessions.txt'), '2026-10-03: controlo 1km R3\n');
+  assert.equal(await value('[data-fid=s-text]'), '\ncontrolo 1km R3');
   ok('the server stops and starts again: the page says so, keeps the typing, and saves it afterwards');
 
   put('season.txt', 'start: 2026-09-29\nweeks: 45\n');
@@ -532,14 +671,14 @@ try {
   await open('plan=juniors&week=2');
   assert.equal(await count('.swk.warn'), 0);
   assert.equal(await count('.chks'), 0);
-  await ff.click('.day:nth-child(1) .add[data-v="water"]');
+  await ff.click('.day:nth-child(2) .add[data-v="water"]');
   await ff.keys("1km R1 + 5x 4' R3/2'");
   await saved();
   assert.deepEqual(await ff.js('return [...document.querySelectorAll("[data-id=s-checks] div")].map(d => d.textContent)'),
     ["R3: 2' of rest after 4', below the recommended minimum of 1:1", "R3 starts 6'19'' into the session: at least 30' before it is recommended"]);
   assert.deepEqual(await ff.js('return [...document.querySelectorAll(".swk.warn")].map(b => b.textContent)'), ['2']);
   // the course's own way of writing: the zone once, before the set, with the multiplication sign
-  await ff.click('.day:nth-child(2) .add[data-v="water"]');
+  await ff.click('.day:nth-child(3) .add[data-v="water"]');
   await ff.keys("6km R1 + R3+ 4 × (6×30''/30'')/8' + 1km R1");
   await saved();
   assert.equal(await text('.zpill'), 'R3+');
@@ -549,10 +688,10 @@ try {
     ['Mon (R3) and Tue (R3+) are less than 48 h apart', "R1 is the block's content and has no session this week", "R2 is the block's content and has no session this week",
       "Mon · R3: 2' of rest after 4', below the recommended minimum of 1:1", "Mon · R3 starts 6'19'' into the session: at least 30' before it is recommended"]);
   await shot('12-checks');
-  // the other band of the plan has its own sessions: its week 2 says nothing, only its week 1 is marked
+  // the other band does the plan's sessions too: its week 2 is marked as well as its own week 1
   await ff.click('.pill.band[data-v="senior"]');
-  assert.equal(await count('.swk.warn'), 1);
-  assert.equal(await count('.chks'), 0);
+  assert.deepEqual(await ff.js('return [...document.querySelectorAll(".swk.warn")].map(b => b.textContent)'), ['1', '2']);
+  assert.match(await text('[data-id=w-checks]'), /Mon \(R3\) and Tue \(R3\+\) are less than 48 h apart/);
   ok('checks: a session and a week say what the course would question; the course notation is read');
 
   // ================= the week sheet =================
@@ -564,10 +703,12 @@ try {
   await ff.click('[data-act=export]');
   await ff.wait('return window.printed === 1');
   const sheetDoc = await ff.js('return document.getElementById("sheet-frame").srcdoc');
-  assert.match(sheetDoc, /<title>The Club - Training plan 28 September to 4 October - junior<\/title>/);
-  assert.match(sheetDoc, /<h1>The Club<\/h1><h2>Season 2026–27 · [A-Za-z\/]+<\/h2><h3>[^<]*28 September to 4 October<\/h3>/);
-  assert.match(sheetDoc, /<th>Monday<\/th>.*<th>Sunday<\/th>/);
-  assert.match(sheetDoc, /<td><b>Water<\/b><p>1km R1<br>8x 4' R2\/1'R0<br>1km R1<\/p><small>\(K2 on the last four reps\)<\/small><\/td>/);
+  // in Portuguese, as the club hands it out, though the page is in English
+  assert.match(sheetDoc, /<title>The Club- Plano de Treino 28 de Setembro a 4 de Outubro - junior<\/title>/);
+  assert.match(sheetDoc, /class="title"><div><span>The Club<\/span>[^]*class="season"><div><span>Época 2026- Setembro\/Outubro<\/span>[^]*class="dates"><div><span>28 de Setembro a 4 de Outubro<\/span>/);
+  assert.match(sheetDoc, /class="day"><div><span>Segunda<\/span>[^]*class="day"><div><span>Domingo<\/span>/);
+  assert.equal(await text('[data-act=export]'), 'Export');
+  assert.match(sheetDoc, /class="place"><div><span>Água<\/span>[^]*class="text"><div><span>1km R1 \+ 8x 4' R2\/1'R0 \+ 1km R1<\/span>[^]*class="note"><div><span>\(K2 on the last four reps\)<\/span>/);
   assert.equal(await ff.js('const r = document.getElementById("sheet-frame").getBoundingClientRect(); return r.width + r.height'), 0);
   // a second export replaces the first frame
   await ff.click('[data-act=export]');
@@ -578,14 +719,14 @@ try {
   // ================= several sessions a day, by place =================
   fresh();
   await open('plan=juniors&band=junior&week=7');
-  await ff.click('.day:nth-child(2) .add[data-v="water"]');
+  await ff.click('.day:nth-child(3) .add[data-v="water"]');
   await ff.keys("60' R1");
   await saved();
-  await ff.click('.day:nth-child(2) .add[data-v="gym"]');
+  await ff.click('.day:nth-child(3) .add[data-v="gym"]');
   await ff.keys('circuit');
   await saved();
   const kmBefore = await text('[data-id=week-km]');
-  await ff.click('.day:nth-child(2) .add[data-v="gym"]');
+  await ff.click('.day:nth-child(3) .add[data-v="gym"]');
   await ff.keys("long circuit 40'");
   await ff.click('[data-fid=s-notes]');
   await ff.keys('for those not on the water');
@@ -593,26 +734,27 @@ try {
   assert.notEqual(await text('[data-id=week-km]'), kmBefore);
   await choose('[data-fid=s-alt]', true);
   await saved();
-  assert.match(file('plans/juniors/sessions.txt'), /^2026-11-10 junior: 60' R1\n2026-11-10 junior gym: circuit\n2026-11-10 junior gym alt: long circuit 40'\n  for those not on the water$/m);
+  assert.match(file('plans/juniors/sessions.txt'), /^2026-11-10: 60' R1\n2026-11-10 gym: circuit\n2026-11-10 gym alt: long circuit 40'\n  for those not on the water$/m);
   // in the order they were added, each under its place; the alternative counts for nothing
-  assert.deepEqual(await ff.js('return [...document.querySelectorAll(".day:nth-child(2) .chip-h")].map(e => e.textContent)'), ['Water · R1', 'Gym', 'Gym · alternative']);
+  assert.deepEqual(await ff.js('return [...document.querySelectorAll(".day:nth-child(3) .chip-h")].map(e => e.textContent)'), ['Water · R1', 'Gym', 'Gym · alternative']);
   assert.equal(await text('[data-id=week-km]'), kmBefore);
-  assert.equal(await count('.day:nth-child(2) .add'), 4);
+  assert.equal(await count('.day:nth-child(3) .add'), 4);
   await ff.js('const a = document.getElementById("app"); a.scrollTop = a.scrollHeight;');
   await shot('08-day-places');
   await ff.js('window.printed = 0; Object.defineProperty(HTMLIFrameElement.prototype, "contentWindow", { get() { return { focus() {}, print() { window.printed++; } }; } });');
   await ff.click('[data-act=export]');
   await ff.wait('return window.printed === 1');
-  assert.match(await ff.js('return document.getElementById("sheet-frame").srcdoc'), /<b>Water<\/b><p>60' R1<\/p><u>\+<\/u><b>Gym<\/b><p>circuit<\/p><em>For those not on the water;<\/em><b>Gym<\/b><p>long circuit 40'<\/p><small>\(for those not on the water\)<\/small><\/td>/);
+  // a row a line, top to bottom: the water, a "+", the gym, then the alternative under its own line
+  assert.match(await ff.js('return document.getElementById("sheet-frame").srcdoc'), /<span>Água<\/span>[^]*<span>60' R1<\/span>[^]*class="plus"><div><span>\+<\/span>[^]*<span>Ginásio<\/span>[^]*<span>circuit<\/span>[^]*class="label"><div><span>Quem não fizer água;<\/span>[^]*<span>Ginásio<\/span>[^]*<span>long circuit 40'<\/span>[^]*<span>\(for those not on the water\)<\/span>/);
   // deleting the one in the middle keeps the others, and the last stays selected-able
-  await ff.click('.day:nth-child(2) .chip:nth-of-type(2)');
+  await ff.click('.day:nth-child(3) .chip:nth-of-type(2)');
   await ff.click('[data-act=del]');
   await saved();
-  assert.match(file('plans/juniors/sessions.txt'), /^2026-11-10 junior: 60' R1\n2026-11-10 junior gym alt: long circuit 40'\n/m);
-  await ff.click('.day:nth-child(2) .chip:nth-of-type(2)');
-  assert.equal(await value('[data-fid=s-text]'), "long circuit 40'");
+  assert.match(file('plans/juniors/sessions.txt'), /^2026-11-10: 60' R1\n2026-11-10 gym alt: long circuit 40'\n/m);
+  await ff.click('.day:nth-child(3) .chip:nth-of-type(2)');
+  assert.equal(await value('[data-fid=s-text]'), "\nlong circuit 40'");
   await ff.sleep(2500);   // through the page's own reload
-  assert.equal(await value('[data-fid=s-text]'), "long circuit 40'");
+  assert.equal(await value('[data-fid=s-text]'), "\nlong circuit 40'");
   ok('a day: any number of sessions, each in a place; an alternative counts for nothing and is exported under its own line');
 
   // ================= suggestions =================
@@ -620,7 +762,7 @@ try {
   await open('plan=juniors&band=junior&week=7');
   const rows = () => ff.js('return [...document.querySelectorAll(".sug-r")].map(r => [r.querySelector("b").textContent, r.querySelector("span").textContent, r.querySelector("small").textContent])');
   assert.equal(await count('.sug'), 0);
-  await ff.click('.day:nth-child(2) .add[data-v="water"]');
+  await ff.click('.day:nth-child(3) .add[data-v="water"]');
   // week 7 is in the block R2 and has no session: R2 first, with the session it had last time, then one of each zone
   assert.deepEqual(await rows(), [
     ['R2', "1km R1 + 8x 4' R2/1'R0 + 1km R1", "32'"], ['R1', '6km R1', "38'"], ['R3', "R3: 4x(3x 2'/30'')/6'", "24'"], ['R6', "R6: 3x(3x 50/3')/6'", "2'"], ['R2', 'R2 ladder', "60'"]]);
@@ -652,7 +794,7 @@ try {
   await shot('09-suggestions-one');
   // using one writes its text into the session, where it is changed like any other
   await ff.click('.sug-r');
-  assert.equal(await value('[data-fid=s-text]'), "R3: 4x(3x 2'/30'')/6'");
+  assert.equal(await value('[data-fid=s-text]'), "\nR3: 4x(3x 2'/30'')/6'");
   assert.equal(await ff.js('return document.activeElement.dataset.fid'), 's-text');
   assert.equal(await text('.zpill'), 'R3');
   assert.equal(await count('.sug'), 0);
@@ -660,9 +802,9 @@ try {
   await shot('09-suggestions-used');
   await ff.keys(' + 2km R1');
   await saved();
-  assert.match(file('plans/juniors/sessions.txt'), /^2026-11-10 junior: R3: 4x\(3x 2'\/30''\)\/6' \+ 2km R1$/m);
+  assert.match(file('plans/juniors/sessions.txt'), /^2026-11-10: R3: 4x\(3x 2'\/30''\)\/6' \+ 2km R1$/m);
   // the next morning an R3 session would be too close: it is not among the first
-  await ff.click('.day:nth-child(3) .add[data-v="water"]');
+  await ff.click('.day:nth-child(4) .add[data-v="water"]');
   assert.ok(!(await rows()).some(r => r[0] === 'R3'));
   // words narrow the list, in any place; the place and the notes come with the session
   await ff.keys('gym');
@@ -672,15 +814,17 @@ try {
   await saved();
   assert.equal(await value('[data-fid=s-place]'), 'gym');
   assert.equal(await value('[data-fid=s-notes]'), 'tempo 2:2');
-  assert.match(file('plans/juniors/sessions.txt'), /^2026-11-11 junior gym: 4-6 exercises, 2-3x 10-15 reps\n  tempo 2:2$/m);
+  assert.match(file('plans/juniors/sessions.txt'), /^2026-11-11 gym: 4-6 exercises, 2-3x 10-15 reps\n  tempo 2:2$/m);
   // the arrows go from the text into the list, and Enter takes the row
-  await ff.click('.day:nth-child(5) .add[data-v="water"]');
+  await ff.click('.day:nth-child(6) .add[data-v="water"]');
   await ff.keys(ff.DOWN + ff.DOWN);
   assert.equal(await ff.js('return [...document.querySelectorAll(".sug-r")].indexOf(document.activeElement)'), 1);
   const second = (await rows())[1][1];
   await ff.keys(ff.ENTER);
   await saved();
-  assert.equal(await value('[data-fid=s-text]'), second);
+  // a named one brings its name to the title line
+  const got = (await value('[data-fid=s-text]')).split('\n');
+  assert.ok(got[0] === second || got.slice(1).join(' + ') === second, JSON.stringify([got, second]));
   assert.equal(await count('.sug'), 0);
   // a session with its work written offers nothing; emptied, it offers again
   await selectAll('[data-fid=s-text]');
@@ -697,8 +841,8 @@ try {
   assert.equal(await text('.month'), 'Set');
   assert.match(await text('.lower .sec-h b'), /Semana 6/);
   assert.match(await text('.lower .sec-h .muted'), /2 Nov – 8 Nov/);
-  assert.equal(await text('.day-h b'), 'Seg');
-  assert.deepEqual(await ff.js('return [...document.querySelectorAll(".day:first-child .add")].map(b => b.textContent)'), ['+ Água', '+ Ginásio', '+ Piscina', '+ Corrida']);
+  assert.deepEqual(await ff.js('return [...document.querySelectorAll(".day-h b")].slice(0, 2).map(b => b.textContent)'), ['Qualquer dia', 'Seg']);
+  assert.deepEqual(await ff.js('return [...document.querySelectorAll(".day:nth-child(2) .add")].map(b => b.textContent)'), ['+ Água', '+ Ginásio', '+ Piscina', '+ Corrida']);
   assert.match(await text('[data-fid=w-type] option'), /^Padrão · /);
   // a number written with a comma, and a hover text
   await ff.click('.swk[data-v="1"]');

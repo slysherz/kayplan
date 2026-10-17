@@ -111,6 +111,7 @@ body.dragging { cursor: col-resize; user-select: none; }
 /* a session's card: its text a part a line, with the minutes and the km each part comes to */
 .ses-l { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 3px 12px; align-items: baseline; }
 .ses-l span { overflow-wrap: anywhere; }
+.ses-l.light span { color: #52606D; }
 .ses-l small, .ses-l b { text-align: right; font-size: 11.5px; white-space: nowrap; }
 .ses-l small { color: #52606D; }
 .ses-l b { border-top: 1px solid #D8DEE4; padding-top: 4px; margin-top: 2px; }
@@ -150,7 +151,9 @@ select { height: 40px; border: 1px solid #C5CDD5; border-radius: 4px; background
 .inline { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #52606D; }
 .inline input[type=text] { width: 48px; height: 40px; border: 1px solid #C5CDD5; border-radius: 4px; background: #FFFFFF; padding: 0 6px; text-align: right; color: #16202A; }
 .inline input:disabled { background: #F3F5F7; }
-.days { flex: 1 1 auto; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; min-width: 620px; }
+.days { flex: 1 1 auto; display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 6px; min-width: 700px; }
+/* the sessions of the whole week, apart from the days */
+.day.any { margin-right: 6px; }
 .day { background: #FFFFFF; border: 1px solid #D8DEE4; border-radius: 6px; padding: 6px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .day-h { display: flex; justify-content: space-between; font-size: 12px; }
 .day-h b { font-weight: 600; }
@@ -163,6 +166,9 @@ select { height: 40px; border: 1px solid #C5CDD5; border-radius: 4px; background
 .chip.off .chip-t { text-decoration: line-through; }
 .chip-h { display: block; font-size: 10px; font-weight: 600; }
 .chip-t { display: block; font-size: 11px; white-space: normal; overflow-wrap: anywhere; line-height: 1.35; }
+/* a session's title, and what comes after it lighter */
+.chip-n { display: block; font-size: 11px; font-weight: 600; overflow-wrap: anywhere; line-height: 1.35; }
+.chip-t.light { opacity: .7; }
 .adds { display: flex; flex-direction: column; gap: 3px; margin-top: auto; }
 .add { height: 24px; width: 100%; border: 1px dashed #AEB8C2; border-radius: 4px; background: transparent; color: #52606D; font-size: 11px; }
 
@@ -170,12 +176,29 @@ select { height: 40px; border: 1px solid #C5CDD5; border-radius: 4px; background
 .fld { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #52606D; min-width: 0; }
 .fld textarea { flex: 1 1 auto; min-height: 80px; resize: none; border: 1px solid #C5CDD5; border-radius: 4px; padding: 10px; color: #16202A; font-size: 13px; line-height: 1.5; }
 .fld textarea.plan { font-size: 15px; }
+/* the plan box: the text is drawn by a copy behind it, so that the first line (the title) and the
+   plan under it can differ; the box itself shows only the caret and the selection */
+.plan-w { position: relative; flex: 1 1 auto; display: flex; min-height: 0; background: #FFFFFF; border-radius: 4px; }
+.plan-w textarea.plan { position: relative; flex: 1 1 auto; background: transparent; color: transparent; caret-color: #16202A; scrollbar-gutter: stable; }
+/* the selection needs its own background: given only a colour, Firefox draws none; see-through, so
+   the text of the copy shows under it */
+.plan-w textarea.plan::selection { color: transparent; background: rgba(15, 92, 122, .28); }
+.plan-m { position: absolute; inset: 0; border: 1px solid transparent; padding: 10px; font-size: 15px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: break-word; overflow: hidden; scrollbar-gutter: stable; color: #16202A; pointer-events: none; }
+.plan-m .pm-t { background: #F3F5F7; margin: 0 -10px; padding: 0 10px; }
+.plan-m .pm-r.light { color: #52606D; }
 .when { font-size: 17px; font-weight: 600; }
+/* the day, and whom the session is for */
+.when-r { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.when-r select { height: 30px; }
 .inf { display: flex; align-items: flex-start; gap: 10px; color: #16202A; min-height: 32px; }
 .inf small { font-size: 11.5px; line-height: 1.4; color: #52606D; padding-top: 7px; }
 .inf small .other { display: block; font-size: 11px; }
 .zpill { flex-shrink: 0; min-width: 48px; text-align: center; padding: 6px 10px; border-radius: 4px; font-size: 15px; font-weight: 600; }
 .del { height: 44px; padding: 0 16px; border: 1px solid #C5CDD5; border-radius: 4px; background: #FFFFFF; color: #8E1B21; font-weight: 500; }
+.lower .f-week { flex: 0 0 auto; }
+.lower .f-week textarea { flex: 0 0 auto; height: 96px; min-height: 96px; }
+.lower .f-phrase { flex: 0 0 auto; }
+.f-phrase input { height: 40px; border: 1px solid #C5CDD5; border-radius: 4px; padding: 0 10px; color: #16202A; font-size: 13px; }
 .ed-col { display: flex; flex-direction: column; gap: 10px; padding: 14px; height: 100%; }
 /* the plan text and the suggestions share one space of a fixed size, so nothing under them moves */
 .ed-col .f-plan { flex: 1 1 0; min-height: 0; }
@@ -184,7 +207,9 @@ select { height: 40px; border: 1px solid #C5CDD5; border-radius: 4px; background
 .ed-col .f-notes textarea { flex: 0 0 auto; height: 64px; min-height: 64px; }
 .ed-col .pop-r { justify-content: space-between; }
 .ed-col.asking .f-plan { flex: 0 0 auto; }
-.ed-col.asking .f-plan textarea { flex: 0 0 auto; height: 44px; }
+.ed-col.asking .plan-w { flex: 0 0 auto; }
+/* two lines: the title and the plan's first */
+.ed-col.asking .f-plan textarea { height: 66px; }
 .sug { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
 .sug-l { flex: 0 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; border: 1px solid #D8DEE4; border-radius: 4px; }
 .sug-l:empty { display: none; }
@@ -204,6 +229,8 @@ select { height: 40px; border: 1px solid #C5CDD5; border-radius: 4px; background
 .events { margin: 12px 16px 16px; padding: 8px; }
 .events table { border-collapse: collapse; width: 100%; }
 .events th { text-align: left; font-size: 11px; font-weight: 600; color: #52606D; padding: 4px 6px; white-space: nowrap; }
+/* a band's column, under its plan's */
+.events th.muted { font-weight: 400; }
 .events td { padding: 2px 3px; border-top: 1px solid #EEF1F4; }
 .events tbody tr:hover td { background: #F3F5F7; }
 .events tbody tr.on td { background: #DCEBF2; }
@@ -237,6 +264,7 @@ select { height: 40px; border: 1px solid #C5CDD5; border-radius: 4px; background
   .lower .left, .lower .right { flex: none; min-width: 0; }
   .days { grid-template-columns: minmax(0, 1fr); min-width: 0; }
   .day { flex-direction: row; flex-wrap: wrap; }
+  .day.any { margin-right: 0; }
   .day-h, .day .race { flex: 0 0 100%; }
   .day .chip { flex: 1 1 100%; width: auto; min-height: 44px; height: auto; }
   .adds { flex: 0 0 100%; flex-direction: row; }
@@ -244,11 +272,12 @@ select { height: 40px; border: 1px solid #C5CDD5; border-radius: 4px; background
   .ed-col { height: auto; }
   .ed-col .f-plan { flex: none; }
   .ed-col .f-plan textarea { min-height: 96px; }
-  .ed-col.asking .f-plan textarea { min-height: 44px; }
+  .ed-col.asking .f-plan textarea { min-height: 66px; }
+  .plan-m { font-size: 16px; }
   .sug { flex: none; }
   .sug-l { max-height: 300px; }
   /* 16 px keeps a phone from zooming in on a field */
-  .fld textarea, .fld textarea.plan, .signin input, select, .inline input[type=text] { font-size: 16px; }
+  .fld textarea, .fld textarea.plan, .f-phrase input, .signin input, select, .inline input[type=text] { font-size: 16px; }
   .events { margin: 8px; overflow-x: auto; }
   .signin { margin: 16px auto; }
   .pop.problems { left: 8px; width: auto; right: 8px; }
@@ -271,8 +300,11 @@ select { height: 40px; border: 1px solid #C5CDD5; border-radius: 4px; background
 .ph-h span { font-size: 12px; }
 .ph-name { font-size: 17px; }
 .ph-t { font-size: 19px; line-height: 1.45; overflow-wrap: anywhere; }
+.ph-t.light { color: #52606D; }
 .ph-w { font-size: 12.5px; line-height: 1.5; }
 .ph-w .mono { display: block; }
 .ph-n { font-size: 15px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; border-top: 1px solid #D8DEE4; padding-top: 10px; }
+.ph-wn { font-size: 15px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ph-wn.ph-ph { font-style: italic; }
 .ph-none { padding: 24px 0 4px; text-align: center; font-size: 15px; }
 .ph-f { display: flex; justify-content: space-between; align-items: center; margin-top: auto; padding-top: 14px; }

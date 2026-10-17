@@ -17,7 +17,8 @@ function plan() {
       { date: '2026-01-31', slot: 1, band: 'older', text: 'week 4 Sat' },
       { date: '2026-02-24', slot: 2, band: 'older', text: 'week 8 Tue' },
       { date: '2026-03-17', slot: 2, band: 'older', text: 'week 11 Tue' }
-    ]
+    ],
+    notes: [{ monday: '2026-01-26', band: 'older', text: 'week 4' }, { monday: '2026-03-16', band: 'older', text: 'week 11' }]
   };
 }
 
@@ -121,7 +122,7 @@ test('deleting a block: its weeks join the previous one', () => {
   assert.throws(() => c.deleteMeso(plan(), 0, 4), locked);
 });
 
-test('moving a block: it carries its hand-set weeks and sessions, weekdays kept', () => {
+test('moving a block: it carries its hand-set weeks, sessions and week notes, weekdays kept', () => {
   const r = c.moveMeso(plan(), 1, 1, 0, START);
   assert.equal(r.index, 2);
   // macrocycles keep their place; the two blocks swap
@@ -131,6 +132,7 @@ test('moving a block: it carries its hand-set weeks and sessions, weekdays kept'
     '2026-01-06 week 1 Tue', '2026-02-21 week 4 Sat', '2026-01-27 week 8 Tue', '2026-03-17 week 11 Tue'
   ]);
   assert.deepEqual(r.plan.hand, [{ monday: '2026-02-16', type: 'R', load: null }, { monday: '2026-01-26', type: 'CH', load: 90 }]);
+  assert.deepEqual(r.plan.notes.map(n => n.monday + ' ' + n.text), ['2026-02-16 week 4', '2026-03-16 week 11']);
   // moving it back restores everything
   const back = c.moveMeso(r.plan, 2, -1, 0, START);
   assert.equal(back.index, 1);

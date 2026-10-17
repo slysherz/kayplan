@@ -2,7 +2,7 @@
 
 import { DAYS, addDays, weekday } from './dates.js';
 import { minutesText, amountText, kmText } from './notation.js';
-import { sheet, weekView, eventView, check, weekOf, dayView } from './engine.js';
+import { sheet, weekView, eventView, check, weekOf, dayView, noteParts } from './engine.js';
 import { suggestions } from './suggest.js';
 import { kmView } from './km.js';
 import { gridView } from './grid.js';
@@ -22,6 +22,8 @@ function eventText(e) {
   if (e.kind === 'race') bits.push(e.type + ', ' + e.boats);
   else bits.push(e.kind);
   if (e.importance) bits.push('importance ' + e.importance);
+  // with no band asked for, an event of some of the plan's bands names them
+  if (e.only) bits.push('for ' + e.only.join(', '));
   if (!e.confirmed) bits.push('date not confirmed');
   return e.code + ' ' + e.name + ' (' + bits.join(', ') + ')';
 }
@@ -34,10 +36,11 @@ function planHead(data, plan, today, current) {
 
 const one = km => km.toFixed(1);
 
-// the annual sheet as a table, one row per week
-export function seasonReport(data, planId, today) {
-  const sh = sheet(data, planId, today);
-  const kms = sh.plan.bands.map(b => kmView(data, planId, b, today));
+// the annual sheet as a table, one row per week. With a band, its km and its races; without one,
+// every band's km and the races of any band, those of some bands only saying which.
+export function seasonReport(data, planId, today, band) {
+  const sh = sheet(data, planId, today, band);
+  const kms = sh.plan.bands.filter(b => !band || b === band).map(b => kmView(data, planId, b, today));
   const rows = [['', 'wk', 'monday', 'macrocycle', 'mesocycle', 'content', 'type', 'load', 'sessions', 'km', 'events']];
   for (const w of sh.weeks) {
     const meso = w.meso === null ? null : sh.mesos[w.meso];
@@ -59,7 +62,7 @@ export function seasonReport(data, planId, today) {
     return 'km ' + k.band + ': ' + one(s.done) + ' done + ' + one(s.planned) + ' planned' + (s.yearly === null ? ', no yearly km' : ' of ' + s.yearly + ' yearly') +
       (sh.ended && s.yearly !== null ? ' · weeks that have ended: ' + one(s.endedKm) + ' of ' + one(s.endedEstimate) + ' estimated' : '');
   });
-  return planHead(data, sh.plan, today, sh.current) + '\n' + totals.join('\n') + '\n' +
+  return planHead(data, sh.plan, today, sh.current) + (band ? '\nband ' + band + ': its own races' : '') + '\n' + totals.join('\n') + '\n' +
     '> current week · * type set by hand · km: from sessions/estimate · ' + (sh.ended ? 'weeks 1 to ' + sh.ended + ' have ended' : 'no week has ended') + '\n\n' + table(rows, [1, 7]);
 }
 
@@ -93,18 +96,27 @@ export function dayReport(data, date, today) {
   const seen = new Set();
   for (const p of d.plans) for (const e of p.events) { if (!seen.has(e.name)) { seen.add(e.name); out.push('  ' + eventText(e)); } }
   for (const p of d.plans) {
-    for (const s of p.sessions) {
-      out.push(p.id + ' ' + s.band + ' ' + s.place + (s.alt ? ' · alternative' : '') + (s.notDone ? ' · not done' : '') + ' · ' + (s.main || 'no zone') + ' · ' + (s.name ? s.name + ' = ' : '') + (s.text || '(empty)'));
+    for (const s of [...p.sessions, ...p.anyDay]) {
+      // a session of the plan's is shown once, with the plan alone
+      out.push(p.id + (s.band ? ' ' + s.band : '') + ' ' + s.place + (s.week ? ' · any day' : '') + (s.alt ? ' · alternative' : '') + (s.notDone ? ' · not done' : '') + ' · ' + (s.main || 'no zone') + ' · ' + (s.name ? s.name + ' = ' : '') + (s.text || '(empty)'));
       for (const line of s.notes ? s.notes.split('\n') : []) out.push(('    ' + line).trimEnd());
     }
+    for (const x of p.notes) {
+      for (const kind of ['notes', 'phrase']) {
+        if (!x[kind].trim()) continue;
+        out.push(p.id + (x.band ? ' ' + x.band : '') + ' · week ' + kind);
+        for (const line of x[kind].split('\n')) out.push(('    ' + line).trimEnd());
+      }
+    }
   }
-  if (!d.plans.some(p => p.sessions.length)) out.push('no sessions' + (d.next ? ' · next ' + d.next : ''));
+  if (!d.plans.some(p => p.sessions.length || p.anyDay.length)) out.push('no sessions' + (d.next ? ' · next ' + d.next : ''));
   return out.join('\n');
 }
 
-// one week: its sessions with the zone working and km, its totals, and its events
+// one week: its sessions with the zone working and km, its totals, and its events. With a band, the
+// sessions it does (the plan's, marked "all", and its own), worked out for it.
 export function weekReport(data, planId, n, today, band) {
-  const w = weekView(data, planId, n, today);
+  const w = band ? weekView(data, planId, n, today, band) : weekView(data, planId, n, today);
   const where = w.mesoInfo ? w.macroInfo.name + ' / ' + w.mesoInfo.name + ' / content ' + w.mesoInfo.label : 'no mesocycle';
   const out = [
     w.plan.id + ' · week ' + n + ' · ' + w.monday + ' to ' + w.sunday + (w.current ? ' · current week' : (w.ended ? ' · ended' : '')),
@@ -121,19 +133,30 @@ export function weekReport(data, planId, n, today, band) {
     if (band && b !== band) continue;
     for (const t of checksView(data, planId, b, today)[n - 1].week) out.push('check ' + b + ': ' + t);
   }
+  // the week's notes as written: the plan's, then each band's own
+  for (const b of ['', ...w.plan.bands]) {
+    if (band && b && b !== band) continue;
+    const part = noteParts(w.plan, w.monday, b);
+    for (const kind of ['notes', 'phrase']) {
+      for (const line of part[kind] ? part[kind].split('\n') : []) out.push((kind + (b ? ' ' + b : '') + ': ' + line).trimEnd());
+    }
+  }
   out.push('');
-  for (const d of w.days) {
-    out.push(DAYS[d.weekday] + ' ' + d.date + (d.today ? ' · today' : ''));
+  // the days, then the sessions of the whole week
+  for (const d of [...w.days, { anyDay: true, events: [], sessions: w.week }]) {
+    if (d.anyDay && !d.sessions.length) continue;
+    out.push(d.anyDay ? 'Any day' : DAYS[d.weekday] + ' ' + d.date + (d.today ? ' · today' : ''));
     for (const e of d.events) out.push('  ' + eventText(e));
     for (const s of d.sessions) {
-      if (band && s.band !== band) continue;
-      out.push('  ' + s.slot + ' ' + s.band + ' ' + s.place + ' · ' + s.status + ' · main zone ' + (s.main || 'none') + ' · ' + (s.text || '(empty)'));
+      out.push('  ' + s.slot + ' ' + (s.band || 'all') + ' ' + s.place + ' · ' + s.status + ' · main zone ' + (s.main || 'none') + ' · ' + (s.title ? s.title + ' = ' : '') + (s.text || '(empty)'));
       const work = s.parts.slice().reverse().map(p => p.zone + ' ' + minutesText(p.min));
       if (s.unzoned) work.push('no zone ' + amountText(s.unzoned));
       if (s.place === 'water' && s.totalKm > 0) work.push(one(s.totalKm) + ' km');
       if (work.length) out.push('      ' + work.join(' · '));
       if (s.pieces.length) out.push('      ' + s.pieces.map(p => p.text + ' ≈ ' + p.approx).join(' · '));
-      for (const t of sessionChecks(s, data.tables)) out.push('      check: ' + t);
+      // a session of the plan's is checked for each band that does it
+      const whom = band || s.band ? [band || s.band] : w.plan.bands;
+      for (const b of whom) for (const t of sessionChecks(s, data.tables, b)) out.push('      check' + (whom.length > 1 ? ' ' + b : '') + ': ' + t);
       for (const line of s.notes ? s.notes.split('\n') : []) out.push(('      note: ' + line).trimEnd());
     }
   }

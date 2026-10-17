@@ -103,15 +103,15 @@ try {
   const commits = gh.commits.length;
   await open('plan=juniors&band=junior&week=7');
   await ff.wait('return !!document.querySelector(".sheet")');
-  await ff.click('.day:nth-child(2) .add[data-v="water"]');
+  await ff.click('.day:nth-child(3) .add[data-v="water"]');
   await ff.keys("6km R1 + 4x 10'' R6/3'");
   await saved();
-  assert.match(season('plans/juniors/sessions.txt'), /^2026-11-10 junior: 6km R1 \+ 4x 10'' R6\/3'$/m);
+  assert.match(season('plans/juniors/sessions.txt'), /^2026-11-10: 6km R1 \+ 4x 10'' R6\/3'$/m);
   assert.ok(gh.commits.length > commits);
   assert.equal(gh.commits[gh.commits.length - 1].message, 'Kayplan: plans/juniors/sessions.txt');
   // the page notices its own commit and stays as it is, with the typing where it was
   await ff.sleep(2500);
-  assert.equal(await value('[data-fid=s-text]'), "6km R1 + 4x 10'' R6/3'");
+  assert.equal(await value('[data-fid=s-text]'), "\n6km R1 + 4x 10'' R6/3'");
   await ff.keys(' + 1km R1');
   await saved();
   assert.match(season('plans/juniors/sessions.txt'), /R6\/3' \+ 1km R1$/m);
@@ -174,10 +174,10 @@ try {
   assert.match(await text('.ph-h div span'), /Water · not done/);
   await ff.click('[data-act=day][data-v=""]');
   assert.equal(await text('.ph-d b'), 'Fri 2 Oct');
-  // a change made elsewhere appears here too
-  gh.put('season/plans/cadetes/sessions.txt', "2026-10-02 cadete: 8km R1\n  easy\n");
+  // a change made elsewhere appears here too; a session of the plan's is named by the plan alone
+  gh.put('season/plans/cadetes/sessions.txt', "2026-10-02: 8km R1\n  easy\n");
   await ff.wait('return !!document.querySelector(".ph-s")', 8000);
-  assert.equal(await text('.ph-h div b'), 'Cadetes · cadete');
+  assert.equal(await text('.ph-h div b'), 'Cadetes');
   // the day is in the address, so a reload stays on it; Portuguese
   await ff.click('[aria-label="Next day"]');
   await ff.click('[data-act=lang][data-v=pt]');
@@ -185,15 +185,22 @@ try {
   assert.match(await ff.js('return location.hash'), /day=2026-10-03/);
   await ff.click('[data-act=lang][data-v=en]');
   await ff.js('localStorage.removeItem("kayplan-lang")');
-  ok('a phone: the day page, with the next session, the arrows, a change from elsewhere and Portuguese');
+  // the week's notes of a band that trains that day, after its sessions
+  gh.put('season/plans/juniors/notes.txt', "2026-09-28 junior\n  Warm-up before every session\n  On land: 15' run\n");
+  await ff.wait('return !!document.querySelector(".ph-wn")', 8000);
+  assert.equal(await count('.ph-wn'), 1);
+  assert.equal(await text('.ph-wn'), "Warm-up before every session\nOn land: 15' run");
+  assert.equal(await ff.js('return document.querySelector(".ph-wn").closest(".ph-s").querySelector(".ph-h").textContent'), 'Juniors · juniorWeek notes');
+  await shot('04-phone-week-notes');
+  ok('a phone: the day page, with the next session, the arrows, a change from elsewhere, Portuguese and the week notes');
 
   // the full page is one tap away, laid out for the narrow window
   await ff.click('[data-act=full]');
   await ff.wait('return !!document.querySelector(".sheet")');
   assert.ok(await ff.js('return document.documentElement.scrollWidth <= window.innerWidth'), 'the page is no wider than the phone');
   await ff.click('.swk[data-v="7"]');
-  await ff.js('document.querySelector(".day:nth-child(2)").scrollIntoView()');
-  await ff.click('.day:nth-child(2) .chip');
+  await ff.js('document.querySelector(".day:nth-child(3)").scrollIntoView()');
+  await ff.click('.day:nth-child(3) .chip');
   await ff.sleep(300);
   assert.ok(await ff.js('const r = document.querySelector(".lower .right").getBoundingClientRect(); return r.top >= 0 && r.top < window.innerHeight / 2'), 'the session is in view');
   assert.ok(await ff.js('const d = [...document.querySelectorAll(".day")].map(x => x.getBoundingClientRect()); return d[1].top > d[0].top && Math.abs(d[1].left - d[0].left) < 1'), 'the days are one under the other');
@@ -234,7 +241,7 @@ try {
   assert.equal(await count('.signin'), 0);
   assert.ok(!/setup=/.test(await ff.js('return location.href')), 'the token is gone from the address');
   // the day page on a wide screen, only the plan the link was made for, and no way to the full page
-  assert.deepEqual(await ff.js('return [...document.querySelectorAll(".ph-h div b")].map(b => b.textContent)'), ['Juniors · junior', 'Juniors · senior']);
+  assert.deepEqual(await ff.js('return [...document.querySelectorAll(".ph-h div b")].map(b => b.textContent)'), ['Juniors · junior', 'Juniors · senior', 'Juniors · junior']);   // the last is the juniors' week notes
   assert.equal(await count('[data-act=full]'), 0);
   assert.equal(await count('textarea, .acct'), 0);
   await ff.click('[aria-label="Previous day"]');
@@ -254,10 +261,10 @@ try {
   assert.ok(!/setup=/.test(await ff.js('return location.href')));
   assert.equal(await text('.acct'), REPO);
   await ff.click('.swk[data-v="7"]');
-  await ff.click('.day:nth-child(7) .add[data-v="water"]');
+  await ff.click('.day:nth-child(8) .add[data-v="water"]');
   await ff.keys('5km R1');
   await saved();
-  assert.match(season('plans/cadetes/sessions.txt'), /^2026-11-15 cadete: 5km R1$/m);
+  assert.match(season('plans/cadetes/sessions.txt'), /^2026-11-15: 5km R1$/m);
   assert.ok(gh.commits.length > before);
   ok('a link with a token that writes opens the full page, and its saves are committed');
 

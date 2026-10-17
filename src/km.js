@@ -2,7 +2,7 @@
 // Nothing here is typed by the coach except the tables: yearly km per band, and the km of a hard
 // session per content.
 
-import { counted } from './format.js';
+import { counted, lastDay, forBand } from './format.js';
 import { sheet, sessionView, weekOf } from './engine.js';
 
 // The race a block is aimed at: the most important race inside it, or else the next one after it,
@@ -35,13 +35,15 @@ export function contentFactor(meso, races, tables) {
 //   coef      load % × content factor. A week that is not planned yet (no load) counts as an
 //             average planned week, so a rough plan still gives sensible estimates for its planned part.
 //   estimate  yearly km × coef ÷ sum of all coefs; null when the band has no yearly km or nothing is planned
-//   km        from the week's sessions on the water that are not marked "not done"
+//   km        from the week's sessions on the water that are not marked "not done": the plan's and the
+//             band's own, at the band's pace
 //   offMin    minutes of work off the water
 // season: { yearly, done, planned, endedKm, endedEstimate }
 //   done      km of sessions before today; planned: km of sessions from today on
 //   ended…    km and estimate summed over the weeks that have ended, to show a shortfall
 export function kmView(data, planId, band, today) {
-  const sh = sheet(data, planId, today), t = data.tables;
+  // the band's own races: the race an R7 block aims at is one of them
+  const sh = sheet(data, planId, today, band), t = data.tables;
   const races = sh.events.filter(e => e.kind === 'race' && e.weeks.length);
   const complete = t.warmup !== null && ['R1', 'R2', 'R3', 'R3+', 'R4', 'R5', 'R6'].every(z => t.hard[z] !== undefined) && Object.keys(t.race).length === 3;
   const factors = sh.mesos.map(m => complete ? contentFactor(m, races, t) : null);
@@ -61,12 +63,12 @@ export function kmView(data, planId, band, today) {
   const season = { yearly, done: 0, planned: 0, endedKm: 0, endedEstimate: 0 };
   for (const s of sh.plan.sessions) {
     const n = weekOf(data.season, s.date);
-    if (s.band !== band || !counted(s) || !n) continue;
-    const v = sessionView(data, s, today), w = weeks[n - 1];
+    if (!forBand(s, band) || !counted(s) || !n) continue;
+    const v = sessionView(data, s, today, band), w = weeks[n - 1];
     w.km += v.totalKm;
     w.offMin += v.offMin;
     for (const z of Object.keys(v.km)) w.zones[z] = (w.zones[z] || 0) + v.km[z];
-    if (s.date < today) season.done += v.totalKm; else season.planned += v.totalKm;
+    if (lastDay(s) < today) season.done += v.totalKm; else season.planned += v.totalKm;
   }
   for (const w of weeks.slice(0, sh.ended)) { season.endedKm += w.km; season.endedEstimate += w.estimate || 0; }
   return { band, weeks, season };

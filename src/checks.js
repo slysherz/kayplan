@@ -3,8 +3,8 @@
 // The texts are what the coach reads, in the language in use. Nothing here stops an edit.
 
 import { ZONES, minutesOf, minutesText } from './notation.js';
-import { sheet, sessionView, eventsFor, weekOf } from './engine.js';
-import { sessionKey, sortSessions, counted } from './format.js';
+import { sheet, bandSessions, eventsFor, weekOf } from './engine.js';
+import { sessionKey, counted } from './format.js';
 import { addDays, daysBetween, weekday, DAYS } from './dates.js';
 import { tr } from './lang.js';
 
@@ -31,8 +31,10 @@ const hard = (tables, s) => hoursOf(tables, s.main) >= 48;
 const contentOf = (tables, z) => Object.keys(tables.develop).find(key => key.split('-').includes(z)) || z;
 
 // The hours two sessions should be apart and are not, a before b (the recovery table): 48 after a
-// session that needs 48 h or more, 24 for the same content twice in a day. 0 when they are far enough.
+// session that needs 48 h or more, 24 for the same content twice in a day. 0 when they are far enough,
+// or when either is a session of the whole week, which has no day.
 export function tooClose(a, b, tables) {
+  if (a.week || b.week) return 0;
   const days = daysBetween(a.date, b.date);
   if (hard(tables, a) && hard(tables, b) && days < 2) return 48;
   if (days === 0 && a.main && contentOf(tables, a.main) === contentOf(tables, b.main) && hoursOf(tables, a.main) >= 24) return 24;
@@ -41,26 +43,28 @@ export function tooClose(a, b, tables) {
 
 // volume first and quality after it on the same day (slide 196: quality in the morning)
 export function wrongHalf(am, pm) {
-  return ORDER[am.main] === 2 && ORDER[pm.main] < 2;
+  return !am.week && !pm.week && ORDER[am.main] === 2 && ORDER[pm.main] < 2;
 }
 
-// "Tue (R3)"
+// "Tue (R3)", or "Any day (R3)" for a session of the whole week
 function named(s) {
-  return tr(DAYS[weekday(s.date)]) + ' (' + s.main + ')';
+  return (s.week ? tr('Any day') : tr(DAYS[weekday(s.date)])) + ' (' + s.main + ')';
 }
 
-// One session, as sessionView gives it: [text]. A session marked "not done" is not checked.
-export function sessionChecks(s, tables) {
+// One session, as sessionView gives it, for one band: [text]. A session of the plan's is checked for
+// the band given, a band's own for its band. A session marked "not done" is not checked.
+export function sessionChecks(s, tables, band) {
   const out = [];
   if (!counted(s)) return out;
-  const band = s.band, off = s.place !== 'water';
+  band = s.band || band || null;
+  const off = s.place !== 'water';
   // off the water a distance is not paddled, so only written time is looked at
   const mins = (a, zone) => minutesOf(off ? { sec: a.sec, m: 0 } : a, ZONES.includes(zone) ? zone : 'R0', tables, band);
   const work = s.efforts.filter(p => !p.rest);
   const reps = work.flatMap(p => p.reps.filter(r => r.zone).map(r => ({ ...r, piece: p })));
 
   // a zone the course does not give this age (the zones table)
-  const allowed = tables.zones[band];
+  const allowed = band ? tables.zones[band] : null;
   if (allowed) {
     const odd = ZONES.filter(z => z !== 'R0' && !allowed.includes(z) && reps.some(r => r.zone === z));
     if (odd.length) out.push(tr('{0}: not recommended for {1}', odd.join(', '), band));
@@ -120,14 +124,16 @@ export function sessionChecks(s, tables) {
   return out;
 }
 
-// Every week of one age band of a plan: [{ n, week: [text], sessions: { key: [text] }, count }].
+// Every week of one age band of a plan, from the sessions it does (the plan's and its own):
+// [{ n, week: [text], sessions: { key: [text] }, count }].
 // week      what the course would question about the week as a whole
 // sessions  the same for each session, by its key
 // count     how many texts there are in all
 export function checksView(data, planId, band, today) {
-  const sh = sheet(data, planId, today), tables = data.tables, plan = sh.plan;
-  const all = sortSessions(plan.sessions.filter(s => s.band === band && counted(s)), plan.bands).map(s => sessionView(data, s, today));
-  const races = eventsFor(data, planId, today).filter(e => e.kind === 'race' && e.importance <= 2);
+  const sh = sheet(data, planId, today, band), tables = data.tables, plan = sh.plan;
+  const all = bandSessions(data, plan, band, today).filter(counted);
+  // the band's own races
+  const races = eventsFor(data, planId, today, band).filter(e => e.kind === 'race' && e.importance <= 2);
   const allowed = tables.zones[band];
   const content = z => contentOf(tables, z);
 
@@ -177,7 +183,7 @@ export function checksView(data, planId, band, today) {
     }
 
     // around a race: a light day before, the day after off (slide 128)
-    for (const s of list) {
+    for (const s of list.filter(x => !x.week)) {
       for (const e of races) {
         if (s.date === addDays(e.date, -1) && hard(tables, s)) week.push(tr('{0} is the day before {1}: a light day is recommended', named(s), e.name));
         if (s.date === addDays(e.to, 1)) week.push(tr('{0} is the day after {1}: a day off is recommended', tr(DAYS[weekday(s.date)]), e.name));
@@ -192,7 +198,7 @@ export function checksView(data, planId, band, today) {
 
     let count = week.length;
     for (const s of list) {
-      const found = sessionChecks(s, tables);
+      const found = sessionChecks(s, tables, band);
       if (found.length) { sessions[sessionKey(s)] = found; count += found.length; }
     }
     return { n: wk.n, week, sessions, count };

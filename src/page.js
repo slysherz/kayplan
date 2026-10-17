@@ -9,7 +9,7 @@ import { minutesText, amountText, kmText, infer, outline, sessionLines, linesTex
 import * as cycles from './cycles.js';
 import * as edits from './edits.js';
 import { KINDS, RACE_TYPES, BOATS, PLACES, sessionKey, sortEvents, nextSlot } from './format.js';
-import { load, usable, planOf, planFiles, sheet, weekView, eventView, check, fileText, weekOf, endedWeeks, dayView } from './engine.js';
+import { load, usable, planOf, planFiles, sheet, weekView, eventView, check, fileText, weekOf, endedWeeks, dayView, noteParts } from './engine.js';
 import { kmView } from './km.js';
 import { gridView } from './grid.js';
 import { zoneCard, typesCard } from './zones.js';
@@ -347,8 +347,29 @@ function banner(e) {
 function chip(s) {
   const c = zc(s.main);
   return '<button class="chip' + (sessionKey(s) === sessionKey(ctx.session) ? ' on' : '') + (s.notDone ? ' off' : '') + '" data-act="pick" data-v="' + sessionKey(s) + '" data-ses="' + sessionKey(s) + '" style="background:' + c.bg + ';color:' + c.fg + '">' +
-    '<span class="chip-h">' + placeName(s.place) + (s.main ? ' · ' + s.main : s.place === 'water' ? ' · ' + tr('no zone') : '') + (s.alt ? ' · ' + tr('alternative') : '') + (s.notDone ? ' · ' + tr('not done') : '') + '</span>' +
-    (s.name ? '<span class="chip-t">' + esc(s.name) + '</span>' : '<span class="chip-t mono">' + esc(s.text || tr('Empty session')) + '</span>') + '</button>';
+    '<span class="chip-h">' + placeName(s.place) + (s.band && ctx.plan.bands.length > 1 ? ' · ' + esc(s.band) : '') + (s.main ? ' · ' + s.main : s.place === 'water' ? ' · ' + tr('no zone') : '') + (s.alt ? ' · ' + tr('alternative') : '') + (s.notDone ? ' · ' + tr('not done') : '') + '</span>' +
+    (s.name ? '<span class="chip-n">' + esc(s.name) + '</span>' + (s.text ? '<span class="chip-t mono light">' + esc(s.text) + '</span>' : '') : '<span class="chip-t mono">' + esc(s.text || tr('Empty session')) + '</span>') + '</button>';
+}
+
+// The plan box of a session: its title on the first line, its plan laid out under it. A copy of the
+// text drawn behind the box (a text box cannot colour one line) marks the first line as the title and
+// shows the plan lighter when there is a title.
+function planValue(s) {
+  return (s.name || '') + '\n' + linesText(s.text, 40);
+}
+function readPlanBox(value) {
+  const lines = String(value).split('\n');
+  return { title: lines[0].replace(/\s+/g, ' ').trim(), text: oneLine(lines.slice(1).join('\n')) };
+}
+function planMirror(value) {
+  const lines = String(value).split('\n'), first = lines[0], rest = lines.slice(1).join('\n');
+  return '<div class="pm-t">' + (esc(first) || ' ') + '</div><div class="pm-r' + (first.trim() ? ' light' : '') + '">' + esc(rest) + ' </div>';
+}
+function syncMirror(ta) {
+  const m = ta && ta.previousElementSibling;
+  if (!m || !m.classList.contains('plan-m')) return;
+  m.innerHTML = planMirror(ta.value);
+  m.scrollTop = ta.scrollTop;
 }
 
 function statusHtml() {
@@ -464,7 +485,7 @@ function sheetView() {
   const on = w => w.n === state.week ? ' on' : '';
   // what the course would question, for the selected band: per week, and per session of the selected week
   const said = (c, days) => [...c.week, ...days.flatMap(d => d.sessions.filter(s => c.sessions[sessionKey(s)]).flatMap(s =>
-    c.sessions[sessionKey(s)].map(t => tr(DAYS[d.weekday]) + ' · ' + t)))];
+    c.sessions[sessionKey(s)].map(t => d.name + ' · ' + t)))];
   const flagged = w => ctx.checks[w.n - 1].count ? ' warn' : '';
   // season km from sessions against the yearly km
   const se = km.season;
@@ -501,11 +522,15 @@ function sheetView() {
   const wkm = km.weeks[wk.n - 1];
   const weekKm = '<span class="mono" data-id="week-km">' + (wkm.estimate === null ? kmText(wkm.km) + ' km' : tr('{0} of {1} km', kmText(wkm.km), Math.round(wkm.estimate))) + (wkm.offMin > 0 ? ' · ' + tr('{0} off the water', minutesText(wkm.offMin)) : '') + '</span>';
 
-  const days = wk.days.map(d => {
-    // the band's sessions in their order, then one button for each place a session can be added in
-    const slots = d.sessions.filter(x => x.band === state.band).map(chip).join('') +
-      '<div class="adds">' + ['water', 'gym', 'pool', 'land'].map(p => '<button class="add" data-act="add" data-v="' + p + '" data-date="' + d.date + '" aria-label="' + tr('Add session') + ' · ' + placeName(p) + '">+ ' + placeName(p) + '</button>').join('') + '</div>';
-    return '<div class="day' + (d.today ? ' now' : '') + '"><div class="day-h"><b>' + tr(DAYS[d.weekday]) + '</b><span class="muted">' + shortDate(d.date) + '</span></div>' + d.events.map(banner).join('') + slots + '</div>';
+  // a column for the sessions that can be done on any day of the week, then the seven days
+  const columns = [{ date: wk.monday, anyDay: true, name: tr('Any day'), when: '', events: [], sessions: wk.week },
+    ...wk.days.map(d => ({ ...d, name: tr(DAYS[d.weekday]), when: shortDate(d.date) }))];
+  const days = columns.map(d => {
+    // the sessions the band does in their order (the plan's and its own), then one button for each
+    // place a session can be added in
+    const slots = d.sessions.map(chip).join('') +
+      '<div class="adds">' + ['water', 'gym', 'pool', 'land'].map(p => '<button class="add" data-act="add" data-v="' + p + '" data-date="' + d.date + '"' + (d.anyDay ? ' data-week="1"' : '') + ' aria-label="' + tr('Add session') + ' · ' + placeName(p) + (d.anyDay ? ' · ' + d.name : '') + '">+ ' + placeName(p) + '</button>').join('') + '</div>';
+    return '<div class="day' + (d.today ? ' now' : '') + (d.anyDay ? ' any' : '') + '"><div class="day-h"><b>' + d.name + '</b><span class="muted">' + d.when + '</span></div>' + d.events.map(banner).join('') + slots + '</div>';
   }).join('');
 
   let right = '<div class="ed-col"><div class="eyebrow">' + tr('Session') + '</div></div>';
@@ -518,10 +543,15 @@ function sheetView() {
     // each piece with a zone, and its other unit
     const other = session.pieces.map(x => x.text + ' ≈ ' + x.approx).join(' · ');
     const c = zc(session.main);
-    right = '<div class="ed-col' + (ctx.sug ? ' asking' : '') + '"><div class="eyebrow">' + tr('Session') + '</div><div class="when">' + tr(DAYS[wk.days.findIndex(d => d.date === session.date)]) + ' ' + shortDate(session.date) + (session.name ? ' · ' + esc(session.name) : '') + '</div>' +
+    right = '<div class="ed-col' + (ctx.sug ? ' asking' : '') + '"><div class="eyebrow">' + tr('Session') + '</div><div class="when-r"><div class="when">' + (session.week ? tr('Any day') + ' · ' + shortDate(wk.monday) + ' – ' + shortDate(wk.sunday) : tr(DAYS[wk.days.findIndex(d => d.date === session.date)]) + ' ' + shortDate(session.date)) + '</div>' +
+      // whom it is for: the whole plan, or the selected band alone
+      (plan.bands.length > 1 ? '<label class="inline"><span>' + tr('For') + '</span><select data-change="band" data-fid="s-band">' +
+        ['', state.band].map(b => '<option value="' + esc(b) + '"' + (b === session.band ? ' selected' : '') + '>' + (b ? esc(b) : tr('Everyone')) + '</option>').join('') + '</select></label>' : '') + '</div>' +
       '<div class="fld"><span>' + tr('Main zone') + '</span><div class="inf"><b class="zpill" style="background:' + c.bg + ';color:' + c.fg + '">' + (session.main || '–') + '</b><small>' + esc(work.join(' · ')) + (other ? '<span class="mono other">' + esc(other) + '</span>' : '') + '</small></div></div>' +
       (doubts.length ? '<div class="chks" data-id="s-checks">' + doubts.map(t => '<div>' + esc(t) + '</div>').join('') + '</div>' : '') +
-      '<label class="fld f-plan"><span>' + tr('Plan') + '</span><textarea class="mono plan" data-input="text" data-fid="s-text" spellcheck="false">' + esc(linesText(session.text, 40)) + '</textarea></label>' +
+      '<label class="fld f-plan"><span>' + tr('Plan') + '</span><div class="plan-w"><div class="plan-m mono" aria-hidden="true">' + planMirror(planValue(session)) + '</div>' +
+      // the HTML parser drops a new line straight after <textarea>, and the first one here is the title's end
+      '<textarea class="mono plan" data-input="text" data-fid="s-text" spellcheck="false">\n' + esc(planValue(session)) + '</textarea></div></label>' +
       suggested() +
       '<label class="fld f-notes"><span>' + tr('Notes') + '</span><textarea data-input="notes" data-fid="s-notes">' + esc(session.notes) + '</textarea></label>' +
       '<div class="pop-r"><label class="inline"><span>' + tr('Place') + '</span><select data-change="place" data-fid="s-place">' + PLACES.map(x => '<option value="' + x + '"' + (x === session.place ? ' selected' : '') + '>' + placeName(x) + '</option>').join('') + '</select></label>' +
@@ -530,16 +560,37 @@ function sheetView() {
       '<button class="del" data-act="del">' + tr('Delete session') + '</button></div></div>';
   }
 
-  const weekSaid = said(ctx.checks[wk.n - 1], wk.days.map(d => ({ ...d, sessions: d.sessions.filter(s => s.band === state.band) })));
+  const weekSaid = said(ctx.checks[wk.n - 1], columns);
   const lower =
     '<div class="lower"><div class="left"><div class="sec-h" style="margin:0">' +
     '<button class="nav" data-act="prev" aria-label="' + tr('Previous week') + '"' + (state.week > 1 ? '' : ' disabled') + '>‹</button><button class="nav" data-act="next" aria-label="' + tr('Next week') + '"' + (state.week < W.length ? '' : ' disabled') + '>›</button>' +
     '<b style="font-size:16px">' + tr('Week {0}', wk.n) + '</b><span class="muted">' + shortDate(wk.monday) + ' – ' + shortDate(wk.sunday) + (where ? ' · ' + where : '') + '</span>' +
     '<span class="push"></span>' + typeSelect + loadInput + weekKm + '<button class="b" data-act="export">' + tr('Export') + '</button></div>' +
     (weekSaid.length ? '<div class="chks" data-id="w-checks">' + weekSaid.map(t => '<div>' + esc(t) + '</div>').join('') + '</div>' : '') +
-    '<div class="sx" style="flex:1 1 auto;display:flex"><div class="days">' + days + '</div></div></div>' +
+    '<div class="sx" style="flex:1 1 auto;display:flex"><div class="days">' + days + '</div></div>' +
+    // what the band has for the whole week, each in its own field and its own place on the sheet
+    weekFields(wk) + '</div>' +
     '<div class="panel right">' + right + '</div></div>';
   return top + lower;
+}
+
+// What the plan has for the whole week, each in its own field and its own place on the sheet: the
+// plan's notes and phrase, and under each the selected band's own when it has some (the band reads
+// its notes after the plan's and its phrase in place of the plan's). A band's field stays while the
+// week is on screen, so that emptying it does not take it away under the cursor.
+let ownShown = { at: '', kinds: new Set() };
+function weekFields(wk) {
+  const all = noteParts(ctx.plan, wk.monday, ''), own = noteParts(ctx.plan, wk.monday, state.band);
+  const at = ctx.plan.id + ' ' + wk.monday + ' ' + state.band;
+  if (ownShown.at !== at) ownShown = { at, kinds: new Set() };
+  const shown = k => {
+    if (String(own[k]).trim()) ownShown.kinds.add(k);
+    return ownShown.kinds.has(k);
+  };
+  const notes = (input, label, value) => '<label class="fld f-week"><span>' + label + '</span><textarea data-input="' + input + '" data-fid="' + input + '">' + esc(value) + '</textarea></label>';
+  const phrase = (input, label, value) => '<label class="fld f-phrase"><span>' + label + '</span><input type="text" data-input="' + input + '" data-fid="' + input + '" value="' + esc(value) + '"></label>';
+  return notes('w-notes', tr('Week notes'), all.notes) + (shown('notes') ? notes('wb-notes', tr('Week notes') + ' · ' + esc(state.band), own.notes) : '') +
+    phrase('w-phrase', tr('Phrase'), all.phrase) + (shown('phrase') ? phrase('wb-phrase', tr('Phrase') + ' · ' + esc(state.band), own.phrase) : '');
 }
 
 // the sessions suggested for the selected session while it has no work written: the band's zones, the
@@ -569,18 +620,19 @@ function phoneView() {
   // a link made for one plan shows that plan only
   if (account && account.plan && d.plans.some(p => p.id === account.plan)) d.plans = d.plans.filter(p => p.id === account.plan);
   const seen = new Set(), events = d.plans.flatMap(p => p.events).filter(e => !seen.has(e.name) && seen.add(e.name));
-  const cards = [0].flatMap(() => d.plans.flatMap(p => p.sessions.map(s => {
+  const cards = [0].flatMap(() => d.plans.flatMap(p => [...p.sessions, ...p.anyDay].map(s => {
     const c = zc(s.main);
     let work = s.parts.slice().reverse().map(x => x.zone + ' ≈ ' + minutesText(x.min));
     if (s.place === 'water' && s.totalKm > 0) work.push('≈ ' + dec(s.totalKm, 1) + ' km');
     const other = s.pieces.map(x => x.text + ' ≈ ' + x.approx).join(' · ');
     return '<div class="ph-s panel' + (s.notDone ? ' off' : '') + '"><div class="ph-h"><b class="zpill" style="background:' + c.bg + ';color:' + c.fg + '">' + (s.main || '–') + '</b>' +
-      '<div><b>' + esc(p.name) + ' · ' + esc(s.band) + '</b><span class="muted">' + placeName(s.place) + (s.alt ? ' · ' + tr('alternative') : '') + (s.notDone ? ' · ' + tr('not done') : '') + '</span></div></div>' +
+      '<div><b>' + esc(p.name) + (s.band ? ' · ' + esc(s.band) : '') + '</b><span class="muted">' + placeName(s.place) + (s.week ? ' · ' + tr('Any day') : '') + (s.alt ? ' · ' + tr('alternative') : '') + (s.notDone ? ' · ' + tr('not done') : '') + '</span></div></div>' +
       (s.name ? '<b class="ph-name">' + esc(s.name) + '</b>' : '') +
-      (s.text ? '<div class="ph-t mono">' + outline(s.text, 26).map(l => '<div style="padding-left:' + l.depth * 14 + 'px">' + esc(l.text) + '</div>').join('') + '</div>' : '') +
+      (s.text ? '<div class="ph-t mono' + (s.name ? ' light' : '') + '">' + outline(s.text, 26).map(l => '<div style="padding-left:' + l.depth * 14 + 'px">' + esc(l.text) + '</div>').join('') + '</div>' : '') +
       (work.length ? '<div class="ph-w muted">' + esc(work.join(' · ')) + (other ? '<span class="mono">' + esc(other) + '</span>' : '') + '</div>' : '') +
       (s.notes ? '<div class="ph-n">' + esc(s.notes) + '</div>' : '') + '</div>';
-  })));
+  }).concat(p.notes.map(x => '<div class="ph-s panel"><div class="ph-h"><div><b>' + esc(p.name) + (x.band ? ' · ' + esc(x.band) : '') + '</b><span class="muted">' + tr('Week notes') + '</span></div></div>' +
+    ['notes', 'phrase'].filter(k => x[k].trim()).map(k => '<div class="ph-wn' + (k === 'phrase' ? ' ph-ph' : '') + '">' + esc(x[k].trim()) + '</div>').join('') + '</div>'))));
   const none = cards.length ? '' : '<div class="ph-none muted">' + tr('No sessions') + '</div>' +
     (d.next ? '<button class="b" data-act="day" data-v="' + d.next + '">' + tr('Next session') + ' · ' + tr(DAYS[weekday(d.next)]) + ' ' + shortDate(d.next) + '</button>' : '');
   return '<header class="ph-top"><button class="nav" data-act="day" data-v="' + addDays(d.date, -1) + '" aria-label="' + tr('Previous day') + '">‹</button>' +
@@ -650,8 +702,14 @@ function popover() {
 
 // ---- drawing: the races and events table -----------------------------------------
 
+// what an event can name in its plans, in the order they are written: each plan, then its bands when
+// it has several (a plan of one band is named by the plan)
+function eventNames() {
+  return data.plans.flatMap(p => [{ id: p.id, name: p.name, band: false }, ...(p.bands.length > 1 ? p.bands.map(b => ({ id: b, name: b, band: true })) : [])]);
+}
+
 function eventsView() {
-  const today = now(), plans = data.plans;
+  const today = now(), plans = data.plans, names = eventNames();
   const options = (list, names, value) => list.map(v => '<option value="' + v + '"' + (v === value ? ' selected' : '') + '>' + names(v) + '</option>').join('');
   const rows = sortEvents(data.events).map(raw => {
     const e = eventView(data, raw, today), id = e.uid, race = e.kind === 'race';
@@ -665,21 +723,26 @@ function eventsView() {
       '<td class="sel"><select' + f('kind') + '>' + options(KINDS, kindName, e.kind) + '</select></td>' +
       '<td class="sel">' + (race ? '<select' + f('type') + '>' + options(RACE_TYPES, raceTypeName, e.type) + '</select>' : '') + '</td>' +
       '<td class="sel">' + (race ? '<select' + f('boats') + '>' + options(BOATS, boatName, e.boats) + '</select>' : '') + '</td>' +
-      plans.map(p => {
-        if (!race) return '<td class="c"><input type="checkbox"' + f('plan:' + p.id) + (e.plans === null || p.id in e.plans ? ' checked' : '') + ' aria-label="' + esc(p.name) + '"></td>';
+      // a plan, and under it each of its bands: a band's own entry comes before its plan's
+      names.map(p => {
+        if (!race) return '<td class="c"><input type="checkbox"' + f('plan:' + p.id) + ((e.plans === null && !p.band) || (e.plans && p.id in e.plans) ? ' checked' : '') + ' aria-label="' + esc(p.name) + '"></td>';
         const v = p.id in e.plans ? String(e.plans[p.id]) : '';
         return '<td><select class="mono"' + f('plan:' + p.id) + ' aria-label="' + tr('{0} importance', esc(p.name)) + '">' + ['', '1', '2', '3'].map(x => '<option value="' + x + '"' + (x === v ? ' selected' : '') + '>' + (x || '–') + '</option>').join('') + '</select></td>';
       }).join('') +
       '<td><button class="b danger" data-act="ev-del" data-v="' + id + '">' + tr('Delete') + '</button></td></tr>';
   }).join('');
-  // the season across the top, as on the plan's sheet: one row of races and events for each plan
-  const sheets = plans.map(p => sheet(data, p.id, today));
+  // the season across the top, as on the plan's sheet: one row of races and events for each band, each
+  // its own calendar; a plan of several bands has its name above its bands' rows
+  const races = (p, b, label) => '<div class="row" data-races="' + p.id + (b ? ' ' + b : '') + '">' + lab('<span class="cut" title="' + esc(label) + '">' + esc(label) + '</span>', 24) +
+    sheet(data, p.id, today, b || p.bands[0]).weeks.map(raceCell).join('') + '</div>';
   const strip = '<div class="panel sx" data-scroll="sheet" style="margin:12px 16px 0;flex-shrink:0"><div class="sheet" style="width:' + (LAB + data.season.weeks * CW + 8) + 'px">' +
-    calendarRows(sheets[0].weeks) +
-    sheets.map((sh, i) => '<div class="row" data-races="' + plans[i].id + '">' + lab('<span class="cut" title="' + esc(plans[i].name) + '">' + esc(plans[i].name) + '</span>', 24) + sh.weeks.map(raceCell).join('') + '</div>').join('') +
+    calendarRows(sheet(data, plans[0].id, today).weeks) +
+    plans.map(p => p.bands.length > 1
+      ? '<div class="row">' + lab('<span class="cut muted" title="' + esc(p.name) + '">' + esc(p.name) + '</span>', 18) + '</div>' + p.bands.map(b => races(p, b, b)).join('')
+      : races(p, null, p.name)).join('') +
     '</div></div>';
   return strip + '<div class="panel sx events"><table><thead><tr>' + [tr('Date'), tr('Until'), tr('Confirmed'), tr('Name'), tr('Place'), tr('Kind'), tr('Race type'), tr('Boats')].map(h => '<th>' + h + '</th>').join('') +
-    plans.map(p => '<th>' + esc(p.name) + '</th>').join('') + '<th></th></tr></thead><tbody>' + rows + '</tbody></table>' +
+    names.map(p => '<th' + (p.band ? ' class="muted"' : '') + '>' + esc(p.name) + '</th>').join('') + '<th></th></tr></thead><tbody>' + rows + '</tbody></table>' +
     '<div class="foot"><button class="b" data-act="ev-add">' + tr('Add event') + '</button></div></div>';
 }
 
@@ -695,7 +758,7 @@ function unpin() { pinned = null; tipEl.classList.remove('pinned'); hideTip(); }
 // a session's card: its name, the work per zone, the text laid out with what each part comes to, the notes
 function sessionCard(key) {
   if (!ctx) return '';
-  const s = /^sug /.test(key) ? ctx.sug && ctx.sug.list[+key.slice(4)] : ctx.wk.days.flatMap(d => d.sessions).find(x => sessionKey(x) === key);
+  const s = /^sug /.test(key) ? ctx.sug && ctx.sug.list[+key.slice(4)] : [...ctx.wk.days.flatMap(d => d.sessions), ...ctx.wk.week].find(x => sessionKey(x) === key);
   if (!s || !s.text) return '';
   const off = s.place !== 'water', v = infer(s.text, data.tables, state.band, off), l = sessionLines(s.text, data.tables, state.band, off, 36);
   const work = v.parts.slice().reverse().map(p => p.zone + ' ≈ ' + minutesText(p.min));
@@ -703,7 +766,7 @@ function sessionCard(key) {
   const size = x => '<small>' + (x.min > 0 ? minutesText(x.min) : '') + '</small><small>' + (x.km > 0 ? dec(x.km, 1) + ' km' : '') + '</small>';
   return '<h4>' + (v.main ? '<i style="background:' + Z[v.main].bg + '"></i>' : '') + esc(s.name || v.main || placeName(s.place)) + '</h4>' +
     (work.length ? '<p>' + esc(work.join(' · ')) + '</p>' : '') +
-    '<div class="ses-l">' + l.lines.map(x => '<span class="mono" style="padding-left:' + x.depth * 14 + 'px">' + esc(x.text) + '</span>' + (x.min === null ? '<small></small><small></small>' : size(x))).join('') +
+    '<div class="ses-l' + (s.name ? ' light' : '') + '">' + l.lines.map(x => '<span class="mono" style="padding-left:' + x.depth * 14 + 'px">' + esc(x.text) + '</span>' + (x.min === null ? '<small></small><small></small>' : size(x))).join('') +
     (l.min > 0 ? '<b></b><b>' + minutesText(l.min) + '</b><b>' + (l.km > 0 ? dec(l.km, 1) + ' km' : '') + '</b>' : '') + '</div>' +
     (s.notes ? '<p class="ses-n">' + esc(s.notes) + '</p>' : '');
 }
@@ -781,15 +844,17 @@ function render() {
     root.innerHTML = header() + '<div id="app"></div>' + problemsPanel();
     return;
   }
-  const today = now(), sh = sheet(data, plan.id, today), wk = weekView(data, plan.id, state.week, today);
-  const mine = wk.days.flatMap(d => d.sessions).filter(s => s.band === state.band);
+  // the week as the selected band does it: the plan's sessions and its own
+  const today = now(), sh = sheet(data, plan.id, today, state.band), wk = weekView(data, plan.id, state.week, today, state.band);
+  const mine = [...wk.days.flatMap(d => d.sessions), ...wk.week];
   ctx = { today, plan, sh, wk, session: mine.find(s => sessionKey(s) === state.sel) || mine[0] || null, km: kmView(data, plan.id, state.band, today), grid: gridView(data, plan.id, state.band, today), checks: checksView(data, plan.id, state.band, today) };
   // a session with no work written yet is offered suggestions; words typed in it narrow them
   const sn = ctx.session;
   ctx.sug = null;
   if (sn && !sn.main && !sn.unzoned) {
-    const r = suggestions(data, plan.id, state.band, sn.date, sn.slot, today, { place: sn.place, query: sn.text, zone: sn.text.trim() ? null : state.zone });
-    if (r.list.length || !sn.text.trim()) ctx.sug = { ...r, typed: !!sn.text.trim() };
+    const typed = (sn.title + ' ' + sn.text).trim();
+    const r = suggestions(data, plan.id, state.band, sn.date, sn.slot, today, { place: sn.place, week: sn.week, query: typed, zone: typed ? null : state.zone });
+    if (r.list.length || !typed) ctx.sug = { ...r, typed: !!typed };
   }
   root.innerHTML = header() + '<div id="app">' + (state.view === 'events' ? eventsView() : sheetView()) + '</div>' + popover() + problemsPanel();
 
@@ -820,8 +885,9 @@ function render() {
     if (el) {
       // what is being typed is kept as typed while it means the same as what was saved
       // (the plan text is laid out when it is shown: it is kept while it is what was stored)
-      const flat = t => String(t).replace(/\s+/g, ''), kept = fid === 's-text' && ctx && ctx.session ? flat(oneLine(held.value)) === flat(ctx.session.text) : squash(el.value) === squash(held.value);
-      if (typeof held.value === 'string' && el.value !== held.value && kept) el.value = held.value;
+      const flat = t => String(t).replace(/\s+/g, ''), box = fid === 's-text' && ctx && ctx.session ? readPlanBox(held.value) : null;
+      const kept = box ? flat(box.title) === flat(ctx.session.name) && flat(box.text) === flat(ctx.session.text) : squash(el.value) === squash(held.value);
+      if (typeof held.value === 'string' && el.value !== held.value && kept) { el.value = held.value; syncMirror(el); }
       el.focus();
       try { el.setSelectionRange(held.from, held.to); } catch (e) { /* not a text field */ }
       el.scrollTop = held.top;
@@ -845,8 +911,8 @@ function planAct(act, v) {
       const zones = ctx.sh.mesos[i].zones;
       change([f.cycles], () => setPlan(cycles.setMeso(plan, i, { zones: zones.includes(v) ? zones.filter(z => z !== v) : [...zones, v] })));
     } else if (act === 'm-left' || act === 'm-right') {
-      // a moved block carries its hand-set weeks and its sessions
-      change([f.cycles, f.weeks, f.sessions], () => {
+      // a moved block carries its hand-set weeks, its sessions and its week notes
+      change([f.cycles, f.weeks, f.sessions, ...(plan.notes.length ? [f.notes] : [])], () => {
         const r = cycles.moveMeso(plan, i, act === 'm-left' ? -1 : 1, ended, data.season.start);
         setPlan(r.plan);
         ed.i = r.index;
@@ -902,8 +968,15 @@ document.addEventListener('click', e => {
     f.id = 'sheet-frame';
     f.setAttribute('aria-hidden', 'true');
     f.style.cssText = 'position:fixed;width:0;height:0;border:0;visibility:hidden';
-    f.onload = () => { f.contentWindow.focus(); f.contentWindow.print(); };
-    f.srcdoc = sheetHtml(weekSheet(data, ctx.plan.id, state.band, state.week, ctx.today));
+    // printed once its fonts are in, or after a few seconds without them (no connection)
+    f.onload = () => {
+      const w = f.contentWindow, fonts = w.document && w.document.fonts;
+      Promise.race([fonts ? fonts.ready : null, new Promise(r => setTimeout(r, 3000))]).then(() => { w.focus(); w.print(); });
+    };
+    // in Portuguese, as the club hands it out, whatever the page's language
+    const was = getLang();
+    setLang('pt');
+    try { f.srcdoc = sheetHtml(weekSheet(data, ctx.plan.id, state.band, state.week, ctx.today)); } finally { setLang(was); }
     document.body.appendChild(f);
     return;
   }
@@ -923,7 +996,7 @@ document.addEventListener('click', e => {
     const x = ctx.sug && ctx.sug.list[+v], sn = ctx.session;
     if (x && sn) {
       state.zone = null;
-      change([planFiles(ctx.plan.id).sessions], () => setPlan(edits.putSession(ctx.plan, { ...sn, text: x.text, place: x.place, notes: sn.notes || x.notes })));
+      change([planFiles(ctx.plan.id).sessions], () => setPlan(edits.putSession(ctx.plan, { ...sn, title: sn.title || x.name || '', text: x.text, place: x.place, notes: sn.notes || x.notes })));
       const ta = document.querySelector('[data-fid="s-text"]');
       if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
     }
@@ -933,13 +1006,16 @@ document.addEventListener('click', e => {
   else if (act === 'edit-macro') { state.edit = { kind: 'macro', i: +v, week: weekAt(e, t, ctx.sh.macros[+v]) }; state.problems = false; }
   else if (/^m-|^mac-/.test(act)) { planAct(act, v); return; }
   else if (act === 'add') {
-    const s = { date: t.dataset.date, slot: nextSlot(ctx.plan.sessions, t.dataset.date, state.band), band: state.band, place: v, text: '', notes: '' };
+    const week = !!t.dataset.week;
+    // a new session is the plan's, done by every band
+    const s = { date: t.dataset.date, slot: nextSlot(ctx.plan.sessions, t.dataset.date, week), band: '', place: v, week, title: '', text: '', notes: '' };
     state.sel = sessionKey(s);
     state.zone = null;
     toSession = true;
     if (change([planFiles(ctx.plan.id).sessions], () => setPlan(edits.putSession(ctx.plan, s)))) {
+      // the cursor goes under the title, on the plan's first line
       const ta = document.querySelector('[data-fid="s-text"]');
-      if (ta) ta.focus();
+      if (ta) { ta.focus(); const at = ta.value.indexOf('\n') + 1; ta.setSelectionRange(at, at); }
     }
     return;
   }
@@ -969,7 +1045,7 @@ document.addEventListener('click', e => {
 
 // one field of the events table
 function eventField(el, typing) {
-  const id = el.dataset.ev, f = el.dataset.f, ids = data.plans.map(p => p.id);
+  const id = el.dataset.ev, f = el.dataset.f, ids = data.plans.map(p => p.id), names = eventNames().map(x => x.id);
   const ev = data.events.find(x => x.uid === id);
   if (!ev) return;
   let changes, how;
@@ -990,7 +1066,7 @@ function eventField(el, typing) {
   else if (f === 'kind' || f === 'type' || f === 'boats') changes = { [f]: el.value };
   else if (f.startsWith('plan:')) changes = { plan: { id: f.slice(5), value: ev.kind === 'race' ? (el.value ? +el.value : null) : (el.checked ? true : null) } };
   else return;
-  change(['events.txt'], () => { data.events = data.events.map(x => x === ev ? edits.setEvent(ev, changes, ids) : x); }, how);
+  change(['events.txt'], () => { data.events = data.events.map(x => x === ev ? edits.setEvent(ev, changes, ids, names) : x); }, how);
 }
 
 document.addEventListener('change', e => {
@@ -1005,7 +1081,14 @@ document.addEventListener('change', e => {
   else if (c === 'alt' && ctx.session) change([f.sessions], () => setPlan(edits.putSession(ctx.plan, { ...ctx.session, alt: el.checked })));
   else if (c === 'notdone' && ctx.session) change([f.sessions], () => setPlan(edits.putSession(ctx.plan, { ...ctx.session, notDone: el.checked })));
   else if (c === 'place' && ctx.session) change([f.sessions], () => setPlan(edits.putSession(ctx.plan, { ...ctx.session, place: el.value })));
+  else if (c === 'band' && ctx.session) change([f.sessions], () => setPlan(edits.putSession(ctx.plan, { ...ctx.session, band: el.value })));
 });
+
+// the copy behind the plan box scrolls with it
+document.addEventListener('scroll', e => {
+  const m = e.target.dataset && e.target.dataset.fid === 's-text' ? e.target.previousElementSibling : null;
+  if (m) m.scrollTop = e.target.scrollTop;
+}, true);
 
 document.addEventListener('input', e => {
   const el = e.target;
@@ -1017,9 +1100,16 @@ document.addEventListener('input', e => {
   if ((name === 'name' || name === 'mname') && state.edit) {
     if (!el.value.trim()) return;   // a block keeps its name while the field is empty
     change([f.cycles], () => setPlan(name === 'name' ? cycles.setMeso(ctx.plan, state.edit.i, { name: el.value }) : cycles.setMacroName(ctx.plan, state.edit.i, el.value)), typing);
-  } else if ((field === 'text' || field === 'notes') && ctx.session) {
-    // the plan text is shown a part a line and stored on one
-    change([f.sessions], () => setPlan(edits.putSession(ctx.plan, { ...ctx.session, [field]: field === 'text' ? oneLine(el.value) : el.value })), typing);
+  } else if (field === 'text' && ctx.session) {
+    // the first line is the title; the plan under it is shown a part a line and stored on one
+    syncMirror(el);
+    change([f.sessions], () => setPlan(edits.putSession(ctx.plan, { ...ctx.session, ...readPlanBox(el.value) })), typing);
+  } else if (field === 'notes' && ctx.session) {
+    change([f.sessions], () => setPlan(edits.putSession(ctx.plan, { ...ctx.session, notes: el.value })), typing);
+  } else if (/^wb?-(notes|phrase)$/.test(field)) {
+    // the plan's notes, or the selected band's own
+    const [who, kind] = field.split('-');
+    change([f.notes], () => setPlan(edits.setNotes(ctx.plan, ctx.wk.monday, who === 'wb' ? state.band : '', el.value, kind)), typing);
   } else if (field === 'load') {
     const w = ctx.wk, v = +el.value;
     if (!/^\d+$/.test(el.value.trim()) || v > 100 || w.type === null || (!w.hand && v === w.load)) return;

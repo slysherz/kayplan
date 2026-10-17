@@ -126,12 +126,13 @@ Zones each category trains, from the same table:
 
 Athletes are split by the races they do, not by age.
 
-- **A plan** holds everyone aiming at the same races. Individual athletes are not stored (section 6.5: no names in the repository); a plan only records which categories train in it. It has one set of macrocycles and mesocycles, one set of week types, and its own importance for each race.
-- **Inside a plan**, athletes of different categories share the cycles. Each category present in the plan is an **age band** with its own session text, yearly km and paces.
+- **A plan** holds everyone aiming at the same races. Individual athletes are not stored (section 6.5: no names in the repository); a plan only records which categories train in it. It has one set of macrocycles and mesocycles and one set of week types. Each of its bands keeps its own race calendar (decided with the coach on 2026-10-17): a race names a plan, meaning all its bands, or single bands, each with its importance.
+- **Inside a plan**, athletes of different categories share the cycles, the sessions and the week notes (decided with the coach on 2026-10-17: "the planning shared between juniors and seniors, and everyone below"). Each category present in the plan is an **age band** with its own yearly km, paces and zones. A session or a week note can still be written for one band only.
+- Km, checks, the capacity grid and suggestions are worked out per band, from the plan's sessions and the band's own, at the band's pace and against its zones.
 - **A new plan can start as a copy of another**, and then be changed. So two sets of athletes can share a structure exactly (same plan), follow similar structures (a copied plan), or have nothing in common (separate plans).
 - The selector at the top of the screen picks a plan and an age band.
 
-At level 1 the coach writes each age band's sessions. At level 3 a session written for one band can be scaled to the others (section 8.3).
+The coach writes a session once for the plan, or for one band when a band does something else. At level 3 a session written for one band can be scaled to the others (section 8.3).
 
 ### 4.2 What is stored
 
@@ -145,11 +146,13 @@ Season            first Monday, number of weeks
  ├─ Tables        zones, load % per week type, load patterns, hard-session km per content, reference volumes, thresholds
  ├─ Categories    yearly km, pace per zone
  └─ Plans         name, and which categories train in it (its age bands)
-      ├─ Races          which races the plan is aimed at, and the importance of each (1–3)
+      ├─ Races          which races the plan, or one of its bands, is aimed at, and the importance of each (1–3)
       ├─ Mesocycles     an ordered list; each has a name, a macrocycle, a length in weeks, contents (zones) and a load pattern
       │                 a macrocycle is a name and a run of consecutive mesocycles
       ├─ Week types     only for weeks whose type was set by hand
-      └─ Sessions       date, slot (morning or afternoon), age band, plan text, notes, "not done" mark
+      ├─ Sessions       date, place in the day's order, age band (none: the plan's, done by every band), place,
+      │                 plan text, notes, "not done" mark
+      └─ Week notes     the week's notes and phrase, the plan's or one band's
 ```
 
 Never stored, always worked out: which weeks each cycle covers, week types that follow a pattern, load %, a session's main zone and km, km estimates, and today.
@@ -217,7 +220,7 @@ A separate view: one editable table, like the one in [../provas.md](../provas.md
 | Kind | Race, test, camp, holiday, no water |
 | Race type | Sprint (regatas em linha), fundo or maratona. Races only. |
 | Boats | Solo, tripulações (crew boats) or mixed. Races only. |
-| Importance | 1 (most important) to 3, set per group. Races only. |
+| Importance | 1 (most important) to 3, set per plan or per band (a band's own comes first). Races only. |
 | Groups | Which groups it applies to |
 
 **How races are drawn.** Like the other cells of the sheet: a short text code in one neutral colour, with no icons and no extra colours. (Coloured badges that varied in size, colour and shape were tried and rejected as too busy.)
@@ -541,7 +544,7 @@ Asked for by the coach on 2026-10-04.
 
 Asked for by the coach on 2026-10-11, to match the sheet the club already hands out.
 
-- **Export** makes the selected band's week as one A4 page lying down: the club's name, the season and its months, the period and the week's dates, then a column a day with each session's place, text and notes.
+- **Export** makes the selected band's week (the plan's sessions and its own) as one A4 page lying down: the club's name, the season and its months, the period and the week's dates, then a column a day with each session's place, text and notes.
 - It is sent to the printer; saving as PDF there gives the file.
 - **Not built:** what the club's sheet has under the days (the sessions for those who do not go on the water, the warm-up, the gym tables, a quote). The plan has no place to write them yet.
 
@@ -549,7 +552,7 @@ Asked for by the coach on 2026-10-11, to match the sheet the club already hands 
 
 Decided with the coach on 2026-10-11, replacing morning and afternoon.
 
-- A day holds any number of sessions for a band, each in a place: water, gym, pool or run. They are shown and exported in the order they were added.
+- A day holds any number of sessions, each in a place: water, gym, pool or run. Each is the plan's or one band's; a band's day is the plan's sessions and its own. They are shown and exported in the order they were added.
 - A session can be marked as an alternative, done in place of the others (a longer gym session for those who do not go on the water). An alternative counts for nothing.
 - Where the course speaks of the morning and the afternoon, the tool reads first and after.
 

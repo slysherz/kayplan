@@ -12,7 +12,7 @@ test('the fixture loads without problems', async () => {
   assert.deepEqual(data.errors, []);
   assert.deepEqual(data.plans.map(p => [p.id, p.name, p.bands]), [['group-a', 'Group A', ['older', 'younger']], ['group-b', 'Group B', ['masters']]]);
   assert.deepEqual(e.check(data, '2026-01-21'), []);
-  assert.equal(Object.keys(data.revs).length, 12);
+  assert.equal(Object.keys(data.revs).length, 14);
 });
 
 test('plans come in the order season.txt lists them, the rest after by id', async () => {
@@ -104,7 +104,7 @@ test('a week: days with their sessions, main zones and done marks', async () => 
   assert.deepEqual(w.days.filter(d => d.today).map(d => d.weekday), [2]);
   assert.deepEqual(w.days.flatMap(d => d.sessions).map(s => [s.date, s.slot, s.band, s.main, s.status]), [
     ['2026-01-20', 1, 'older', 'R2', 'done'],
-    ['2026-01-20', 1, 'younger', null, 'done'],
+    ['2026-01-20', 2, 'younger', null, 'done'],
     ['2026-01-22', 1, 'older', 'R1', 'not done'],
     ['2026-01-24', 1, 'older', 'R6', 'planned']
   ]);
@@ -123,7 +123,7 @@ test('check: problems in the files, with the file and line', async () => {
   assert.deepEqual(problems(data), [
     'error events.txt:1 kind must be one of: race, test, camp, holiday, no-water',
     'error plans/group-a/cycles.txt:3 pattern must be one of: build, intro, restart, comp, recovery, none',
-    'error plans/group-a/sessions.txt:1 a session is written "date band: plan", like "2026-10-11 junior: 6km R1"'
+    'error plans/group-a/sessions.txt:1 a session is written "date: plan", or "date band: plan" for one band, like "2026-10-11: 6km R1" or "2026-10-11 junior gym: circuit"'
   ]);
   // the rest of the plan is still worked out
   assert.equal(e.sheet(data, 'group-a', '2026-01-21').weeks.length, 12);
@@ -137,7 +137,7 @@ test('check: a plan that does not add up', async () => {
     'plans/group-a/sessions.txt': '2026-01-20 older: 6km R1\n2026-01-20 older: 4km R1\n2026-01-20 guest: 4km R1\n2025-12-30 older: 4km R1\n'
   });
   assert.deepEqual(problems(data), [
-    'error events.txt:1 Spring regatta: there is no plan "group-c"',
+    'error events.txt:1 Spring regatta: there is no plan or band "group-c"',
     'warning events.txt:7 Late race (2026-05-01) is outside the season',
     'warning events.txt:7 Late race is in no plan',
     'error plans/group-a/cycles.txt the mesocycles cover 3 weeks and the season has 12',
@@ -220,7 +220,7 @@ Tue 2026-01-20
       note: crew boats on the last four
       note:
       note: watch the stroke rate
-  1 younger water · done · main zone none · 2x2000m
+  2 younger water · done · main zone none · 2x2000m
       no zone 4 km · 4.0 km
 Wed 2026-01-21 · today
 Thu 2026-01-22
@@ -236,7 +236,7 @@ Sat 2026-01-24
       check: R6: 2' of rest, below the recommended minimum of 3'
 Sun 2026-01-25`);
   const younger = weekReport(await load(), 'group-a', 3, '2026-01-21', 'younger');
-  assert.match(younger, /1 younger water/);
+  assert.match(younger, /2 younger water/);
   assert.doesNotMatch(younger, /older ·/);
   assert.match(weekReport(await load(), 'group-a', 1, '2026-01-21'), /week 1 · 2026-01-05 to 2026-01-11 · ended\n.* type I · load 60%\nkm older: 0\.0 of 93\.1 estimated \(load 60% × content 1\.00\)\nkm younger: 0\.0\n/);
   assert.match(weekReport(await load(), 'group-b', 9, '2026-01-21'), /type - · load -\nkm masters: 0\.0\n[^]*Sat 2026-03-07\n  M\+ Long race \(Sat 2026-03-07 to 2026-03-08, maratona, mixed, importance 3\)\nSun 2026-03-08\n  M\+ Long race/);

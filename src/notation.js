@@ -267,7 +267,7 @@ export function amountText(a) {
 // ---- the text laid out to be read (DESIGN.md 8.5) ---------------------------
 
 // the parts between the "+" that are outside brackets; the "+" of R3+ belongs to the zone
-function partsOf(t) {
+export function partsOf(t) {
   const out = [];
   let depth = 0, from = 0;
   for (let i = 0; i < t.length; i++) {

@@ -18,15 +18,15 @@ const USAGE = `usage: node kayplan.js <command> [options]
   show day [date]        what every plan does on one day; without a date, today
   show grid              the capacity grid: sessions a week per zone with their state, and km
   show checks            what the course would question about the sessions and weeks that are written
-  show suggestions <date> [n]   the sessions suggested for the band's nth session of a day (default: a new one), the most likely first
+  show suggestions <date> [n]   the sessions suggested for the nth session of a day in the plan (default: a new one), the most likely first
   show zone <zone>       what a zone is and how the course says to train it, e.g. show zone R3
   show types             what each week type is for, with its load
   show events            the races and events table
-  export week [n]        a week as the sheet that is handed out, as a page to print; needs --band when the plan has several
+  export week [n]        a week as the sheet that is handed out, as a page to print; needs --plan; with --band, that band's sheet
   check                  whether the plan is valid, plus the warnings
 
   --plan <id>            one plan (default: every plan)
-  --band <name>          show week, show grid, show checks, show suggestions: one age band (default: every band of the plan)
+  --band <name>          show season, show week, show grid, show checks, show suggestions, export week: one age band, with its own races (default: every band of the plan)
   --zone <zone>          show suggestions: every suggestion of one main zone
   --find <words>         show suggestions: every suggestion with these words
   --place <place>        show suggestions: pool, gym or land instead of the water
@@ -86,7 +86,7 @@ if (command === 'show events') {
   if (!isDate(words[2] || '') || (words[3] !== undefined && !/^[1-9]\d*$/.test(words[3]))) fail('show suggestions needs a date, like: show suggestions 2026-10-12');
   const ask = { zone: opts.zone ? opts.zone.toUpperCase() : undefined, query: opts.find, place: opts.place };
   const out = [];
-  for (const id of plans) { for (const b of planOf(data, id).bands) { if (opts.band === undefined || opts.band === b) out.push(suggestReport(data, id, b, words[2], words[3] ? +words[3] : nextSlot(planOf(data, id).sessions, words[2], b), today, ask)); } }
+  for (const id of plans) { for (const b of planOf(data, id).bands) { if (opts.band === undefined || opts.band === b) out.push(suggestReport(data, id, b, words[2], words[3] ? +words[3] : nextSlot(planOf(data, id).sessions, words[2]), today, ask)); } }
   if (!out.length) fail('no band "' + opts.band + '" in ' + plans.join(', '));
   console.log(out.join('\n\n'));
 } else if (command === 'show checks') {
@@ -95,7 +95,9 @@ if (command === 'show events') {
   if (!out.length) fail('no band "' + opts.band + '" in ' + plans.join(', '));
   console.log(out.join('\n\n'));
 } else if (command === 'show season') {
-  console.log(plans.map(id => seasonReport(data, id, today)).join('\n\n\n'));
+  const shown = opts.band !== undefined ? plans.filter(id => planOf(data, id).bands.includes(opts.band)) : plans;
+  if (!shown.length) fail('no band "' + opts.band + '" in ' + plans.join(', '));
+  console.log(shown.map(id => seasonReport(data, id, today, opts.band)).join('\n\n\n'));
 } else {
   let n;
   if (words[2] === undefined) {
@@ -108,11 +110,12 @@ if (command === 'show events') {
   const shown = opts.band !== undefined ? plans.filter(id => planOf(data, id).bands.includes(opts.band)) : plans;
   if (!shown.length) fail('no band "' + opts.band + '" in ' + plans.join(', '));
   if (command === 'export week') {
-    // one sheet: the plan's only band, or the one that was asked for
-    const id = shown.find(x => opts.band !== undefined || planOf(data, x).bands.length === 1);
-    if (shown.length !== 1 || !id) fail('export week needs one plan and one band: --plan <id> --band <name>');
+    // one sheet: the band that was asked for (the plan's sessions and its own), else the plan's
+    // sessions alone; in a plan of one band, that band's
+    if (shown.length !== 1) fail('export week needs one plan: --plan <id>, and --band <name> for one band');
+    const id = shown[0], bands = planOf(data, id).bands;
     setLang(opts.lang === 'en' ? 'en' : 'pt');
-    const sh = weekSheet(data, id, opts.band || planOf(data, id).bands[0], n, today), file = opts.out || sh.file.replace(/[\/\\]/g, '-') + '.html';
+    const sh = weekSheet(data, id, opts.band || (bands.length === 1 ? bands[0] : ''), n, today), file = opts.out || sh.file.replace(/[\/\\]/g, '-') + '.html';
     fs.writeFileSync(file, sheetHtml(sh));
     console.log(file);
     process.exit(0);

@@ -3,7 +3,8 @@
 // Using one copies its text into the slot; nothing links the two afterwards.
 
 import { infer, ZONES } from './notation.js';
-import { sheet, sessionView, weekOf } from './engine.js';
+import { addDays } from './dates.js';
+import { sheet, bandSessions, weekOf } from './engine.js';
 import { contents } from './grid.js';
 import { tooClose, wrongHalf } from './checks.js';
 import { CONTENT_ZONES } from './cycles.js';
@@ -21,8 +22,9 @@ const same = t => String(t || '').replace(/\s+/g, ' ').trim().toLowerCase();
 
 // Suggestions for one slot of one band.
 //
-// ask: { place, zone, query, limit }
+// ask: { place, week, zone, query, limit }
 //   place   the place the session is set to; the water unless given
+//   week    the slot is a session of the whole week that starts on date
 //   zone    every suggestion of this main zone, whatever the week is for
 //   query   every suggestion with these words in its name, text, zone, place or notes, whatever the week and place
 //   limit   how many to list; SHOWN when neither zone nor query is given, all of them otherwise
@@ -46,16 +48,17 @@ const same = t => String(t || '').replace(/\s+/g, ' ').trim().toLowerCase();
 // A session that clashes comes after all the others.
 export function suggestions(data, planId, band, date, slot, today, ask) {
   ask = ask || {};
-  const sh = sheet(data, planId, today), tables = data.tables, n = weekOf(data.season, date);
+  const sh = sheet(data, planId, today, band), tables = data.tables, n = weekOf(data.season, date);
   const wk = n ? sh.weeks[n - 1] : null, meso = wk && wk.meso !== null ? sh.mesos[wk.meso] : null;
-  const allowed = tables.zones[band] || null, here = { date, slot, band };
-  const mine = sh.plan.sessions.filter(s => s.band === band && counted(s) && sessionKey(s) !== sessionKey(here) && same(s.text)).map(s => sessionView(data, s, today));
+  const allowed = tables.zones[band] || null, here = { date, slot, band, week: !!ask.week };
+  // what the band has had: the plan's sessions and its own
+  const mine = bandSessions(data, sh.plan, band, today).filter(s => counted(s) && sessionKey(s) !== sessionKey(here) && same(s.text));
   const earlier = s => s.date < date || (s.date === date && s.slot < slot);
 
   // every different text once: the band's own sessions, then the library
   const found = new Map();
   for (const s of mine) {
-    const key = plain(s.text) + '|' + s.place, c = found.get(key) || { text: s.text, place: s.place, notes: s.notes, name: '', used: null, order: Infinity };
+    const key = plain(s.text) + '|' + s.place, c = found.get(key) || { text: s.text, place: s.place, notes: s.notes, name: s.title || '', used: null, order: Infinity };
     if (earlier(s) && (!c.used || s.date > c.used)) c.used = s.date;
     found.set(key, c);
   }
@@ -65,7 +68,8 @@ export function suggestions(data, planId, band, date, slot, today, ask) {
   });
 
   // where: a place that was chosen; else off the water on a day with no water; else the water
-  const dry = (wk ? wk.events : []).some(e => e.kind === 'no-water' && e.date <= date && e.to >= date);
+  // a session of the whole week is dry only when the whole week is
+  const dry = (wk ? wk.events : []).some(e => e.kind === 'no-water' && e.date <= date && e.to >= (ask.week ? addDays(date, 6) : date));
   const places = ask.place && ask.place !== 'water' ? [ask.place] : dry ? ['pool', 'gym', 'land'] : ['water'];
   const words = same(ask.query).split(' ').filter(Boolean);
   const light = wk && LIGHT[wk.type] ? LIGHT[wk.type] : null;
@@ -85,7 +89,7 @@ export function suggestions(data, planId, band, date, slot, today, ask) {
     const part = v.parts.find(p => p.zone === v.main);
     const as = { ...here, main: v.main, place: c.place };
     const clash = mine.some(o => earlier(o) ? tooClose(o, as, tables) > 0 : tooClose(as, o, tables) > 0) ||
-      mine.some(o => o.date === date && o.slot !== slot && (slot < o.slot ? wrongHalf(as, o) : wrongHalf(o, as)));
+      mine.some(o => o.date === date && !o.week && !ask.week && o.slot !== slot && (slot < o.slot ? wrongHalf(as, o) : wrongHalf(o, as)));
     list.push({ text: c.text, place: c.place, notes: c.notes, name: c.name, main: v.main, min: part ? part.min : v.offMin, share: part ? part.share : 0, used: c.used, order: c.order, clash });
   }
 

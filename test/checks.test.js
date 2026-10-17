@@ -133,5 +133,5 @@ week 3
   assert.equal(checksReport(data, 'group-b', 'masters', '2026-01-21'), 'group-b · masters · what the course would question\nnothing');
   const c = checksView(data, 'group-a', 'older', '2026-01-21');
   assert.deepEqual(c.map(x => x.count).filter(Boolean), [1]);
-  assert.deepEqual(Object.keys(c[2].sessions), ['2026-01-24 1 older']);
+  assert.deepEqual(Object.keys(c[2].sessions), ['2026-01-24 1']);
 });

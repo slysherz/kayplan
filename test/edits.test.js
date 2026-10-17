@@ -24,16 +24,16 @@ test('a week set by hand, and back to its pattern', () => {
 
 test('sessions: add, replace, remove', () => {
   const added = ed.putSession(plan(), { date: '2026-01-21', slot: 1, band: 'younger', text: ' 4km\n R1 ', notes: 'easy' });
-  assert.deepEqual(added.sessions[1], { date: '2026-01-21', slot: 1, band: 'younger', place: 'water', alt: false, notDone: false, text: '4km R1', notes: 'easy' });
+  assert.deepEqual(added.sessions[1], { date: '2026-01-21', slot: 1, band: 'younger', place: 'water', week: false, alt: false, notDone: false, title: '', text: '4km R1', notes: 'easy' });
   const replaced = ed.putSession(plan(), { date: '2026-01-20', slot: 1, band: 'older', text: '8km R1', notDone: true });
-  assert.deepEqual(replaced.sessions, [{ date: '2026-01-20', slot: 1, band: 'older', place: 'water', alt: false, notDone: true, text: '8km R1', notes: '' }]);
+  assert.deepEqual(replaced.sessions, [{ date: '2026-01-20', slot: 1, band: 'older', place: 'water', week: false, alt: false, notDone: true, title: '', text: '8km R1', notes: '' }]);
   // with no place in the day's order it comes after the band's others; any number on a day
   const more = ed.putSession(ed.putSession(plan(), { date: '2026-01-20', band: 'older', place: 'gym', text: 'circuit' }), { date: '2026-01-20', band: 'older', place: 'gym', alt: true, text: 'long circuit' });
   assert.deepEqual(more.sessions.map(s => [s.slot, s.place, s.alt]), [[1, undefined, undefined], [2, 'gym', false], [3, 'gym', true]]);
   // removing one moves the later ones up
-  assert.deepEqual(ed.removeSession(more, '2026-01-20 2 older').sessions.map(s => [s.slot, s.text]), [[1, plan().sessions[0].text], [2, 'long circuit']]);
-  assert.deepEqual(ed.removeSession(plan(), '2026-01-20 1 older').sessions, []);
-  assert.equal(ed.removeSession(plan(), '2026-01-20 2 older').sessions.length, 1);
+  assert.deepEqual(ed.removeSession(more, '2026-01-20 2').sessions.map(s => [s.slot, s.text]), [[1, plan().sessions[0].text], [2, 'long circuit']]);
+  assert.deepEqual(ed.removeSession(plan(), '2026-01-20 1').sessions, []);
+  assert.equal(ed.removeSession(plan(), '2026-01-20 2').sessions.length, 1);
   assert.equal(ed.putSession(plan(), { date: '2026-01-20', slot: 1, band: 'older', place: 'pool', text: "30' R2" }).sessions[0].place, 'pool');
   assert.throws(() => ed.putSession(plan(), { date: '2026-01-20', slot: 1, band: 'older', place: 'lake', text: '' }), /on the water, or in the pool/);
   assert.throws(() => ed.putSession(plan(), { date: '2026-01-20', slot: 1, band: 'guest', text: '' }), /no band "guest"/);
@@ -70,7 +70,7 @@ test('events: which plans, and how important', () => {
   assert.deepEqual(r.plans, { 'group-b': 3 });
   assert.deepEqual(ed.setEvent(r, { plan: { id: 'group-b', value: null } }, IDS).plans, {});
   assert.throws(() => ed.setEvent(race(), { plan: { id: 'group-a', value: 4 } }, IDS), /1, 2 or 3/);
-  assert.throws(() => ed.setEvent(race(), { plan: { id: 'group-z', value: 1 } }, IDS), /no plan "group-z"/);
+  assert.throws(() => ed.setEvent(race(), { plan: { id: 'group-z', value: 1 } }, IDS), /no plan or band "group-z"/);
 
   // an event that is not a race: every plan (no list), or some of them
   const camp = { date: '2026-02-16', until: null, confirmed: true, name: 'Camp', place: '', kind: 'camp', type: null, boats: null, plans: null };
